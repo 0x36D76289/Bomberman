@@ -1,3 +1,5 @@
+use glam::Vec2;
+
 pub enum BombState {
     // TODO: Define the states of a bomb
     Planted,

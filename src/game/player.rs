@@ -1,3 +1,8 @@
+use super::direction::Direction;
+use glam::Vec2;
+
+const PLAYER_RADIUS: f32 = 0.4;
+
 pub struct Player {
     pub id: u32,
     pub position: Vec2,
