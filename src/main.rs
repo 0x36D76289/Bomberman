@@ -1,6 +1,8 @@
 mod game;
+mod settings;
 
 use game::state::State;
+use settings::fps::FpsManager;
 use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
@@ -14,6 +16,7 @@ use winit::{
 struct App {
     rcx: Option<RenderContext>,
     state: State,
+    fps: FpsManager,
 }
 
 pub struct RenderContext {
@@ -32,6 +35,7 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // TODO: main loop
+        //
         // TODO: render
 
         // Event Handling
@@ -61,6 +65,9 @@ impl ApplicationHandler for App {
             }
             _ => (),
         }
+
+        // end of frame
+        self.fps.register_frame();
     }
 }
 
