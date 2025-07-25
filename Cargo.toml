@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 glam = "0.30.4"
 vulkano = "0.35.1"
+vulkano-shaders = "0.35.0"
 winit = "0.30.11"
