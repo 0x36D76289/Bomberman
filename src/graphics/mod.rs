@@ -4,7 +4,7 @@ pub mod render;
 
 pub use init::window_size_dependent_setup;
 
-use std::sync::Arc;
+use std::{hash::Hash, sync::Arc};
 use vulkano::{
     buffer::{BufferContents, Subbuffer, allocator::SubbufferAllocator},
     command_buffer::allocator::StandardCommandBufferAllocator,
@@ -58,4 +58,40 @@ pub struct MyVertex {
     #[format(R32G32_SFLOAT)]
     #[name("in_uv")]
     pub uv: [f32; 2],
+}
+
+impl PartialEq for MyVertex {
+    fn eq(&self, other: &Self) -> bool {
+        let iter_self = self
+            .position
+            .iter()
+            .chain(self.normal.iter())
+            .chain(self.uv.iter());
+        let iter_other = other
+            .position
+            .iter()
+            .chain(other.normal.iter())
+            .chain(other.uv.iter());
+        for (s, o) in iter_self.zip(iter_other) {
+            if s.to_bits() != o.to_bits() {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for MyVertex {}
+
+impl Hash for MyVertex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for v in self
+            .position
+            .iter()
+            .chain(self.normal.iter())
+            .chain(self.uv.iter())
+        {
+            v.to_bits().hash(state);
+        }
+    }
 }
