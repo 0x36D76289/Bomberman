@@ -45,6 +45,7 @@ impl ApplicationHandler for App {
                 rcx.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                println!("{event:?}");
                 #[cfg(debug_assertions)]
                 if event.state.is_pressed() && event.repeat == false {
                     if event.physical_key == KeyCode::Space {
