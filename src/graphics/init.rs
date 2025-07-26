@@ -1,15 +1,16 @@
+use crate::graphics::{MyVertex, RenderContext, Vulkan};
 use std::{error::Error, sync::Arc};
 use vulkano::{
     VulkanLibrary,
     buffer::{
-        Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer,
+        Buffer, BufferCreateInfo, BufferUsage,
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
     },
     command_buffer::allocator::StandardCommandBufferAllocator,
     descriptor_set::allocator::StandardDescriptorSetAllocator,
     device::{
-        Device, DeviceCreateInfo, DeviceExtensions, DeviceOwned, Queue, QueueCreateInfo,
-        QueueFlags, physical::PhysicalDeviceType,
+        Device, DeviceCreateInfo, DeviceExtensions, DeviceOwned, QueueCreateInfo, QueueFlags,
+        physical::PhysicalDeviceType,
     },
     format::Format,
     image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
@@ -39,57 +40,6 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
     window::Window,
 };
-
-pub struct Vulkan {
-    pub instance: Arc<Instance>,
-    pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-    pub memory_allocator: Arc<StandardMemoryAllocator>,
-    pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
-    pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-    pub uniform_buffer_allocator: SubbufferAllocator,
-    pub vertex_buffer: Subbuffer<[MyVertex]>,
-    // pub index_buffer: Subbuffer<[u32]>,
-}
-
-pub struct RenderContext {
-    pub window: Arc<Window>,
-    pub swapchain: Arc<Swapchain>,
-    pub render_pass: Arc<RenderPass>,
-    pub framebuffers: Vec<Arc<Framebuffer>>,
-    pub vs: EntryPoint,
-    pub fs: EntryPoint,
-    pub pipeline: Arc<GraphicsPipeline>,
-    pub recreate_swapchain: bool,
-    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
-}
-
-// #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
-// #[repr(C)]
-// pub struct MyVertex {
-//     #[format(R32G32B32_SFLOAT)]
-//     #[name("in_position")]
-//     pub position: [f32; 3],
-
-//     #[format(R32G32B32_SFLOAT)]
-//     #[name("in_normal")]
-//     pub normal: [f32; 3],
-
-//     #[format(R32G32B32_SFLOAT)]
-//     #[name("in_color")]
-//     pub color: [f32; 3],
-
-//     #[format(R32G32_SFLOAT)]
-//     #[name("in_texture")]
-//     pub texture: [f32; 2],
-// }
-
-#[derive(BufferContents, Vertex)]
-#[repr(C)]
-pub struct MyVertex {
-    #[format(R32G32_SFLOAT)]
-    position: [f32; 2],
-}
 
 impl Vulkan {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
@@ -194,17 +144,7 @@ impl Vulkan {
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
-            [
-                MyVertex {
-                    position: [-0.5, -0.25],
-                },
-                MyVertex {
-                    position: [0.0, 0.5],
-                },
-                MyVertex {
-                    position: [0.25, -0.1],
-                },
-            ],
+            [],
         )?;
 
         // let index_buffer = Buffer::from_iter(
