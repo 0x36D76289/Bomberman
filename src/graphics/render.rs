@@ -1,7 +1,12 @@
-use crate::{app::App, graphics::window_size_dependent_setup};
+use crate::{
+    app::App,
+    graphics::{vs, window_size_dependent_setup},
+};
 use vulkano::{
     Validated, VulkanError,
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo},
+    descriptor_set::{DescriptorSet, WriteDescriptorSet},
+    pipeline::{Pipeline, PipelineBindPoint},
     swapchain::{SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image},
     sync::{self, GpuFuture},
 };
@@ -39,15 +44,6 @@ impl App {
             rcx.recreate_swapchain = false;
         }
 
-        // let layout = &rcx.pipeline.layout().set_layouts()[0];
-        // let descriptor_set = DescriptorSet::new(
-        //     vulkan.descriptor_set_allocator.clone(),
-        //     layout.clone(),
-        //     [],
-        //     [],
-        // )
-        // .unwrap();
-
         let (image_index, suboptimal, acquire_future) =
             match acquire_next_image(rcx.swapchain.clone(), None).map_err(Validated::unwrap) {
                 Ok(r) => r,
@@ -81,10 +77,55 @@ impl App {
             )
             .unwrap()
             .bind_pipeline_graphics(rcx.pipeline.clone())
-            .unwrap()
-            .bind_vertex_buffers(0, vulkan.vertex_buffer.clone())
             .unwrap();
-        unsafe { builder.draw(vulkan.vertex_buffer.len() as u32, 1, 0, 0) }.unwrap();
+
+        let aspect_ratio =
+            rcx.swapchain.image_extent()[0] as f32 / rcx.swapchain.image_extent()[1] as f32;
+        self.camera.set_perspective_projection(0.87, aspect_ratio, 0.1, 10.0);
+
+        for object in self.objects.iter() {
+            let uniform_buffer = {
+                let uniform_data = vs::Data {
+                    world: object.transform.mat4().to_cols_array_2d(),
+                    view: self.camera.view_matrix.to_cols_array_2d(),
+                    proj: self.camera.projection_matrix.to_cols_array_2d(),
+                    color: object.color.to_array()
+                };
+
+                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+                *buffer.write().unwrap() = uniform_data;
+
+                buffer
+            };
+
+            let layout = &rcx.pipeline.layout().set_layouts()[0];
+            let descriptor_set = DescriptorSet::new(
+                vulkan.descriptor_set_allocator.clone(),
+                layout.clone(),
+                [WriteDescriptorSet::buffer(0, uniform_buffer)],
+                [],
+            )
+            .unwrap();
+
+            builder
+                .bind_descriptor_sets(
+                    PipelineBindPoint::Graphics,
+                    rcx.pipeline.layout().clone(),
+                    0,
+                    descriptor_set,
+                )
+                .unwrap()
+                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+                .unwrap()
+                .bind_index_buffer(object.model.index_buffer.clone())
+                .unwrap();
+
+            unsafe {
+                builder
+                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+                    .unwrap();
+            }
+        }
 
         builder.end_render_pass(Default::default()).unwrap();
 

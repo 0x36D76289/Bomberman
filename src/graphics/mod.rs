@@ -1,12 +1,19 @@
+pub mod camera;
 pub mod init;
 pub mod model;
+pub mod object;
 pub mod render;
 
-pub use init::window_size_dependent_setup;
+pub use {
+    camera::Camera,
+    init::{vs, window_size_dependent_setup},
+    model::Model,
+    object::{GameObject, Transform},
+};
 
 use std::{hash::Hash, sync::Arc};
 use vulkano::{
-    buffer::{BufferContents, Subbuffer, allocator::SubbufferAllocator},
+    buffer::{BufferContents, allocator::SubbufferAllocator},
     command_buffer::allocator::StandardCommandBufferAllocator,
     descriptor_set::allocator::StandardDescriptorSetAllocator,
     device::{Device, Queue},
@@ -28,8 +35,6 @@ pub struct Vulkan {
     pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub uniform_buffer_allocator: SubbufferAllocator,
-    pub vertex_buffer: Subbuffer<[MyVertex]>,
-    // pub index_buffer: Subbuffer<[u32]>,
 }
 
 pub struct RenderContext {

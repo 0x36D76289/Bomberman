@@ -1,6 +1,8 @@
 use crate::game::state::State;
-use crate::graphics::{RenderContext, Vulkan};
+use crate::graphics::{Camera, GameObject, Model, RenderContext, Transform, Vulkan};
+use glam::Vec3;
 use std::error::Error;
+use std::sync::Arc;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -11,15 +13,52 @@ use winit::{
 
 pub struct App {
     pub state: State,
+    pub camera: Camera,
+    pub objects: Vec<GameObject>,
     pub vulkan: Vulkan,
     pub rcx: Option<RenderContext>,
 }
 
 impl App {
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
+        let vulkan = Vulkan::init(event_loop)?;
+
+        let link_model = Arc::new(Model::load(
+            "src/assets/link.obj",
+            vulkan.memory_allocator.clone(),
+        )?);
+        let miku_model = Arc::new(Model::load(
+            "src/assets/miku.obj",
+            vulkan.memory_allocator.clone(),
+        )?);
+        let link = GameObject {
+            model: link_model.clone(),
+            transform: Transform {
+                translation: Vec3::new(-0.2, 0.0, 0.0),
+                scale: Vec3::splat(0.02),
+                rotation: Vec3::splat(0.0)
+            },
+            color: Vec3::new(1.0, 0.0, 0.0)
+        };
+        let miku = GameObject {
+            model: miku_model.clone(),
+            transform: Transform {
+                translation: Vec3::new(0.2, 0.0, 0.0),
+                scale: Vec3::splat(0.03),
+                rotation: Vec3::splat(0.0)
+            },
+            color: Vec3::new(0.0, 0.0, 1.0)
+        };
+        let objects = vec![link, miku];
+
+        let mut camera = Camera::new();
+        camera.set_view_target(Vec3::new(0.0, 0.0, -1.0), Vec3::splat(0.0));
+
         Ok(Self {
             state: State::default(),
-            vulkan: Vulkan::init(event_loop)?,
+            camera,
+            objects,
+            vulkan,
             rcx: None,
         })
     }
@@ -39,10 +78,10 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
+            WindowEvent::Resized(_) => self.rcx.as_mut().unwrap().recreate_swapchain = true,
             WindowEvent::RedrawRequested => {
                 self.draw_frame();
-                let rcx = self.rcx.as_mut().unwrap();
-                rcx.window.request_redraw();
+                self.rcx.as_ref().unwrap().window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 println!("{event:?}");
