@@ -1,4 +1,5 @@
-use crate::graphics::{MyVertex, RenderContext, Vulkan};
+use crate::graphics::{Camera, Model, MyVertex, RenderContext, Vulkan};
+use glam::Vec3;
 use std::{error::Error, sync::Arc};
 use vulkano::{
     VulkanLibrary,
@@ -132,35 +133,6 @@ impl Vulkan {
             },
         );
 
-        // creating the vertex and index buffers
-        let vertex_buffer = Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            [],
-        )?;
-
-        // let index_buffer = Buffer::from_iter(
-        //     memory_allocator.clone(),
-        //     BufferCreateInfo {
-        //         usage: BufferUsage::INDEX_BUFFER,
-        //         ..Default::default()
-        //     },
-        //     AllocationCreateInfo {
-        //         memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-        //             | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-        //         ..Default::default()
-        //     },
-        //     object.indice.clone(),
-        // )?;
-
         Ok(Self {
             instance,
             device,
@@ -169,8 +141,6 @@ impl Vulkan {
             descriptor_set_allocator,
             command_buffer_allocator,
             uniform_buffer_allocator,
-            vertex_buffer,
-            // index_buffer
         })
     }
 }
@@ -276,6 +246,7 @@ impl RenderContext {
 
         let recreate_swapchain = false;
         let previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
+
         Ok(RenderContext {
             window,
             swapchain,
@@ -385,14 +356,14 @@ pub fn window_size_dependent_setup(
     (framebuffers, pipeline)
 }
 
-mod vs {
+pub mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         path: "src/shaders/vertex.glsl"
     }
 }
 
-mod fs {
+pub mod fs {
     vulkano_shaders::shader! {
         ty: "fragment",
         path: "src/shaders/fragment.glsl"
