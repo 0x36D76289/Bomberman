@@ -14,6 +14,7 @@ impl Camera {
     }
 
     pub fn set_perspective_projection(&mut self, fovy: f32, aspect: f32, near: f32, far: f32) {
+        assert!((aspect - f32::EPSILON).abs() > 0.0);
         let tan_half_fovy = (fovy / 2.0).tan();
         let a = 1.0 / (aspect * tan_half_fovy);
         let b = 1.0 / tan_half_fovy;
@@ -30,8 +31,8 @@ impl Camera {
 
     pub fn set_view_direction(&mut self, position: Vec3, direction: Vec3) {
         let up = Vec3::new(0.0, -1.0, 0.0);
-        let w = Vec3::normalize(direction);
-        let u = Vec3::normalize(w.cross(up));
+        let w = direction.normalize();
+        let u = w.cross(up).normalize();
         let v = w.cross(u);
 
         self.view_matrix = Mat4::from_cols(
