@@ -1,3 +1,5 @@
+#![allow(dead_code, unused)]
+
 mod app;
 mod game;
 mod graphics;
@@ -9,6 +11,6 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = App::new(&event_loop).unwrap();
+    let mut app = App::init(&event_loop).unwrap();
     event_loop.run_app(&mut app).unwrap();
 }

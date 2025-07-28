@@ -20,48 +20,56 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
+    pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let vulkan = Vulkan::init(event_loop)?;
 
-        let link_model = Arc::new(Model::load(
-            "src/assets/link.obj",
-            vulkan.memory_allocator.clone(),
-        )?);
-        let miku_model = Arc::new(Model::load(
-            "src/assets/miku.obj",
-            vulkan.memory_allocator.clone(),
-        )?);
-        let link = GameObject {
-            model: link_model.clone(),
-            transform: Transform {
-                translation: Vec3::new(-0.2, 0.0, 0.0),
-                scale: Vec3::splat(0.02),
-                rotation: Vec3::splat(0.0)
-            },
-            color: Vec3::new(1.0, 0.0, 0.0)
-        };
-        let miku = GameObject {
-            model: miku_model.clone(),
-            transform: Transform {
-                translation: Vec3::new(0.2, 0.0, 0.0),
-                scale: Vec3::splat(0.03),
-                rotation: Vec3::splat(0.0)
-            },
-            color: Vec3::new(0.0, 0.0, 1.0)
-        };
-        let objects = vec![link, miku];
+        let state = State::default();
+
+        let objects = load_game_objects(&vulkan)?;
 
         let mut camera = Camera::new();
-        camera.set_view_target(Vec3::new(0.0, 0.0, -1.0), Vec3::splat(0.0));
+        camera.set_view_target(Vec3::new(1.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 0.0));
 
         Ok(Self {
-            state: State::default(),
+            state,
             camera,
             objects,
             vulkan,
             rcx: None,
         })
     }
+}
+
+fn load_game_objects(vulkan: &Vulkan) -> Result<Vec<GameObject>, Box<dyn Error>> {
+    let link_model = Arc::new(Model::load(
+        "src/assets/link.obj",
+        vulkan.memory_allocator.clone(),
+    )?);
+    let miku_model = Arc::new(Model::load(
+        "src/assets/miku.obj",
+        vulkan.memory_allocator.clone(),
+    )?);
+    let link = GameObject {
+        model: link_model.clone(),
+        transform: Transform {
+            translation: Vec3::new(0.0, 0.0, 0.0),
+            scale: Vec3::splat(0.02),
+            rotation: Vec3::splat(0.0)
+        },
+        color: Vec3::new(1.0, 0.0, 0.0)
+    };
+    let miku = GameObject {
+        model: miku_model.clone(),
+        transform: Transform {
+            translation: Vec3::new(0.2, 0.0, 0.0),
+            scale: Vec3::splat(0.03),
+            rotation: Vec3::splat(0.0)
+        },
+        color: Vec3::new(0.0, 0.0, 1.0)
+    };
+    let objects = vec![link, miku];
+
+    Ok(objects)
 }
 
 impl ApplicationHandler for App {
