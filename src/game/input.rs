@@ -13,6 +13,7 @@ pub struct Input {
     pub down: InputState,
     pub left: InputState,
     pub right: InputState,
+    pub bomb: InputState,
 }
 
 impl Default for Input {
@@ -22,6 +23,7 @@ impl Default for Input {
             down: InputState::Released,
             left: InputState::Released,
             right: InputState::Released,
+            bomb: InputState::Released,
         }
     }
 }

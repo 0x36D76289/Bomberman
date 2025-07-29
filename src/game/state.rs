@@ -53,6 +53,12 @@ impl State {
             let pos: usize = y * (self.map.width + 1) + x;
             display.replace_range(pos..pos + 1, "+");
         }
+        for bomb in &self.bombs {
+            let y: usize = bomb.position.y as usize;
+            let x: usize = bomb.position.x as usize;
+            let pos: usize = y * (self.map.width + 1) + x;
+            display.replace_range(pos..pos + 1, "O");
+        }
 
         print!("{}", display);
     }
@@ -119,17 +125,38 @@ impl State {
             }
             None => (),
         }
+        match self.keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
+            Some(state) => {
+                if state.is_pressed() {
+                    if self.inputs[0].bomb == InputState::Released {
+                        self.inputs[0].bomb = InputState::Pressed;
+                    } else {
+                        self.inputs[0].bomb = InputState::Held;
+                    }
+                } else {
+                    self.inputs[0].bomb = InputState::Released;
+                }
+            }
+            None => (),
+        }
     }
 
     fn mp_game_tick(&mut self, delta: f32) {
         //update inputs
         self.update_inputs();
-        // println!("{:#?}", self.inputs[0]);
-        //send inputs to each player move function
+        // tick bombs
+        // for player in players: summon bomb if Pressed
+        for i in 0..self.players.len() {
+            if self.inputs[i].bomb == InputState::Pressed {
+                match self.players[i].create_bomb() {
+                    Some(bomb) => self.bombs.push(bomb),
+                    None => (),
+                }
+            }
+        }
         for i in 0..self.players.len() {
             self.players[i].player_move(self.inputs[i], delta, &self.map, &self.bombs);
         }
-        // println!("frametime: {}", delta);
     }
 
     pub fn tick(&mut self) {
