@@ -32,6 +32,7 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // TODO: main loop
+        self.state.tick();
         // TODO: render
 
         // Event Handling
@@ -45,6 +46,7 @@ impl ApplicationHandler for App {
                 rcx.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                self.state.record_key(event.physical_key, event.state);
                 #[cfg(debug_assertions)]
                 if event.state.is_pressed() && event.repeat == false {
                     if event.physical_key == KeyCode::Space {
@@ -57,5 +59,6 @@ impl ApplicationHandler for App {
             }
             _ => (),
         }
+        self.state.fps.register_frame();
     }
 }
