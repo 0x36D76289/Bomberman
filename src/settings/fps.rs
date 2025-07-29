@@ -14,6 +14,7 @@ impl FpsManager {
             duration.unwrap_or_else(|_x| -> Duration { Duration::new(0, 1000) });
 
         self.delta = duration.as_secs_f32();
+        self.last_frame = now;
     }
 
     pub fn get_delta(&self) -> f32 {

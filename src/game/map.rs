@@ -1,5 +1,5 @@
-#[derive(Clone, Debug)]
-enum MapElement {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MapElement {
     Empty,
     Breakable,
     Unbreakable,
@@ -16,9 +16,9 @@ impl MapElement {
 }
 
 pub struct Map {
-    width: usize,
-    height: usize,
-    content: Vec<MapElement>,
+    pub width: usize,
+    pub height: usize,
+    pub content: Vec<MapElement>,
 }
 
 impl Map {
