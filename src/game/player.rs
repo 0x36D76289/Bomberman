@@ -93,7 +93,22 @@ impl Player {
         //TODO:
         //collide players
         //collide bombs
+        // check if bomb is ours and has collision disabled
         //collide powerups
+    }
+
+    pub fn create_bomb(&mut self) -> Option<Bomb> {
+        if self.bombs_remaining == 0 {
+            return None;
+        }
+        //check position
+        //check position is bomb
+        self.bombs_remaining -= 1;
+        return Some(Bomb::new(
+            self.id,
+            self.position.x as usize,
+            self.position.y as usize,
+        ));
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &Vec<Bomb>) {
