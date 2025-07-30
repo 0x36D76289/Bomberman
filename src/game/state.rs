@@ -145,6 +145,9 @@ impl State {
         //update inputs
         self.update_inputs();
         // tick bombs
+        for bomb in &mut self.bombs {
+            bomb.tick(&self.players);
+        }
         // for player in players: summon bomb if Pressed
         for i in 0..self.players.len() {
             if self.inputs[i].bomb == InputState::Pressed {

@@ -43,10 +43,13 @@ impl Player {
         self.position.y = self.position.y.min(height as f32 - PLAYER_RADIUS);
     }
 
+    pub fn is_colliding(&self, pos: Vec2, radius: f32) -> bool {
+        return ((self.position.x - pos.x).abs() < (PLAYER_RADIUS + radius))
+            && ((self.position.y - pos.y).abs() < (PLAYER_RADIUS + radius));
+    }
+
     fn resolve_collision(&mut self, pos: Vec2, radius: f32, direction: Direction) {
-        if ((self.position.x - pos.x).abs() >= (PLAYER_RADIUS + radius))
-            || ((self.position.y - pos.y).abs() >= (PLAYER_RADIUS + radius))
-        {
+        if !self.is_colliding(pos, radius) {
             return;
         }
         match direction {
@@ -87,9 +90,15 @@ impl Player {
         }
     }
 
-    fn handle_collisions(&mut self, map: &Map, direction: Direction) {
+    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &Vec<Bomb>) {
         self.bound(map.width, map.height);
         self.collide_map(map, direction);
+        for bomb in bombs {
+            if bomb.owner_id == self.id && !bomb.collision_enabled {
+                continue;
+            }
+            self.resolve_collision(bomb.position, 0.5, direction);
+        }
         //TODO:
         //collide players
         //collide bombs
@@ -102,7 +111,9 @@ impl Player {
             return None;
         }
         //check position
-        //check position is bomb
+        //TODO:
+        // check position doesn't have another player
+        // check position isn't already bomb
         self.bombs_remaining -= 1;
         return Some(Bomb::new(
             self.id,
@@ -131,7 +142,7 @@ impl Player {
                     motion.x += dist;
                     self.position.x -= dist;
                 }
-                self.handle_collisions(map, direction);
+                self.handle_collisions(map, direction, bombs);
             }
             if motion.y != 0.0 {
                 if motion.y > 0.0 {
@@ -150,7 +161,7 @@ impl Player {
                     // self.collide_up_map(map);
                 }
                 self.bound(map.width, map.height);
-                self.handle_collisions(map, direction);
+                self.handle_collisions(map, direction, bombs);
             }
         }
     }
