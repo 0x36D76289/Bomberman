@@ -11,7 +11,7 @@ pub use {
     object::{GameObject, Transform},
 };
 
-use std::{hash::Hash, sync::Arc};
+use std::{hash::Hash, sync::Arc, time::Instant};
 use vulkano::{
     buffer::{BufferContents, allocator::SubbufferAllocator},
     command_buffer::allocator::StandardCommandBufferAllocator,
@@ -47,6 +47,12 @@ pub struct RenderContext {
     pub pipeline: Arc<GraphicsPipeline>,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub time_info: TimeInfo,
+}
+
+pub struct TimeInfo {
+    pub time: Instant,
+    pub dt: f32,
 }
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]

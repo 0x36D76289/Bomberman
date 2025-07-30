@@ -1,5 +1,6 @@
 use glam::{Mat4, Vec3, Vec4};
 
+#[derive(Debug)]
 pub struct Camera {
     pub projection_matrix: Mat4,
     pub view_matrix: Mat4,
@@ -60,10 +61,10 @@ impl Camera {
         let w = Vec3::new(c2 * s1, -s2, c1 * c2);
 
         self.view_matrix = Mat4::from_cols(
-            Vec4::new(u.x, v.x, w.x, 1.0),
-            Vec4::new(u.y, v.y, w.y, 1.0),
-            Vec4::new(u.z, v.z, w.z, 1.0),
-            Vec4::new(-u.dot(position), -v.dot(position), -w.dot(position), 1.0),
-        )
+            Vec4::new(u.x, v.x, w.x, 0.0),
+            Vec4::new(u.y, v.y, w.y, 0.0),
+            Vec4::new(u.z, v.z, w.z, 0.0),
+            Vec4::new(-(u.dot(position)), -(v.dot(position)), -(w.dot(position)), 1.0),
+        );
     }
 }

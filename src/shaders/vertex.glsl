@@ -4,18 +4,21 @@ layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec2 in_uv;
 
-layout(location = 0) out vec3 out_color;
+layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform Data {
-    mat4 world;
+layout(set = 0, binding = 0) uniform GlobalUbo {
     mat4 view;
-    mat4 proj;
-    vec3 color;
-} uniforms;
+    mat4 projection;
+} ubo;
+
+layout(push_constant) uniform Push {
+  mat4 model_matrix;
+  mat4 normal_matrix;
+  vec4 color;
+} push;
 
 void main() {
-    out_color = uniforms.color;
-    mat4 projection_view = uniforms.proj * uniforms.view;
-    mat4 transform = projection_view * uniforms.world;
-    gl_Position = transform * vec4(in_position, 1.0);
+    vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
+    gl_Position = ubo.projection * ubo.view * position_world;
+    out_color = push.color;
 }
