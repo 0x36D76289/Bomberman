@@ -1,6 +1,5 @@
-use crate::graphics::{Camera, Model, MyVertex, RenderContext, Vulkan};
-use glam::Vec3;
-use std::{error::Error, sync::Arc};
+use crate::graphics::{MyVertex, RenderContext, TimeInfo, Vulkan};
+use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
     VulkanLibrary,
     buffer::{
@@ -48,6 +47,7 @@ impl Vulkan {
 
         let instance = {
             let required_extensions = Surface::required_extensions(event_loop)?;
+            println!("{required_extensions:?}");
 
             Instance::new(
                 library,
@@ -211,7 +211,7 @@ impl RenderContext {
                     store_op: Store,
                 },
                 depth_stencil: {
-                    format: Format::D16_UNORM,
+                    format: Format::D32_SFLOAT,
                     samples: 1,
                     load_op: Clear,
                     store_op: DontCare,
@@ -247,6 +247,11 @@ impl RenderContext {
         let recreate_swapchain = false;
         let previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
 
+        let time_info = TimeInfo {
+            time: Instant::now(),
+            dt: 0.0,
+        };
+
         Ok(RenderContext {
             window,
             swapchain,
@@ -257,6 +262,7 @@ impl RenderContext {
             pipeline,
             recreate_swapchain,
             previous_frame_end,
+            time_info,
         })
     }
 }
@@ -277,7 +283,7 @@ pub fn window_size_dependent_setup(
             memory_allocator.clone(),
             ImageCreateInfo {
                 image_type: ImageType::Dim2d,
-                format: Format::D16_UNORM,
+                format: Format::D32_SFLOAT,
                 extent: images[0].extent(),
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
                 ..Default::default()

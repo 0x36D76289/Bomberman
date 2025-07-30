@@ -3,6 +3,7 @@
 mod app;
 mod game;
 mod graphics;
+mod input;
 
 use app::App;
 use winit::event_loop::{ControlFlow, EventLoop};

@@ -1,5 +1,6 @@
 use crate::graphics::MyVertex;
-use std::{collections::HashMap, error::Error, sync::Arc};
+use std::{collections::HashMap, error::Error, fs::File, io::{BufReader, Cursor}, sync::Arc};
+use tobj::LoadError;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
@@ -11,12 +12,67 @@ pub struct Model {
     pub index_buffer: Subbuffer<[u32]>,
 }
 
+#[macro_export]
+macro_rules! load_model {
+    ($path:literal, $allocator:expr) => {
+        {
+            let file = include_bytes!($path);
+            let mut cursor: Cursor<&[u8]> = Cursor::new(file);
+            Arc::new(Model::load(&mut cursor, ($allocator).clone())?)
+        }
+    };
+}
+
 impl Model {
+    // pub fn from_path(
+    //     path: &str,
+    //     memory_allocator: Arc<StandardMemoryAllocator>,
+    // ) -> Result<Self, Box<dyn Error>> {
+    //     let (models, _) = tobj::load_obj(path, &tobj::GPU_LOAD_OPTIONS)?;
+    //     Model::load(models, memory_allocator, true)
+    // }
+
+    // pub fn from_path_inverse_y(
+    //     path: &str,
+    //     memory_allocator: Arc<StandardMemoryAllocator>,
+    // ) -> Result<Self, Box<dyn Error>> {
+    //     let (models, _) = tobj::load_obj(path, &tobj::GPU_LOAD_OPTIONS)?;
+    //     Model::load(models, memory_allocator, false)
+    // }
+
+    // pub fn from_buf(
+    //     bytes: &mut Cursor<&[u8]>,
+    //     memory_allocator: Arc<StandardMemoryAllocator>
+    // ) -> Result<Self, Box<dyn Error>> {
+    //     let (models, _) = tobj::load_obj_buf(
+    //         bytes,
+    //         &tobj::GPU_LOAD_OPTIONS,
+    //         |p| { Err(LoadError::OpenFileFailed) }
+    //     )?;
+    //     Model::load(models, memory_allocator, true)
+    // }
+
+    // pub fn from_buf_inverse_y(
+    //     bytes: &mut Cursor<&[u8]>,
+    //     memory_allocator: Arc<StandardMemoryAllocator>
+    // ) -> Result<Self, Box<dyn Error>> {
+    //     let (models, _) = tobj::load_obj_buf(
+    //         bytes,
+    //         &tobj::GPU_LOAD_OPTIONS,
+    //         |p| { Err(LoadError::OpenFileFailed) }
+    //     )?;
+    //     Model::load(models, memory_allocator, false)
+    // }
+
     pub fn load(
-        path: &str,
+        bytes: &mut Cursor<&[u8]>,
         memory_allocator: Arc<StandardMemoryAllocator>,
     ) -> Result<Self, Box<dyn Error>> {
-        let (models, _) = tobj::load_obj(path, &tobj::GPU_LOAD_OPTIONS)?;
+        let (models, _) = tobj::load_obj_buf(
+            bytes,
+            &tobj::GPU_LOAD_OPTIONS,
+            |p| { Err(LoadError::OpenFileFailed) }
+        )?;
 
         let mut unique_vertices: HashMap<MyVertex, u32> = HashMap::new();
         let mut vertices = vec![MyVertex::default()];
@@ -52,6 +108,44 @@ impl Model {
                 indices.push(unique_vertices[&vertex]);
             }
         }
+
+        let vertex_buffer = Buffer::from_iter(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            vertices,
+        )?;
+
+        let index_buffer = Buffer::from_iter(
+            memory_allocator.clone(),
+            BufferCreateInfo {
+                usage: BufferUsage::INDEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            indices,
+        )?;
+
+        Ok(Self {
+            vertex_buffer,
+            index_buffer,
+        })
+    }
+
+    pub fn empty(memory_allocator: Arc<StandardMemoryAllocator>) -> Result<Self, Box<dyn Error>> {
+        let vertices: Vec<MyVertex> = Vec::new();
+        let indices: Vec<u32> = Vec::new();
 
         let vertex_buffer = Buffer::from_iter(
             memory_allocator.clone(),

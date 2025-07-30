@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     app::App,
     graphics::{vs, window_size_dependent_setup},
@@ -65,6 +67,27 @@ impl App {
         )
         .unwrap();
 
+        let uniform_buffer = {
+            let uniform_data = vs::GlobalUbo {
+                projection: self.camera.projection_matrix.to_cols_array_2d(),
+                view: self.camera.view_matrix.to_cols_array_2d(),
+            };
+
+            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+            *buffer.write().unwrap() = uniform_data;
+
+            buffer
+        };
+
+        let layout = &rcx.pipeline.layout().set_layouts()[0];
+        let descriptor_set = DescriptorSet::new(
+            vulkan.descriptor_set_allocator.clone(),
+            layout.clone(),
+            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [],
+        )
+        .unwrap();
+
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
@@ -77,52 +100,42 @@ impl App {
             )
             .unwrap()
             .bind_pipeline_graphics(rcx.pipeline.clone())
+            .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                rcx.pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
             .unwrap();
 
         let aspect_ratio =
             rcx.swapchain.image_extent()[0] as f32 / rcx.swapchain.image_extent()[1] as f32;
-        self.camera.set_perspective_projection(0.87, aspect_ratio, 0.1, 10.0);
+        self.camera
+            .set_perspective_projection(0.872664626, aspect_ratio, 0.1, 100.0);
 
         for object in self.objects.iter() {
-            let uniform_buffer = {
-                let uniform_data = vs::Data {
-                    world: object.transform.mat4().to_cols_array_2d(),
-                    view: self.camera.view_matrix.to_cols_array_2d(),
-                    proj: self.camera.projection_matrix.to_cols_array_2d(),
-                    color: object.color.to_array()
-                };
+            if object.model.is_none() { continue; }
 
-                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-                *buffer.write().unwrap() = uniform_data;
+            let model = object.model.as_ref().unwrap();
 
-                buffer
+            let push_constant = vs::Push {
+                model_matrix: object.transform.mat4().to_cols_array_2d(),
+                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+                color: object.color.to_array()
             };
 
-            let layout = &rcx.pipeline.layout().set_layouts()[0];
-            let descriptor_set = DescriptorSet::new(
-                vulkan.descriptor_set_allocator.clone(),
-                layout.clone(),
-                [WriteDescriptorSet::buffer(0, uniform_buffer)],
-                [],
-            )
-            .unwrap();
-
             builder
-                .bind_descriptor_sets(
-                    PipelineBindPoint::Graphics,
-                    rcx.pipeline.layout().clone(),
-                    0,
-                    descriptor_set,
-                )
+                .push_constants(rcx.pipeline.layout().clone(), 0, push_constant)
                 .unwrap()
-                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+                .bind_vertex_buffers(0, model.vertex_buffer.clone())
                 .unwrap()
-                .bind_index_buffer(object.model.index_buffer.clone())
+                .bind_index_buffer(model.index_buffer.clone())
                 .unwrap();
 
             unsafe {
                 builder
-                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+                    .draw_indexed(model.index_buffer.len() as u32, 1, 0, 0, 0)
                     .unwrap();
             }
         }
@@ -156,10 +169,19 @@ impl App {
                 rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
         }
+    }
 
-        // rcx.update_time();
-        // rcx.input_state.reset();
-        // rcx.window
-        //     .set_title(&format!("Scop! fps: {:.2}", rcx.avg_fps()));
+    pub fn update_time(&mut self) {
+        let time_info = &mut self.rcx.as_mut().unwrap().time_info;
+
+        time_info.dt = time_info.time.elapsed().as_secs_f32();
+        time_info.time = Instant::now();
+    }
+
+    pub fn debug(&self) {
+        println!("{:?}\n", self.camera);
+        for object in self.objects.iter() {
+            println!("{object:?}\n");
+        }
     }
 }
