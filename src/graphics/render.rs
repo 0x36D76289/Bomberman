@@ -4,6 +4,7 @@ use crate::{
     app::App,
     graphics::{vs, window_size_dependent_setup},
 };
+use glam::Vec4;
 use vulkano::{
     Validated, VulkanError,
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo},
@@ -71,6 +72,9 @@ impl App {
             let uniform_data = vs::GlobalUbo {
                 projection: self.camera.projection_matrix.to_cols_array_2d(),
                 view: self.camera.view_matrix.to_cols_array_2d(),
+                ambient_light_color: [1.0, 1.0, 1.0, 0.2],
+                light_position: self.light.position.to_array().into(),
+                light_color: self.light.color.to_array()
             };
 
             let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
@@ -176,6 +180,24 @@ impl App {
 
         time_info.dt = time_info.time.elapsed().as_secs_f32();
         time_info.time = Instant::now();
+        time_info.dt_sum += time_info.dt;
+        time_info.frame_count += 1.0;
+        
+        // calculate the fps every second
+        if (time_info.dt_sum > 1.0) {
+            time_info.avg_fps = time_info.frame_count / time_info.dt_sum;
+            time_info.dt_sum = 0.0;
+            time_info.frame_count = 0.0;
+        }
+    }
+
+    pub fn update_title(&mut self) {
+        let rcx = self.rcx.as_ref().unwrap();
+    
+        let fps = rcx.time_info.avg_fps;
+
+        let title = format!("Bomberman! fps: {:.0}", fps);
+        rcx.window.set_title(&title);
     }
 
     pub fn debug(&self) {

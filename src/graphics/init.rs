@@ -47,7 +47,6 @@ impl Vulkan {
 
         let instance = {
             let required_extensions = Surface::required_extensions(event_loop)?;
-            println!("{required_extensions:?}");
 
             Instance::new(
                 library,
@@ -250,6 +249,9 @@ impl RenderContext {
         let time_info = TimeInfo {
             time: Instant::now(),
             dt: 0.0,
+            frame_count: 0.0,
+            avg_fps:0.0,
+            dt_sum:0.0
         };
 
         Ok(RenderContext {

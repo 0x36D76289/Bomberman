@@ -3,12 +3,14 @@ pub mod init;
 pub mod model;
 pub mod object;
 pub mod render;
+pub mod light;
 
 pub use {
     camera::Camera,
     init::{vs, window_size_dependent_setup},
     model::Model,
     object::{GameObject, Transform},
+    light::Light
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
@@ -51,8 +53,11 @@ pub struct RenderContext {
 }
 
 pub struct TimeInfo {
-    pub time: Instant,
     pub dt: f32,
+    pub avg_fps: f32,
+    time: Instant,
+    dt_sum: f32,
+    frame_count: f32,
 }
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
