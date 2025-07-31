@@ -6,7 +6,7 @@ use std::sync::Arc;
 pub struct GameObject {
     pub model: Option<Arc<Model>>,
     pub transform: Transform,
-    pub color: Vec4,
+    pub color: Vec3,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ impl GameObject {
                 scale: Vec3::splat(1.0),
                 rotation: Vec3::splat(0.0)
             },
-            color: Vec4::splat(1.0)
+            color: Vec3::splat(1.0)
         }
     }
 }
