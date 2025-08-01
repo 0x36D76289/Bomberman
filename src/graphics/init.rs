@@ -1,4 +1,7 @@
-use crate::graphics::{MyVertex, RenderContext, TimeInfo, Vulkan};
+use crate::graphics::{
+    MyVertex, RenderContext, TimeInfo, Vulkan,
+    systems::{GlobalUbo, game_object_system::GameObjectSystem},
+};
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
     VulkanLibrary,
@@ -17,7 +20,7 @@ use vulkano::{
     instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
     pipeline::{
-        GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
             GraphicsPipelineCreateInfo,
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
@@ -32,7 +35,7 @@ use vulkano::{
     },
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
     shader::EntryPoint,
-    swapchain::{ColorSpace, Surface, Swapchain, SwapchainCreateInfo},
+    swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
     sync::{self, GpuFuture},
 };
 use winit::{
@@ -194,6 +197,7 @@ impl RenderContext {
                         .into_iter()
                         .next()
                         .unwrap(),
+                    present_mode: PresentMode::Mailbox,
                     ..Default::default()
                 },
             )
@@ -223,24 +227,11 @@ impl RenderContext {
         )
         .unwrap();
 
-        // loading the shaders
-        let vs = vs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-
-        let fs = fs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-
-        let (framebuffers, pipeline) = window_size_dependent_setup(
+        let framebuffers = window_size_dependent_setup(
             window_size,
             &images,
             &render_pass,
             &vulkan.memory_allocator,
-            &vs,
-            &fs,
         );
 
         let recreate_swapchain = false;
@@ -250,8 +241,8 @@ impl RenderContext {
             time: Instant::now(),
             dt: 0.0,
             frame_count: 0.0,
-            avg_fps:0.0,
-            dt_sum:0.0
+            avg_fps: 0.0,
+            dt_sum: 0.0,
         };
 
         Ok(RenderContext {
@@ -259,9 +250,6 @@ impl RenderContext {
             swapchain,
             render_pass,
             framebuffers,
-            vs,
-            fs,
-            pipeline,
             recreate_swapchain,
             previous_frame_end,
             time_info,
@@ -275,9 +263,7 @@ pub fn window_size_dependent_setup(
     images: &[Arc<Image>],
     render_pass: &Arc<RenderPass>,
     memory_allocator: &Arc<StandardMemoryAllocator>,
-    vs: &EntryPoint,
-    fs: &EntryPoint,
-) -> (Vec<Arc<Framebuffer>>, Arc<GraphicsPipeline>) {
+) -> (Vec<Arc<Framebuffer>>) {
     let device = memory_allocator.device();
 
     let depth_buffer = ImageView::new_default(
@@ -312,68 +298,5 @@ pub fn window_size_dependent_setup(
         })
         .collect::<Vec<_>>();
 
-    let pipeline = {
-        let vertex_input_state = MyVertex::per_vertex().definition(vs).unwrap();
-        let stages = [
-            PipelineShaderStageCreateInfo::new(vs.clone()),
-            PipelineShaderStageCreateInfo::new(fs.clone()),
-        ];
-        let layout = PipelineLayout::new(
-            device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-                .into_pipeline_layout_create_info(device.clone())
-                .unwrap(),
-        )
-        .unwrap();
-        let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-
-        GraphicsPipeline::new(
-            device.clone(),
-            None,
-            GraphicsPipelineCreateInfo {
-                stages: stages.into_iter().collect(),
-                vertex_input_state: Some(vertex_input_state),
-                input_assembly_state: Some(InputAssemblyState::default()),
-                viewport_state: Some(ViewportState {
-                    viewports: [Viewport {
-                        offset: [0.0, 0.0],
-                        extent: window_size.into(),
-                        depth_range: 0.0..=1.0,
-                    }]
-                    .into_iter()
-                    .collect(),
-                    ..Default::default()
-                }),
-                rasterization_state: Some(RasterizationState::default()),
-                depth_stencil_state: Some(DepthStencilState {
-                    depth: Some(DepthState::simple()),
-                    ..Default::default()
-                }),
-                multisample_state: Some(MultisampleState::default()),
-                color_blend_state: Some(ColorBlendState::with_attachment_states(
-                    subpass.num_color_attachments(),
-                    ColorBlendAttachmentState::default(),
-                )),
-                subpass: Some(subpass.into()),
-                ..GraphicsPipelineCreateInfo::layout(layout)
-            },
-        )
-        .unwrap()
-    };
-
-    (framebuffers, pipeline)
-}
-
-pub mod vs {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/shaders/vertex.glsl"
-    }
-}
-
-pub mod fs {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/shaders/fragment.glsl"
-    }
+    framebuffers
 }

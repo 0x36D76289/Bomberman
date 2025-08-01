@@ -9,8 +9,9 @@ layout(location = 1) out vec3 out_position_world;
 layout(location = 2) out vec3 out_normal_world;
 
 layout(set = 0, binding = 0) uniform GlobalUbo {
-    mat4 view;
     mat4 projection;
+    mat4 view;
+    mat4 inverse_view;
     vec4 ambient_light_color;
     vec3 light_position;
     vec4 light_color;

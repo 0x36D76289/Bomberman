@@ -2,14 +2,14 @@ use crate::graphics::Model;
 use glam::{Mat3, Mat4, Vec3, Vec4};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GameObject {
     pub model: Option<Arc<Model>>,
     pub transform: Transform,
     pub color: Vec3,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Transform {
     pub translation: Vec3,
     pub scale: Vec3,
@@ -23,9 +23,9 @@ impl GameObject {
             transform: Transform {
                 translation: Vec3::splat(0.0),
                 scale: Vec3::splat(1.0),
-                rotation: Vec3::splat(0.0)
+                rotation: Vec3::splat(0.0),
             },
-            color: Vec3::splat(1.0)
+            color: Vec3::splat(1.0),
         }
     }
 }
@@ -84,21 +84,21 @@ impl Transform {
                 inv_scale.x * (c1 * c3 + s1 * s2 * s3),
                 inv_scale.x * (c2 * s3),
                 inv_scale.x * (c1 * s2 * s3 - c3 * s1),
-                0.0
+                0.0,
             ),
             Vec4::new(
                 inv_scale.y * (c3 * s1 * s2 - c1 * s3),
                 inv_scale.y * (c2 * c3),
                 inv_scale.y * (c1 * c3 * s2 + s1 * s3),
-                0.0
+                0.0,
             ),
             Vec4::new(
                 inv_scale.z * (c2 * s1),
                 inv_scale.z * (-s2),
                 inv_scale.z * (c1 * c2),
-                0.0
+                0.0,
             ),
-            Vec4::new(0.0, 0.0, 0.0, 1.0)
+            Vec4::new(0.0, 0.0, 0.0, 1.0),
         )
     }
 }
