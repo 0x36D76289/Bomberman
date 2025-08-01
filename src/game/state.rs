@@ -146,7 +146,7 @@ impl State {
         self.update_inputs();
         // tick bombs
         for bomb in &mut self.bombs {
-            bomb.tick(&self.players);
+            bomb.tick(delta, &mut self.players);
         }
         // for player in players: summon bomb if Pressed
         for i in 0..self.players.len() {
@@ -157,6 +157,8 @@ impl State {
                 }
             }
         }
+        // TODO: remove bombs with despawn flag
+
         for i in 0..self.players.len() {
             self.players[i].player_move(self.inputs[i], delta, &self.map, &self.bombs);
         }
