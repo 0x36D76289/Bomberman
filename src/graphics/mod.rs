@@ -1,19 +1,24 @@
 pub mod camera;
 pub mod init;
+pub mod light;
 pub mod model;
 pub mod object;
-pub mod render;
-pub mod light;
+pub mod renderer;
+pub mod systems;
+
+use crate::graphics::systems::game_object_system::GameObjectSystem;
 
 pub use {
     camera::Camera,
-    init::{vs, window_size_dependent_setup},
+    init::window_size_dependent_setup,
+    light::Light,
     model::Model,
     object::{GameObject, Transform},
-    light::Light
+    renderer::Renderer,
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
+use systems::GlobalUbo;
 use vulkano::{
     buffer::{BufferContents, allocator::SubbufferAllocator},
     command_buffer::allocator::StandardCommandBufferAllocator,
@@ -44,9 +49,6 @@ pub struct RenderContext {
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
-    pub vs: EntryPoint,
-    pub fs: EntryPoint,
-    pub pipeline: Arc<GraphicsPipeline>,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub time_info: TimeInfo,

@@ -1,5 +1,11 @@
 use crate::graphics::MyVertex;
-use std::{collections::HashMap, error::Error, fs::File, io::{BufReader, Cursor}, sync::Arc};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fs::File,
+    io::{BufReader, Cursor},
+    sync::Arc,
+};
 use tobj::LoadError;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -14,13 +20,11 @@ pub struct Model {
 
 #[macro_export]
 macro_rules! load_model {
-    ($path:literal, $allocator:expr) => {
-        {
-            let file = include_bytes!($path);
-            let mut cursor: Cursor<&[u8]> = Cursor::new(file);
-            Arc::new(Model::load(&mut cursor, ($allocator).clone())?)
-        }
-    };
+    ($path:literal, $allocator:expr) => {{
+        let file = include_bytes!($path);
+        let mut cursor: Cursor<&[u8]> = Cursor::new(file);
+        Arc::new(Model::load(&mut cursor, ($allocator).clone())?)
+    }};
 }
 
 impl Model {
@@ -68,11 +72,9 @@ impl Model {
         bytes: &mut Cursor<&[u8]>,
         memory_allocator: Arc<StandardMemoryAllocator>,
     ) -> Result<Self, Box<dyn Error>> {
-        let (models, _) = tobj::load_obj_buf(
-            bytes,
-            &tobj::GPU_LOAD_OPTIONS,
-            |p| { Err(LoadError::OpenFileFailed) }
-        )?;
+        let (models, _) = tobj::load_obj_buf(bytes, &tobj::GPU_LOAD_OPTIONS, |p| {
+            Err(LoadError::OpenFileFailed)
+        })?;
 
         let mut unique_vertices: HashMap<MyVertex, u32> = HashMap::new();
         let mut vertices = vec![MyVertex::default()];

@@ -1,4 +1,7 @@
-use winit::{event::KeyEvent, keyboard::{Key, NamedKey}};
+use winit::{
+    event::KeyEvent,
+    keyboard::{Key, NamedKey},
+};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InputState {
@@ -27,7 +30,7 @@ impl InputState {
             Key::Named(NamedKey::ArrowRight) => self.look_right = state,
             Key::Named(NamedKey::ArrowUp) => self.look_up = state,
             Key::Named(NamedKey::ArrowDown) => self.look_down = state,
-            _ => ()
+            _ => (),
         }
     }
 }

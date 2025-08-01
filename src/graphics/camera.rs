@@ -1,9 +1,10 @@
 use glam::{Mat4, Vec3, Vec4};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Camera {
     pub projection_matrix: Mat4,
     pub view_matrix: Mat4,
+    pub inverse_view_matrix: Mat4,
 }
 
 impl Camera {
@@ -11,6 +12,7 @@ impl Camera {
         Self {
             projection_matrix: Mat4::IDENTITY,
             view_matrix: Mat4::IDENTITY,
+            inverse_view_matrix: Mat4::IDENTITY,
         }
     }
 
@@ -41,7 +43,14 @@ impl Camera {
             Vec4::new(u.y, v.y, w.y, 1.0),
             Vec4::new(u.z, v.z, w.z, 1.0),
             Vec4::new(-u.dot(position), -v.dot(position), -w.dot(position), 1.0),
-        )
+        );
+
+        self.inverse_view_matrix = Mat4::from_cols(
+            Vec4::new(u.x, u.y, u.z, 1.0),
+            Vec4::new(v.x, v.y, v.z, 1.0),
+            Vec4::new(w.x, w.y, w.z, 1.0),
+            Vec4::new(position.x, position.y, position.z, 1.0),
+        );
     }
 
     pub fn set_view_target(&mut self, position: Vec3, target: Vec3) {
@@ -64,7 +73,19 @@ impl Camera {
             Vec4::new(u.x, v.x, w.x, 0.0),
             Vec4::new(u.y, v.y, w.y, 0.0),
             Vec4::new(u.z, v.z, w.z, 0.0),
-            Vec4::new(-(u.dot(position)), -(v.dot(position)), -(w.dot(position)), 1.0),
+            Vec4::new(
+                -(u.dot(position)),
+                -(v.dot(position)),
+                -(w.dot(position)),
+                1.0,
+            ),
+        );
+
+        self.inverse_view_matrix = Mat4::from_cols(
+            Vec4::new(u.x, u.y, u.z, 1.0),
+            Vec4::new(v.x, v.y, v.z, 1.0),
+            Vec4::new(w.x, w.y, w.z, 1.0),
+            Vec4::new(position.x, position.y, position.z, 1.0),
         );
     }
 }
