@@ -197,7 +197,7 @@ impl RenderContext {
                         .into_iter()
                         .next()
                         .unwrap(),
-                    present_mode: PresentMode::Mailbox,
+                    present_mode: PresentMode::Fifo,
                     ..Default::default()
                 },
             )
