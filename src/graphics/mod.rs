@@ -6,7 +6,7 @@ pub mod object;
 pub mod renderer;
 pub mod systems;
 
-use crate::graphics::systems::game_object_system::GameObjectSystem;
+use crate::graphics::systems::{game_object_system::GameObjectSystem, point_light_system::PointLightSystem};
 
 pub use {
     camera::Camera,
@@ -33,6 +33,13 @@ use vulkano::{
     sync::GpuFuture,
 };
 use winit::window::Window;
+
+pub struct Graphics {
+    pub vulkan: Vulkan,
+    pub renderer: Renderer,
+    pub game_object_system: GameObjectSystem,
+    pub point_light_system: PointLightSystem
+}
 
 pub struct Vulkan {
     pub instance: Arc<Instance>,

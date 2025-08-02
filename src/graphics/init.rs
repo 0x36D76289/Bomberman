@@ -1,6 +1,5 @@
 use crate::graphics::{
-    MyVertex, RenderContext, TimeInfo, Vulkan,
-    systems::{GlobalUbo, game_object_system::GameObjectSystem},
+    systems::{game_object_system::GameObjectSystem, point_light_system::PointLightSystem, GlobalUbo}, Graphics, MyVertex, RenderContext, Renderer, TimeInfo, Vulkan
 };
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
@@ -43,6 +42,19 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
     window::Window,
 };
+
+impl Graphics {
+    pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
+        let vulkan = Vulkan::init(event_loop)?;
+
+        Ok(Graphics {
+            vulkan,
+            renderer: Renderer::new(),
+            game_object_system: GameObjectSystem::default(),
+            point_light_system: PointLightSystem::default()
+        })
+    }
+}
 
 impl Vulkan {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {

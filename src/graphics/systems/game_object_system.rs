@@ -28,21 +28,12 @@ use crate::{
     graphics::{GameObject, MyVertex, RenderContext, Vulkan, systems::GlobalUbo},
 };
 
+#[derive(Debug, Default)]
 pub struct GameObjectSystem {
-    pub pipeline: Arc<GraphicsPipeline>,
+    pipeline: Option<Arc<GraphicsPipeline>>,
 }
 
 impl GameObjectSystem {
-    pub fn init(
-        vulkan: &Vulkan,
-        render_pass: Arc<RenderPass>,
-        window_size: PhysicalSize<u32>,
-    ) -> Self {
-        GameObjectSystem {
-            pipeline: create_pipeline(vulkan, render_pass, window_size),
-        }
-    }
-
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
@@ -50,6 +41,12 @@ impl GameObjectSystem {
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
+        if self.pipeline.is_none() {
+            panic!("Tried to render game objects but the pipeline is not initialized")
+        }
+
+        let pipeline = self.pipeline.as_ref().unwrap();
+
         let uniform_buffer = {
             let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = global_ubo;
@@ -57,7 +54,7 @@ impl GameObjectSystem {
             buffer
         };
 
-        let layout = &self.pipeline.layout().set_layouts()[0];
+        let layout = &pipeline.layout().set_layouts()[0];
         let descriptor_set = DescriptorSet::new(
             vulkan.descriptor_set_allocator.clone(),
             layout.clone(),
@@ -67,11 +64,11 @@ impl GameObjectSystem {
         .unwrap();
 
         command_buffer
-            .bind_pipeline_graphics(self.pipeline.clone())
+            .bind_pipeline_graphics(pipeline.clone())
             .unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
-                self.pipeline.layout().clone(),
+                pipeline.layout().clone(),
                 0,
                 descriptor_set,
             )
@@ -91,7 +88,7 @@ impl GameObjectSystem {
             };
 
             command_buffer
-                .push_constants(self.pipeline.layout().clone(), 0, push_constant)
+                .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap()
                 .bind_vertex_buffers(0, model.vertex_buffer.clone())
                 .unwrap()
@@ -105,73 +102,75 @@ impl GameObjectSystem {
             }
         }
     }
+
+    pub fn create_pipeline(
+        &mut self,
+        vulkan: &Vulkan,
+        render_pass: Arc<RenderPass>,
+        window_size: PhysicalSize<u32>,
+    ) {
+        let vertex_shader = vs::load(vulkan.device.clone())
+            .unwrap()
+            .entry_point("main")
+            .unwrap();
+        let fragment_shader = fs::load(vulkan.device.clone())
+            .unwrap()
+            .entry_point("main")
+            .unwrap();
+    
+        let vertex_input_state = MyVertex::per_vertex().definition(&vertex_shader).unwrap();
+        let stages = [
+            PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
+            PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
+        ];
+        let layout = PipelineLayout::new(
+            vulkan.device.clone(),
+            PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
+                .into_pipeline_layout_create_info(vulkan.device.clone())
+                .unwrap(),
+        )
+        .unwrap();
+    
+        let subpass = Subpass::from(render_pass, 0).unwrap();
+    
+        self.pipeline = Some(GraphicsPipeline::new(
+            vulkan.device.clone(),
+            None,
+            GraphicsPipelineCreateInfo {
+                stages: stages.into_iter().collect(),
+                vertex_input_state: Some(vertex_input_state),
+                viewport_state: Some(Default::default()),
+                input_assembly_state: Some(InputAssemblyState::default()),
+                rasterization_state: Some(RasterizationState::default()),
+                depth_stencil_state: Some(DepthStencilState {
+                    depth: Some(DepthState::simple()),
+                    ..Default::default()
+                }),
+                multisample_state: Some(MultisampleState::default()),
+                color_blend_state: Some(ColorBlendState::with_attachment_states(
+                    subpass.num_color_attachments(),
+                    ColorBlendAttachmentState::default(),
+                )),
+                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
+                subpass: Some(subpass.into()),
+                ..GraphicsPipelineCreateInfo::layout(layout)
+            },
+        )
+        .unwrap())
+    }
 }
 
-fn create_pipeline(
-    vulkan: &Vulkan,
-    render_pass: Arc<RenderPass>,
-    window_size: PhysicalSize<u32>,
-) -> Arc<GraphicsPipeline> {
-    let vertex_shader = vs::load(vulkan.device.clone())
-        .unwrap()
-        .entry_point("main")
-        .unwrap();
-    let fragment_shader = fs::load(vulkan.device.clone())
-        .unwrap()
-        .entry_point("main")
-        .unwrap();
-
-    let vertex_input_state = MyVertex::per_vertex().definition(&vertex_shader).unwrap();
-    let stages = [
-        PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
-        PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
-    ];
-    let layout = PipelineLayout::new(
-        vulkan.device.clone(),
-        PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-            .into_pipeline_layout_create_info(vulkan.device.clone())
-            .unwrap(),
-    )
-    .unwrap();
-
-    let subpass = Subpass::from(render_pass, 0).unwrap();
-
-    GraphicsPipeline::new(
-        vulkan.device.clone(),
-        None,
-        GraphicsPipelineCreateInfo {
-            stages: stages.into_iter().collect(),
-            vertex_input_state: Some(vertex_input_state),
-            viewport_state: Some(Default::default()),
-            input_assembly_state: Some(InputAssemblyState::default()),
-            rasterization_state: Some(RasterizationState::default()),
-            depth_stencil_state: Some(DepthStencilState {
-                depth: Some(DepthState::simple()),
-                ..Default::default()
-            }),
-            multisample_state: Some(MultisampleState::default()),
-            color_blend_state: Some(ColorBlendState::with_attachment_states(
-                subpass.num_color_attachments(),
-                ColorBlendAttachmentState::default(),
-            )),
-            dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-            subpass: Some(subpass.into()),
-            ..GraphicsPipelineCreateInfo::layout(layout)
-        },
-    )
-    .unwrap()
-}
 
 pub mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "src/shaders/vertex.glsl"
+        path: "src/shaders/game_object.vert"
     }
 }
 
 pub mod fs {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "src/shaders/fragment.glsl"
+        path: "src/shaders/game_object.frag"
     }
 }
