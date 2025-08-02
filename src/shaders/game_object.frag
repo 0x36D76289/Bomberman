@@ -17,15 +17,23 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
 
 void main() {
     vec3 direction_to_light = ubo.light_position - in_position_world;
-    vec3 specular_light = vec3(0.0);
+    vec3 surface_normal = normalize(in_normal_world);
+
     float attenuation = 1.0 / dot(direction_to_light, direction_to_light);
+    direction_to_light = normalize(direction_to_light);
 
     vec3 camera_pos_world = ubo.inverse_view[3].xyz;
     vec3 view_direction = normalize(camera_pos_world - in_position_world);
 
     vec3 light_color = ubo.light_color.xyz * ubo.light_color.w * attenuation;
     vec3 ambient_light = ubo.ambient_light_color.xyz * ubo.ambient_light_color.w;
-    vec3 diffuse_light = light_color * max(dot(normalize(in_normal_world), normalize(direction_to_light)), 0);
+    vec3 diffuse_light = light_color * max(dot(surface_normal, direction_to_light), 0);
 
-    f_color = vec4((diffuse_light + ambient_light) * in_color, 1.0);
+    vec3 half_angle = normalize(direction_to_light + view_direction);
+    float blinn_term = dot(surface_normal, half_angle);
+    blinn_term = clamp(blinn_term, 0, 1);
+    blinn_term = pow(blinn_term, 512.0); // higher values -> sharper highlight
+    vec3 specular_light = light_color * blinn_term;
+
+    f_color = vec4((diffuse_light + ambient_light) * in_color + specular_light * in_color, 1.0);
 }

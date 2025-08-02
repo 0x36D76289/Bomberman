@@ -27,36 +27,26 @@ use vulkano::{
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 
 pub struct Renderer {
-    vulkan: Vulkan,
     rcx: Option<RenderContext>,
-    pub game_object_system: Option<GameObjectSystem>,
     image_index: u32,
     acquire_future: Option<SwapchainAcquireFuture>,
 }
 
 impl Renderer {
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
-        let vulkan = Vulkan::init(event_loop)?;
-
-        Ok(Self {
-            vulkan,
+    pub fn new() -> Self {
+        Self {
             rcx: None,
-            game_object_system: None,
-            image_index: Default::default(),
-            acquire_future: None,
-        })
+            image_index: 0,
+            acquire_future: None
+        }
     }
 
-    pub fn init_render_context(&mut self, event_loop: &ActiveEventLoop) {
-        self.rcx = Some(RenderContext::init(event_loop, &self.vulkan).unwrap())
+    pub fn init_render_context(&mut self, event_loop: &ActiveEventLoop, vulkan: &Vulkan) {
+        self.rcx = Some(RenderContext::init(event_loop, &vulkan).unwrap())
     }
 
-    pub fn init_game_object_system(&mut self) {
-        self.game_object_system = Some(GameObjectSystem::init(
-            &self.vulkan,
-            self.rcx.as_ref().unwrap().render_pass.clone(),
-            self.rcx.as_ref().unwrap().window.inner_size(),
-        ));
+    pub fn get_rcx(&self) -> &RenderContext {
+        self.rcx.as_ref().unwrap()
     }
 
     pub fn get_aspect_ration(&self) -> f32 {
@@ -64,8 +54,8 @@ impl Renderer {
         rcx.swapchain.image_extent()[0] as f32 / rcx.swapchain.image_extent()[1] as f32
     }
 
-    pub fn get_memory_allocator(&self) -> Arc<StandardMemoryAllocator> {
-        self.vulkan.memory_allocator.clone()
+    pub fn get_memory_allocator(&self, vulkan: &Vulkan) -> Arc<StandardMemoryAllocator> {
+        vulkan.memory_allocator.clone()
     }
 
     pub fn get_delta_time(&self) -> f32 {
@@ -80,7 +70,7 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
-    pub fn begin_frame(&mut self) -> Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>> {
+    pub fn begin_frame(&mut self, vulkan: &Vulkan) -> Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>> {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
@@ -105,7 +95,7 @@ impl Renderer {
                 window_size,
                 &new_images,
                 &rcx.render_pass,
-                &self.vulkan.memory_allocator,
+                &vulkan.memory_allocator,
             );
             rcx.recreate_swapchain = false;
         }
@@ -128,8 +118,8 @@ impl Renderer {
         self.acquire_future = Some(acquire_future);
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.vulkan.command_buffer_allocator.clone(),
-            self.vulkan.queue.queue_family_index(),
+            vulkan.command_buffer_allocator.clone(),
+            vulkan.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
@@ -137,7 +127,7 @@ impl Renderer {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.15, 0.15, 0.15, 1.0].into()), Some(1f32.into())],
+                    clear_values: vec![Some([0.08, 0.08, 0.08, 1.0].into()), Some(1f32.into())],
                     ..RenderPassBeginInfo::framebuffer(
                         rcx.framebuffers[image_index as usize].clone(),
                     )
@@ -162,6 +152,7 @@ impl Renderer {
 
     pub fn end_frame(
         &mut self,
+        vulkan: &Vulkan,
         mut command_buffer: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
         let rcx = self.rcx.as_mut().unwrap();
@@ -176,10 +167,10 @@ impl Renderer {
             .take()
             .unwrap()
             .join(acquire_future)
-            .then_execute(self.vulkan.queue.clone(), command_buffer)
+            .then_execute(vulkan.queue.clone(), command_buffer)
             .unwrap()
             .then_swapchain_present(
-                self.vulkan.queue.clone(),
+                vulkan.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(
                     rcx.swapchain.clone(),
                     self.image_index,
@@ -193,24 +184,13 @@ impl Renderer {
             }
             Err(VulkanError::OutOfDate) => {
                 rcx.recreate_swapchain = true;
-                rcx.previous_frame_end = Some(sync::now(self.vulkan.device.clone()).boxed());
+                rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
             Err(e) => {
                 println!("failed to flush future: {e}");
-                rcx.previous_frame_end = Some(sync::now(self.vulkan.device.clone()).boxed());
+                rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
         }
-    }
-
-    pub fn render_game_objects(
-        &self,
-        objects: &Vec<GameObject>,
-        global_ubo: GlobalUbo,
-        command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-    ) {
-        let game_object_system = self.game_object_system.as_ref().unwrap();
-
-        game_object_system.render_game_objects(&self.vulkan, objects, global_ubo, command_buffer);
     }
 
     pub fn update_time(&mut self) {
