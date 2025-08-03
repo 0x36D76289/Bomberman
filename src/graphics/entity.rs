@@ -3,12 +3,19 @@ use glam::{Mat3, Mat4, Vec3, Vec4};
 use vulkano::image::view::ImageView;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Default)]
-pub struct GameObject {
-    pub model: Option<Arc<Model>>,
-    pub texture_index: Option<i32>,
+#[derive(Debug, Clone)]
+pub struct GameEntity {
+    // pub id: u32,
+    pub name: String,
+    pub entity_type: GameEntityType,
     pub transform: Transform,
-    pub color: Vec3,
+}
+
+#[derive(Debug, Clone)]
+pub enum GameEntityType {
+    Object {model: Arc<Model>, texture_index: Option<i32>, color: Vec3},
+    Light {color: Vec4},
+    Viewer
 }
 
 #[derive(Debug, Clone, Default)]
@@ -18,20 +25,34 @@ pub struct Transform {
     pub rotation: Vec3,
 }
 
-impl GameObject {
-    pub fn new() -> Self {
+impl GameEntity {
+    pub fn new(entity_type: GameEntityType) -> Self {
         Self {
-            model: None,
-            texture_index: None,
+            name: String::new(),
             transform: Transform {
-                translation: Vec3::splat(0.0),
                 scale: Vec3::splat(1.0),
-                rotation: Vec3::splat(0.0),
+                ..Default::default()
             },
-            color: Vec3::splat(1.0),
+            entity_type
+        }
+    }
+
+    pub fn new_object(name: &str, model: Arc<Model>, texture_index: Option<i32>, color: Vec3) -> Self {
+        Self {
+            name: name.to_string(),
+            transform: Transform {
+                scale: Vec3::splat(1.0),
+                ..Default::default()
+            },
+            entity_type: GameEntityType::Object { 
+                model,
+                texture_index,
+                color
+            }
         }
     }
 }
+
 
 impl Transform {
     // Matrix corrsponds to Translate * Ry * Rx * Rz * Scale

@@ -3,7 +3,7 @@ use std::{error::Error, sync::Arc, time::Instant};
 use crate::{
     app::App,
     graphics::{
-        systems::{game_object_system::GameObjectSystem, GlobalUbo}, window_size_dependent_setup, Camera, GameObject, Light, TimeInfo, Vulkan
+        systems::{game_object_system::GameEntitySystem, GlobalUbo}, window_size_dependent_setup, Camera, GameEntity, TimeInfo, Vulkan
     },
     input::KeyboardMovementController,
 };
@@ -210,12 +210,9 @@ impl Renderer {
         }
     }
 
-    pub fn update_title(&mut self) {
+    pub fn update_title(&mut self, title: &str) {
         let rcx = self.rcx.as_ref().unwrap();
 
-        let fps = rcx.time_info.avg_fps;
-
-        let title = format!("Bomberman! fps: {:.0}", fps);
-        rcx.window.set_title(&title);
+        rcx.window.set_title(title);
     }
 }

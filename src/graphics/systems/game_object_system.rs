@@ -11,20 +11,20 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     app::App,
-    graphics::{GameObject, MyVertex, RenderContext, Vulkan, systems::GlobalUbo},
+    graphics::{systems::GlobalUbo, GameEntity, GameEntityType, MyVertex, RenderContext, Vulkan},
 };
 
 #[derive(Debug, Default)]
-pub struct GameObjectSystem {
+pub struct GameEntitySystem {
     pipeline: Option<Arc<GraphicsPipeline>>,
     sampler: Option<Arc<Sampler>>
 }
 
-impl GameObjectSystem {
+impl GameEntitySystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
-        objects: &Vec<GameObject>,
+        enities: &Vec<GameEntity>,
         textures: &Vec<Arc<ImageView>>,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -67,18 +67,18 @@ impl GameObjectSystem {
             )
             .unwrap();
 
-        for object in objects.iter() {
-            if object.model.is_none() {
-                continue;
-            }
-
-            let model = object.model.as_ref().unwrap();
-
+        for (entity, model, texture_index, color) in enities
+            .iter()
+            .filter_map(|o| match &o.entity_type {
+                GameEntityType::Object { model, texture_index, color } => Some((o, model, texture_index, color)),
+                _ => None
+            }) 
+        {
             let push_constant = vs::Push {
-                model_matrix: object.transform.mat4().to_cols_array_2d(),
-                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-                color: object.color.to_array(),
-                tex_index: object.texture_index.unwrap_or(-1)
+                model_matrix: entity.transform.mat4().to_cols_array_2d(),
+                normal_matrix: entity.transform.normal_matrix().to_cols_array_2d(),
+                color: color.to_array(),
+                tex_index: texture_index.unwrap_or(-1)
             };
 
             command_buffer

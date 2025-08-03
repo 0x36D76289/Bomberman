@@ -1,20 +1,18 @@
 pub mod camera;
 pub mod init;
-pub mod light;
 pub mod model;
 pub mod texture;
-pub mod object;
+pub mod entity;
 pub mod renderer;
 pub mod systems;
 
-use crate::graphics::systems::{game_object_system::GameObjectSystem, point_light_system::PointLightSystem};
+use crate::graphics::systems::{game_object_system::GameEntitySystem, point_light_system::PointLightSystem};
 
 pub use {
     camera::Camera,
     init::window_size_dependent_setup,
-    light::Light,
     model::Model,
-    object::{GameObject, Transform},
+    entity::{GameEntity, GameEntityType, Transform},
     renderer::{Renderer, RenderContext},
     texture::load_texture
 };
@@ -39,7 +37,7 @@ use winit::window::Window;
 pub struct Graphics {
     pub vulkan: Vulkan,
     pub renderer: Renderer,
-    pub game_object_system: GameObjectSystem,
+    pub game_object_system: GameEntitySystem,
     pub point_light_system: PointLightSystem
 }
 
