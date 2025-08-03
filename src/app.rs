@@ -73,14 +73,18 @@ impl ApplicationHandler for App {
                 let game_object_system = &self.graphics.game_object_system;
                 let point_light_system = &self.graphics.point_light_system;
 
+                if (state.input_state.change_controller_target) {
+                    state.controlled_object_id = (state.controlled_object_id + 1) % state.objects.len();
+                    state.input_state.change_controller_target = false;
+                }
                 state.camera_controller.move_in_plane_xz(
                     &state.input_state,
                     renderer.get_delta_time(),
-                    &mut state.viewer_object,
+                    &mut state.objects[state.controlled_object_id],
                 );
                 state.camera.set_view_xyz(
-                    state.viewer_object.transform.translation,
-                    state.viewer_object.transform.rotation,
+                    state.objects[0].transform.translation,
+                    state.objects[0].transform.rotation,
                 );
                 state.camera.set_perspective_projection(
                     0.872664626,
@@ -134,23 +138,30 @@ fn load_game_objects(
     .unwrap();
 
     let mut textures = Vec::new();
-    textures.push(load_texture(include_bytes!("assets/miku.png"), &mut command_buffer, memory_allocator.clone()));
+    textures.push(load_texture(include_bytes!("assets/WhiteBomberMan.png"), &mut command_buffer, memory_allocator.clone()));
+    textures.push(load_texture(&include_bytes!("assets/crate2.png").to_vec(), &mut command_buffer, memory_allocator.clone()));
+    textures.push(load_texture(&include_bytes!("assets/textureStone.png").to_vec(), &mut command_buffer, memory_allocator.clone()));
     let _ = command_buffer.build().unwrap().execute(queue.clone()).unwrap();
 
-    let model = Model::load(include_bytes!("assets/miku.obj"), memory_allocator.clone())?;
-    let mut miku = GameObject::new();
-    miku.model = Some(model.clone());
-    miku.texture_index = Some(0);
-    miku.transform.translation = Vec3::new(-0.5, 0.5, 0.0);
-    miku.transform.scale = Vec3::splat(0.1);
-    miku.color = Vec3::new(1.0, 1.0, 1.0);
+    let mut viewer_object = GameObject::new();
+    viewer_object.transform.translation = Vec3::new(0.0, -5.25, -3.0);
+    viewer_object.transform.rotation.x = -1.17;
 
-    let model = Model::load(include_bytes!("assets/link.obj"), memory_allocator.clone())?;
-    let mut link = GameObject::new();
-    link.model = Some(model.clone());
-    link.transform.translation = Vec3::new(0.5, 0.5, 0.0);
-    link.transform.scale = Vec3::splat(0.06);
-    link.color = Vec3::new(1.0, 1.0, 1.0);
+    let model = Model::load(include_bytes!("assets/bomberman.obj"), memory_allocator.clone())?;
+    let mut bomberman = GameObject::new();
+    bomberman.model = Some(model.clone());
+    bomberman.texture_index = Some(0);
+    bomberman.transform.translation = Vec3::new(-0.5, 0.5, 0.0);
+    bomberman.transform.scale = Vec3::splat(0.1);
+    bomberman.color = Vec3::new(1.0, 1.0, 1.0);
+
+    let model = Model::load(include_bytes!("assets/cube.obj"), memory_allocator.clone())?;
+    let mut cratee = GameObject::new();
+    cratee.model = Some(model.clone());
+    cratee.texture_index = Some(1);
+    cratee.transform.translation = Vec3::new(0.5, 0.5, 0.0);
+    cratee.transform.scale = Vec3::splat(0.5);
+    cratee.color = Vec3::new(1.0, 1.0, 1.0);
 
     let model = Model::load(include_bytes!("assets/quad.obj"), memory_allocator.clone())?;
     let mut floor = GameObject::new();
@@ -158,7 +169,7 @@ fn load_game_objects(
     floor.transform.translation = Vec3::new(0.0, 0.5, 0.0);
     floor.transform.scale = Vec3::new(3.0, 1.0, 3.0);
 
-    let objects = vec![floor, miku, link];
+    let objects = vec![viewer_object, bomberman, floor, cratee];
 
     Ok((objects, textures))
 }

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 glam = "0.30.4"
+png = "0.17.16"
 tobj = "4.0.3"
 vulkano = "0.35.1"
 vulkano-shaders = "0.35.0"

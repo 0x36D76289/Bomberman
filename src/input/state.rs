@@ -15,6 +15,7 @@ pub struct InputState {
     pub look_left: bool,
     pub look_up: bool,
     pub look_down: bool,
+    pub change_controller_target: bool,
 }
 
 impl InputState {
@@ -32,6 +33,7 @@ impl InputState {
             Key::Named(NamedKey::ArrowRight) => self.look_right = state,
             Key::Named(NamedKey::ArrowUp) => self.look_up = state,
             Key::Named(NamedKey::ArrowDown) => self.look_down = state,
+            Key::Character("c") => self.change_controller_target = state,
             _ => (),
         }
     }
