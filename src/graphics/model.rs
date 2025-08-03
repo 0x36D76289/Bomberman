@@ -18,61 +18,14 @@ pub struct Model {
     pub index_buffer: Subbuffer<[u32]>,
 }
 
-#[macro_export]
-macro_rules! load_model {
-    ($path:literal, $allocator:expr) => {{
-        let file = include_bytes!($path);
-        let mut cursor: Cursor<&[u8]> = Cursor::new(file);
-        Arc::new(Model::load(&mut cursor, ($allocator).clone())?)
-    }};
-}
-
 impl Model {
-    // pub fn from_path(
-    //     path: &str,
-    //     memory_allocator: Arc<StandardMemoryAllocator>,
-    // ) -> Result<Self, Box<dyn Error>> {
-    //     let (models, _) = tobj::load_obj(path, &tobj::GPU_LOAD_OPTIONS)?;
-    //     Model::load(models, memory_allocator, true)
-    // }
-
-    // pub fn from_path_inverse_y(
-    //     path: &str,
-    //     memory_allocator: Arc<StandardMemoryAllocator>,
-    // ) -> Result<Self, Box<dyn Error>> {
-    //     let (models, _) = tobj::load_obj(path, &tobj::GPU_LOAD_OPTIONS)?;
-    //     Model::load(models, memory_allocator, false)
-    // }
-
-    // pub fn from_buf(
-    //     bytes: &mut Cursor<&[u8]>,
-    //     memory_allocator: Arc<StandardMemoryAllocator>
-    // ) -> Result<Self, Box<dyn Error>> {
-    //     let (models, _) = tobj::load_obj_buf(
-    //         bytes,
-    //         &tobj::GPU_LOAD_OPTIONS,
-    //         |p| { Err(LoadError::OpenFileFailed) }
-    //     )?;
-    //     Model::load(models, memory_allocator, true)
-    // }
-
-    // pub fn from_buf_inverse_y(
-    //     bytes: &mut Cursor<&[u8]>,
-    //     memory_allocator: Arc<StandardMemoryAllocator>
-    // ) -> Result<Self, Box<dyn Error>> {
-    //     let (models, _) = tobj::load_obj_buf(
-    //         bytes,
-    //         &tobj::GPU_LOAD_OPTIONS,
-    //         |p| { Err(LoadError::OpenFileFailed) }
-    //     )?;
-    //     Model::load(models, memory_allocator, false)
-    // }
-
     pub fn load(
-        bytes: &mut Cursor<&[u8]>,
+        obj_bytes: &[u8],
         memory_allocator: Arc<StandardMemoryAllocator>,
-    ) -> Result<Self, Box<dyn Error>> {
-        let (models, _) = tobj::load_obj_buf(bytes, &tobj::GPU_LOAD_OPTIONS, |p| {
+    ) -> Result<Arc<Self>, Box<dyn Error>> {
+        let mut cursor = Cursor::new(obj_bytes);
+
+        let (models, _) = tobj::load_obj_buf(&mut cursor, &tobj::GPU_LOAD_OPTIONS, |p| {
             Err(LoadError::OpenFileFailed)
         })?;
 
@@ -100,7 +53,7 @@ impl Model {
                 }
 
                 if !model.mesh.texcoords.is_empty() {
-                    vertex.uv = [model.mesh.texcoords[i * 2], model.mesh.texcoords[i * 2 + 1]];
+                    vertex.uv = [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]];
                 }
 
                 if !unique_vertices.contains_key(&vertex) {
@@ -139,47 +92,9 @@ impl Model {
             indices,
         )?;
 
-        Ok(Self {
+        Ok(Arc::new(Self {
             vertex_buffer,
             index_buffer,
-        })
-    }
-
-    pub fn empty(memory_allocator: Arc<StandardMemoryAllocator>) -> Result<Self, Box<dyn Error>> {
-        let vertices: Vec<MyVertex> = Vec::new();
-        let indices: Vec<u32> = Vec::new();
-
-        let vertex_buffer = Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            vertices,
-        )?;
-
-        let index_buffer = Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::INDEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            indices,
-        )?;
-
-        Ok(Self {
-            vertex_buffer,
-            index_buffer,
-        })
+        }))
     }
 }

@@ -1,25 +1,11 @@
 use std::{collections::HashSet, hash::RandomState, sync::Arc};
 
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
-    descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    pipeline::{
-        DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
-        PipelineShaderStageCreateInfo,
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo}, descriptor_set::{layout::DescriptorBindingFlags, DescriptorSet, WriteDescriptorSet}, image::{sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo}, view::ImageView}, pipeline::{
         graphics::{
-            GraphicsPipelineCreateInfo,
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{DepthState, DepthStencilState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::{Vertex, VertexDefinition},
-            viewport::{Viewport, ViewportState},
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-    },
-    render_pass::{RenderPass, Subpass},
-    shader::EntryPoint,
+            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition}, viewport::{Viewport, ViewportState}, GraphicsPipelineCreateInfo
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo
+    }, render_pass::{RenderPass, Subpass}, shader::EntryPoint
 };
 use winit::dpi::PhysicalSize;
 
@@ -31,6 +17,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct GameObjectSystem {
     pipeline: Option<Arc<GraphicsPipeline>>,
+    sampler: Option<Arc<Sampler>>
 }
 
 impl GameObjectSystem {
@@ -38,6 +25,7 @@ impl GameObjectSystem {
         &self,
         vulkan: &Vulkan,
         objects: &Vec<GameObject>,
+        textures: &Vec<Arc<ImageView>>,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
@@ -55,10 +43,15 @@ impl GameObjectSystem {
         };
 
         let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new(
+        let descriptor_set = DescriptorSet::new_variable(
             vulkan.descriptor_set_allocator.clone(),
             layout.clone(),
-            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            textures.len() as u32,
+            [
+                WriteDescriptorSet::buffer(0, uniform_buffer),
+                WriteDescriptorSet::sampler(1, self.sampler.as_ref().unwrap().clone()),
+                WriteDescriptorSet::image_view_array(2, 0, textures.clone())
+            ],
             [],
         )
         .unwrap();
@@ -85,6 +78,7 @@ impl GameObjectSystem {
                 model_matrix: object.transform.mat4().to_cols_array_2d(),
                 normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
                 color: object.color.to_array(),
+                tex_index: object.texture_index.unwrap_or(-1)
             };
 
             command_buffer
@@ -123,13 +117,24 @@ impl GameObjectSystem {
             PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
             PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
         ];
-        let layout = PipelineLayout::new(
-            vulkan.device.clone(),
-            PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages)
-                .into_pipeline_layout_create_info(vulkan.device.clone())
-                .unwrap(),
-        )
-        .unwrap();
+        let layout = {
+            let mut layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
+
+            let binding = layout_create_info.set_layouts[0]
+                .bindings
+                .get_mut(&2)
+                .unwrap();
+            binding.binding_flags |= DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT;
+            binding.descriptor_count = 100;
+
+            PipelineLayout::new(
+                vulkan.device.clone(),
+                layout_create_info
+                    .into_pipeline_layout_create_info(vulkan.device.clone())
+                    .unwrap()
+            )
+            .unwrap()
+        };
     
         let subpass = Subpass::from(render_pass, 0).unwrap();
     
@@ -156,7 +161,19 @@ impl GameObjectSystem {
                 ..GraphicsPipelineCreateInfo::layout(layout)
             },
         )
-        .unwrap())
+        .unwrap());
+
+        self.sampler = Some(Sampler::new(
+            vulkan.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Nearest,
+                min_filter: Filter::Nearest,
+                address_mode: [SamplerAddressMode::ClampToBorder; 3],
+                border_color: BorderColor::FloatOpaqueWhite,
+                ..Default::default()
+            },
+        )
+        .unwrap());
     }
 }
 

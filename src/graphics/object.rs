@@ -1,10 +1,12 @@
 use crate::graphics::Model;
 use glam::{Mat3, Mat4, Vec3, Vec4};
+use vulkano::image::view::ImageView;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Default)]
 pub struct GameObject {
     pub model: Option<Arc<Model>>,
+    pub texture_index: Option<i32>,
     pub transform: Transform,
     pub color: Vec3,
 }
@@ -20,6 +22,7 @@ impl GameObject {
     pub fn new() -> Self {
         Self {
             model: None,
+            texture_index: None,
             transform: Transform {
                 translation: Vec3::splat(0.0),
                 scale: Vec3::splat(1.0),

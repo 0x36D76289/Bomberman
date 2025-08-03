@@ -3,33 +3,34 @@ use std::{error::Error, sync::Arc, time::Instant};
 use crate::{
     app::App,
     graphics::{
-        Camera, GameObject, Light, RenderContext, Vulkan,
-        systems::{GlobalUbo, game_object_system::GameObjectSystem},
-        window_size_dependent_setup,
+        systems::{game_object_system::GameObjectSystem, GlobalUbo}, window_size_dependent_setup, Camera, GameObject, Light, TimeInfo, Vulkan
     },
     input::KeyboardMovementController,
-    load_model,
 };
 use glam::{Vec3, Vec4};
 use vulkano::{
-    Validated, VulkanError,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
-    },
-    descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    memory::allocator::StandardMemoryAllocator,
-    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
-    swapchain::{
-        SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
-    },
-    sync::{self, GpuFuture},
+    }, descriptor_set::{DescriptorSet, WriteDescriptorSet}, memory::allocator::StandardMemoryAllocator, pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint}, render_pass::{Framebuffer, RenderPass}, swapchain::{
+        acquire_next_image, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo
+    }, sync::{self, GpuFuture}, Validated, VulkanError
 };
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::{event_loop::{ActiveEventLoop, EventLoop}, window::Window};
 
 pub struct Renderer {
     rcx: Option<RenderContext>,
     image_index: u32,
     acquire_future: Option<SwapchainAcquireFuture>,
+}
+
+pub struct RenderContext {
+    pub window: Arc<Window>,
+    pub swapchain: Arc<Swapchain>,
+    pub render_pass: Arc<RenderPass>,
+    pub framebuffers: Vec<Arc<Framebuffer>>,
+    pub recreate_swapchain: bool,
+    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub time_info: TimeInfo,
 }
 
 impl Renderer {

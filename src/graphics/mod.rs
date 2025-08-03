@@ -2,6 +2,7 @@ pub mod camera;
 pub mod init;
 pub mod light;
 pub mod model;
+pub mod texture;
 pub mod object;
 pub mod renderer;
 pub mod systems;
@@ -14,7 +15,8 @@ pub use {
     light::Light,
     model::Model,
     object::{GameObject, Transform},
-    renderer::Renderer,
+    renderer::{Renderer, RenderContext},
+    texture::load_texture
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
@@ -49,16 +51,6 @@ pub struct Vulkan {
     pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub uniform_buffer_allocator: SubbufferAllocator,
-}
-
-pub struct RenderContext {
-    pub window: Arc<Window>,
-    pub swapchain: Arc<Swapchain>,
-    pub render_pass: Arc<RenderPass>,
-    pub framebuffers: Vec<Arc<Framebuffer>>,
-    pub recreate_swapchain: bool,
-    pub previous_frame_end: Option<Box<dyn GpuFuture>>,
-    pub time_info: TimeInfo,
 }
 
 pub struct TimeInfo {
