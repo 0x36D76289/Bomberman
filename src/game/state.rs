@@ -23,8 +23,8 @@ pub struct State {
     pub objects: Vec<GameObject>,
     pub textures: Vec<Arc<ImageView>>,
     pub camera: Camera,
-    pub viewer_object: GameObject,
     pub camera_controller: KeyboardMovementController,
+    pub controlled_object_id: usize,
     pub light: Light,
 }
 
@@ -54,8 +54,8 @@ impl State {
         viewer_object.transform.translation.z = -2.5;
 
         let camera_controller = KeyboardMovementController {
-            move_speed: 3.0,
-            look_speed: 1.5,
+            move_speed: 2.0,
+            look_speed: 2.0,
         };
 
         let mut light = Light {
@@ -71,8 +71,8 @@ impl State {
             objects,
             textures,
             camera,
-            viewer_object,
             camera_controller,
+            controlled_object_id: 0,
             light,
         })
     }
