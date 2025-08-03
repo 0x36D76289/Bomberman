@@ -1,9 +1,12 @@
 use glam::{Vec3, Vec4};
+use vulkano::command_buffer::allocator::{CommandBufferAllocator, StandardCommandBufferAllocator};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract};
+use vulkano::device::Queue;
+use vulkano::image::view::ImageView;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
 use crate::graphics::{Camera, GameObject, Light, Model, Transform};
 use crate::input::{InputState, KeyboardMovementController};
-use crate::load_model;
 
 use super::map::Map;
 use super::player::Player;
@@ -18,6 +21,7 @@ pub struct State {
     pub players: Vec<Player>,
     pub map: Map,
     pub objects: Vec<GameObject>,
+    pub textures: Vec<Arc<ImageView>>,
     pub camera: Camera,
     pub viewer_object: GameObject,
     pub camera_controller: KeyboardMovementController,
@@ -34,16 +38,15 @@ impl State {
     }
 
     pub fn default_state(
-        memory_allocator: Arc<StandardMemoryAllocator>,
+        objects: Vec<GameObject>,
+        textures: Vec<Arc<ImageView>>
     ) -> Result<Self, Box<dyn Error>> {
         let input_state = InputState::default();
 
         let players = Vec::new();
 
         let map = Map::new(16, 16);
-
-        let objects = load_game_objects(memory_allocator)?;
-
+    
         let mut camera = Camera::new();
         camera.set_view_target(Vec3::new(1.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 0.0));
 
@@ -66,6 +69,7 @@ impl State {
             players,
             map,
             objects,
+            textures,
             camera,
             viewer_object,
             camera_controller,
@@ -76,32 +80,4 @@ impl State {
     pub fn print(&self) {
         print!("{}", self.map.to_str());
     }
-}
-
-fn load_game_objects(
-    memory_allocator: Arc<StandardMemoryAllocator>,
-) -> Result<Vec<GameObject>, Box<dyn Error>> {
-    let model = load_model!("../assets/miku.obj", memory_allocator);
-    let mut miku = GameObject::new();
-    miku.model = Some(model.clone());
-    miku.transform.translation = Vec3::new(-0.5, 0.5, 0.0);
-    miku.transform.scale = Vec3::splat(0.1);
-    miku.color = Vec3::new(1.0, 1.0, 1.0);
-
-    let model = load_model!("../assets/link.obj", memory_allocator);
-    let mut link = GameObject::new();
-    link.model = Some(model.clone());
-    link.transform.translation = Vec3::new(0.5, 0.5, 0.0);
-    link.transform.scale = Vec3::splat(0.06);
-    link.color = Vec3::new(1.0, 1.0, 1.0);
-
-    let model = load_model!("../assets/quad.obj", memory_allocator);
-    let mut floor = GameObject::new();
-    floor.model = Some(model.clone());
-    floor.transform.translation = Vec3::new(0.0, 0.5, 0.0);
-    floor.transform.scale = Vec3::new(3.0, 1.0, 3.0);
-
-    let objects = vec![floor, miku, link];
-
-    Ok(objects)
 }

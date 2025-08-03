@@ -3,11 +3,16 @@ use crate::graphics::systems::point_light_system::{self, PointLightSystem};
 use crate::graphics::systems::GlobalUbo;
 use crate::graphics::systems::game_object_system::{self, GameObjectSystem};
 use crate::graphics::{
-    self, Camera, GameObject, Graphics, Light, Model, RenderContext, Renderer, Transform, Vulkan
+    self, load_texture, Camera, GameObject, Graphics, Light, Model, RenderContext, Renderer, Transform, Vulkan
 };
 use crate::input::{InputState, KeyboardMovementController};
-use crate::load_model;
 use glam::{Vec3, Vec4};
+use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract};
+use vulkano::device::{Device, Queue};
+use vulkano::image::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
+use vulkano::image::view::ImageView;
+use vulkano::memory::allocator::StandardMemoryAllocator;
 use std::error::Error;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -28,7 +33,9 @@ impl App {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
 
-        let state = State::default_state(graphics.vulkan.memory_allocator.clone())?;
+        let (objects, textures) = load_game_objects(graphics.vulkan.memory_allocator.clone(), graphics.vulkan.command_buffer_allocator.clone(), graphics.vulkan.queue.clone())?;
+
+        let state = State::default_state(objects, textures)?;
 
         Ok(Self {
             state,
@@ -92,7 +99,7 @@ impl ApplicationHandler for App {
                         light_color: state.light.color.to_array(),
                     };
 
-                    game_object_system.render_game_objects(&self.graphics.vulkan, &state.objects, global_ubo, &mut command_buffer);
+                    game_object_system.render_game_objects(&self.graphics.vulkan, &state.objects, &state.textures, global_ubo, &mut command_buffer);
                     point_light_system.render(&self.graphics.vulkan, global_ubo, &mut command_buffer);
                     point_light_system.update(&mut state.light, renderer.get_delta_time());
                     renderer.end_frame(&self.graphics.vulkan, command_buffer);
@@ -112,4 +119,46 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.graphics.renderer.request_redraw();
     }
+}
+
+fn load_game_objects(
+    memory_allocator: Arc<StandardMemoryAllocator>,
+    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    queue: Arc<Queue>,
+) -> Result<(Vec<GameObject>, Vec<Arc<ImageView>>), Box<dyn Error>> {
+    let mut command_buffer = AutoCommandBufferBuilder::primary(
+        command_buffer_allocator.clone(),
+        queue.queue_family_index(),
+        CommandBufferUsage::OneTimeSubmit
+    )
+    .unwrap();
+
+    let mut textures = Vec::new();
+    textures.push(load_texture(include_bytes!("assets/miku.png"), &mut command_buffer, memory_allocator.clone()));
+    let _ = command_buffer.build().unwrap().execute(queue.clone()).unwrap();
+
+    let model = Model::load(include_bytes!("assets/miku.obj"), memory_allocator.clone())?;
+    let mut miku = GameObject::new();
+    miku.model = Some(model.clone());
+    miku.texture_index = Some(0);
+    miku.transform.translation = Vec3::new(-0.5, 0.5, 0.0);
+    miku.transform.scale = Vec3::splat(0.1);
+    miku.color = Vec3::new(1.0, 1.0, 1.0);
+
+    let model = Model::load(include_bytes!("assets/link.obj"), memory_allocator.clone())?;
+    let mut link = GameObject::new();
+    link.model = Some(model.clone());
+    link.transform.translation = Vec3::new(0.5, 0.5, 0.0);
+    link.transform.scale = Vec3::splat(0.06);
+    link.color = Vec3::new(1.0, 1.0, 1.0);
+
+    let model = Model::load(include_bytes!("assets/quad.obj"), memory_allocator.clone())?;
+    let mut floor = GameObject::new();
+    floor.model = Some(model.clone());
+    floor.transform.translation = Vec3::new(0.0, 0.5, 0.0);
+    floor.transform.scale = Vec3::new(3.0, 1.0, 3.0);
+
+    let objects = vec![floor, miku, link];
+
+    Ok((objects, textures))
 }

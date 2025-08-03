@@ -1,41 +1,17 @@
 use crate::graphics::{
-    systems::{game_object_system::GameObjectSystem, point_light_system::PointLightSystem, GlobalUbo}, Graphics, MyVertex, RenderContext, Renderer, TimeInfo, Vulkan
+    renderer::RenderContext, systems::{game_object_system::GameObjectSystem, point_light_system::PointLightSystem, GlobalUbo}, Graphics, MyVertex, Renderer, TimeInfo, Vulkan
 };
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
-    VulkanLibrary,
     buffer::{
-        Buffer, BufferCreateInfo, BufferUsage,
-        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
-    },
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::allocator::StandardDescriptorSetAllocator,
-    device::{
-        Device, DeviceCreateInfo, DeviceExtensions, DeviceOwned, QueueCreateInfo, QueueFlags,
-        physical::PhysicalDeviceType,
-    },
-    format::Format,
-    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
-    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-    pipeline::{
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo}, Buffer, BufferCreateInfo, BufferUsage
+    }, command_buffer::allocator::StandardCommandBufferAllocator, descriptor_set::allocator::StandardDescriptorSetAllocator, device::{
+        physical::PhysicalDeviceType, Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, DeviceOwned, QueueCreateInfo, QueueFlags
+    }, format::Format, image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage}, instance::{Instance, InstanceCreateFlags, InstanceCreateInfo}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator}, pipeline::{
         graphics::{
-            GraphicsPipelineCreateInfo,
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{DepthState, DepthStencilState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::{Vertex, VertexDefinition},
-            viewport::{Viewport, ViewportState},
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-    },
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
-    shader::EntryPoint,
-    swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
-    sync::{self, GpuFuture},
+            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition}, viewport::{Viewport, ViewportState}, GraphicsPipelineCreateInfo
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo
+    }, render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass}, shader::EntryPoint, swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo}, sync::{self, GpuFuture}, VulkanLibrary
 };
 use winit::{
     dpi::PhysicalSize,
@@ -113,6 +89,13 @@ impl Vulkan {
                 physical_device,
                 DeviceCreateInfo {
                     enabled_extensions: device_extensions,
+                    enabled_features: DeviceFeatures {
+                        descriptor_indexing: true,
+                        shader_sampled_image_array_non_uniform_indexing: true,
+                        runtime_descriptor_array: true,
+                        descriptor_binding_variable_descriptor_count: true,
+                        ..DeviceFeatures::empty()
+                    },
                     queue_create_infos: vec![QueueCreateInfo {
                         queue_family_index,
                         ..Default::default()
