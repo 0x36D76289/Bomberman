@@ -1,6 +1,6 @@
 use std::{collections::HashSet, hash::RandomState, sync::Arc};
 
-use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
+use glam::{Mat4, Vec3, Vec3Swizzles, Vec4, Vec4Swizzles};
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
@@ -26,7 +26,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     app::App,
-    graphics::{systems::GlobalUbo, GameObject, Light, MyVertex, RenderContext, Vulkan},
+    graphics::{systems::{GlobalUbo, PointLight}, GameEntity, GameEntityType, MyVertex, RenderContext, Vulkan},
 };
 
 #[derive(Debug, Default)]
@@ -38,6 +38,7 @@ impl PointLightSystem {
     pub fn render(
         &self,
         vulkan: &Vulkan,
+        entities: &Vec<GameEntity>,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
@@ -74,15 +75,46 @@ impl PointLightSystem {
             )
             .unwrap();
 
-        unsafe {
-            command_buffer.draw(6, 1, 0, 0);
+        for (entity, light_color) in entities.iter().filter_map(|o| match &o.entity_type {
+            GameEntityType::Light { color } => Some((o, color)),
+            _ => None
+        }) {
+            let push_constant = vs::Push {
+                position: Vec4::splat(1.0).with_xyz(entity.transform.translation).to_array(),
+                color: light_color.to_array(),
+                radius: entity.transform.scale.x
+            };
+
+            command_buffer
+                .push_constants(pipeline.layout().clone(), 0, push_constant)
+                .unwrap();
+
+            unsafe {
+                command_buffer.draw(6, 1, 0, 0);
+            }
         }
     }
 
-    pub fn update(&self, light: &mut Light, delta_time: f32) {
-        let rotate_light = Mat4::from_rotation_y(delta_time);
-
-        light.transform.translation = (rotate_light * Vec4::splat(1.0).with_xyz(light.transform.translation)).xyz();
+    pub fn lights_array(&self, objects: &Vec<GameEntity>) -> ([PointLight; 100], i32) {
+        let mut vec = [
+            PointLight {
+                position: Default::default(),
+                color: Default::default()
+            };
+            100
+        ];
+        let mut i: usize = 0;
+        for (object, light_color) in objects.iter().filter_map(|o| match &o.entity_type {
+            GameEntityType::Light { color } => Some((o, color)),
+            _ => None
+        }) {
+            vec[i] = PointLight {
+                position: Vec4::splat(1.0).with_xyz(object.transform.translation).to_array(),
+                color: light_color.to_array()
+            };
+            i += 1;
+        }
+        (vec, i as i32)
     }
 
     pub fn create_pipeline(

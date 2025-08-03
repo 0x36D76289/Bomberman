@@ -5,7 +5,7 @@ use vulkano::device::Queue;
 use vulkano::image::view::ImageView;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
-use crate::graphics::{Camera, GameObject, Light, Model, Transform};
+use crate::graphics::{Camera, GameEntity, Model, Transform};
 use crate::input::{InputState, KeyboardMovementController};
 
 use super::map::Map;
@@ -20,12 +20,11 @@ pub struct State {
     pub input_state: InputState,
     pub players: Vec<Player>,
     pub map: Map,
-    pub objects: Vec<GameObject>,
+    pub entities: Vec<GameEntity>,
     pub textures: Vec<Arc<ImageView>>,
     pub camera: Camera,
-    pub camera_controller: KeyboardMovementController,
+    pub entity_controller: KeyboardMovementController,
     pub controlled_object_id: usize,
-    pub light: Light,
 }
 
 impl State {
@@ -38,7 +37,7 @@ impl State {
     }
 
     pub fn default_state(
-        objects: Vec<GameObject>,
+        entities: Vec<GameEntity>,
         textures: Vec<Arc<ImageView>>
     ) -> Result<Self, Box<dyn Error>> {
         let input_state = InputState::default();
@@ -50,30 +49,20 @@ impl State {
         let mut camera = Camera::new();
         camera.set_view_target(Vec3::new(1.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 0.0));
 
-        let mut viewer_object = GameObject::new();
-        viewer_object.transform.translation.z = -2.5;
-
-        let camera_controller = KeyboardMovementController {
+        let entity_controller = KeyboardMovementController {
             move_speed: 2.0,
-            look_speed: 2.0,
+            look_speed: 1.5,
         };
-
-        let mut light = Light {
-            transform: Transform::default(),
-            color: Vec4::splat(1.0),
-        };
-        light.transform.translation = Vec3::splat(-1.0);
 
         Ok(Self {
             input_state,
             players,
             map,
-            objects,
+            entities,
             textures,
             camera,
-            camera_controller,
+            entity_controller,
             controlled_object_id: 0,
-            light,
         })
     }
 

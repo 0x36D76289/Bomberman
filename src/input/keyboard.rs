@@ -1,4 +1,4 @@
-use crate::{graphics::GameObject, input::InputState};
+use crate::{graphics::GameEntity, input::InputState};
 use glam::Vec3;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -12,7 +12,7 @@ impl KeyboardMovementController {
         &self,
         input_state: &InputState,
         dt: f32,
-        game_object: &mut GameObject,
+        game_object: &mut GameEntity,
     ) {
         let mut rotate = Vec3::splat(0.0);
 

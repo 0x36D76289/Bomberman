@@ -28,7 +28,7 @@ impl InputState {
             Key::Character("a") => self.move_left = state,
             Key::Character("d") => self.move_right = state,
             Key::Named(NamedKey::Space) => self.move_up = state,
-            Key::Named(NamedKey::Control) => self.move_down = state,
+            Key::Named(NamedKey::Shift) => self.move_down = state,
             Key::Named(NamedKey::ArrowLeft) => self.look_left = state,
             Key::Named(NamedKey::ArrowRight) => self.look_right = state,
             Key::Named(NamedKey::ArrowUp) => self.look_up = state,

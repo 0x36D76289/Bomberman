@@ -1,4 +1,10 @@
 #version 460
+#define MAX_LIGHT_NUMBER 100
+
+struct PointLight {
+  vec4 position;
+  vec4 color;
+};
 
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
@@ -14,8 +20,8 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     mat4 view;
     mat4 inverse_view;
     vec4 ambient_light_color;
-    vec3 light_position;
-    vec4 light_color;
+    PointLight lights[MAX_LIGHT_NUMBER];
+    int light_number;
 } ubo;
 
 layout(push_constant) uniform Push {
@@ -24,6 +30,7 @@ layout(push_constant) uniform Push {
   vec3 color;
   int tex_index;
 } push;
+
 
 void main() {
     vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
