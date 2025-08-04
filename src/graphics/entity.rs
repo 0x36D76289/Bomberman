@@ -3,56 +3,109 @@ use glam::{Mat3, Mat4, Vec3, Vec4};
 use vulkano::image::view::ImageView;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct GameEntity {
-    // pub id: u32,
-    pub name: String,
-    pub entity_type: GameEntityType,
-    pub transform: Transform,
-}
-
-#[derive(Debug, Clone)]
-pub enum GameEntityType {
-    Object {model: Arc<Model>, texture_index: Option<i32>, color: Vec3},
-    Light {color: Vec4},
-    Viewer
-}
+type TextureIndex = i32;
+type LightIntensity = f32;
 
 #[derive(Debug, Clone, Default)]
+pub struct Entity {
+    pub name: Option<String>,
+    pub model: Option<Arc<Model>>,
+    pub texture: Option<TextureIndex>,
+    pub physics: Option<Physics>,
+    pub light: Option<LightIntensity>,
+    pub color: Option<Vec3>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Physics {
+    pub transform: Transform,
+    pub velocity: Vec3
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Transform {
     pub translation: Vec3,
     pub scale: Vec3,
     pub rotation: Vec3,
 }
 
-impl GameEntity {
-    pub fn new(entity_type: GameEntityType) -> Self {
-        Self {
-            name: String::new(),
-            transform: Transform {
-                scale: Vec3::splat(1.0),
-                ..Default::default()
-            },
-            entity_type
-        }
+impl Entity {
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name = Some(name.to_string());
+        self
     }
 
-    pub fn new_object(name: &str, model: Arc<Model>, texture_index: Option<i32>, color: Vec3) -> Self {
-        Self {
-            name: name.to_string(),
-            transform: Transform {
-                scale: Vec3::splat(1.0),
-                ..Default::default()
-            },
-            entity_type: GameEntityType::Object { 
-                model,
-                texture_index,
-                color
-            }
-        }
+    pub fn with_model(mut self, model: Arc<Model>) -> Self {
+        self.model = Some(model);
+        self
+    }
+
+    pub fn with_texture(mut self, texture: TextureIndex) -> Self {
+        self.texture = Some(texture);
+        self
+    }
+
+    pub fn with_physics(mut self, physics: Physics) -> Self {
+        self.physics = Some(physics);
+        self
+    }
+
+    pub fn with_position(mut self, position: Vec3) -> Self {
+        let mut physics = self.physics.unwrap_or_default();
+        physics.transform.translation = position;
+        self.with_physics(physics)
+    }
+       
+    pub fn with_rotation(mut self, rotation: Vec3) -> Self {
+        let mut physics = self.physics.unwrap_or_default();
+        physics.transform.rotation = rotation;
+        self.with_physics(physics)
+    }
+
+    pub fn with_scale(mut self, scale: Vec3) -> Self {
+        let mut physics = self.physics.unwrap_or_default();
+        physics.transform.scale = scale;
+        self.with_physics(physics)
+    }
+
+    pub fn with_light(mut self, light: LightIntensity) -> Self {
+        self.light = Some(light);
+        self
+    }
+
+    pub fn with_color(mut self, color: Vec3) -> Self {
+        self.color = Some(color);
+        self
     }
 }
 
+// impl Entity {
+//     pub fn new(entity_type: GameEntityType) -> Self {
+//         Self {
+//             name: String::new(),
+//             transform: Transform {
+//                 scale: Vec3::splat(1.0),
+//                 ..Default::default()
+//             },
+//             entity_type
+//         }
+//     }
+
+//     pub fn new_object(name: &str, model: Arc<Model>, texture_index: Option<i32>, color: Vec3) -> Self {
+//         Self {
+//             name: name.to_string(),
+//             transform: Transform {
+//                 scale: Vec3::splat(1.0),
+//                 ..Default::default()
+//             },
+//             entity_type: GameEntityType::Object { 
+//                 model,
+//                 texture_index,
+//                 color
+//             }
+//         }
+//     }
+// }
 
 impl Transform {
     // Matrix corrsponds to Translate * Ry * Rx * Rz * Scale

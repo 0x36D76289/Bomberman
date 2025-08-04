@@ -1,4 +1,4 @@
-use crate::{graphics::GameEntity, input::InputState};
+use crate::{graphics::Entity, input::InputState};
 use glam::Vec3;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -12,8 +12,10 @@ impl KeyboardMovementController {
         &self,
         input_state: &InputState,
         dt: f32,
-        game_object: &mut GameEntity,
+        entity: &mut Entity,
     ) {
+        let transform = &mut entity.physics.as_mut().unwrap().transform;
+
         let mut rotate = Vec3::splat(0.0);
 
         if input_state.look_right {
@@ -30,14 +32,14 @@ impl KeyboardMovementController {
         }
 
         if rotate.dot(rotate) > f32::EPSILON {
-            game_object.transform.rotation += self.look_speed * dt * rotate.normalize()
+            transform.rotation += self.look_speed * dt * rotate.normalize()
         }
 
-        game_object.transform.rotation.x = game_object.transform.rotation.x.clamp(-1.5, 1.5);
-        game_object.transform.rotation.y =
-            game_object.transform.rotation.y % (2.0 * std::f32::consts::PI);
+        transform.rotation.x = transform.rotation.x.clamp(-1.5, 1.5);
+        transform.rotation.y =
+            transform.rotation.y % (2.0 * std::f32::consts::PI);
 
-        let yaw = game_object.transform.rotation.y;
+        let yaw = transform.rotation.y;
         let forward_dir = Vec3::new(yaw.sin(), 0.0, yaw.cos());
         let right_dir = Vec3::new(forward_dir.z, 0.0, -forward_dir.x);
         let up_dir = Vec3::new(0.0, -1.0, 0.0);
@@ -64,7 +66,7 @@ impl KeyboardMovementController {
         }
 
         if move_dir.dot(move_dir) > f32::EPSILON {
-            game_object.transform.translation += self.move_speed * dt * move_dir.normalize()
+            transform.translation += self.move_speed * dt * move_dir.normalize()
         }
     }
 }

@@ -5,19 +5,9 @@ use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
     pipeline::{
-        DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
-        PipelineShaderStageCreateInfo,
         graphics::{
-            GraphicsPipelineCreateInfo,
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{DepthState, DepthStencilState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::{Vertex, VertexDefinition},
-            viewport::{Viewport, ViewportState},
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
+            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition, VertexInputState}, viewport::{Viewport, ViewportState}, GraphicsPipelineCreateInfo
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo
     },
     render_pass::{RenderPass, Subpass},
     shader::EntryPoint,
@@ -26,7 +16,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     app::App,
-    graphics::{systems::{GlobalUbo, PointLight}, GameEntity, GameEntityType, MyVertex, RenderContext, Vulkan},
+    graphics::{systems::{GlobalUbo, PointLight}, Entity, MyVertex, RenderContext, Vulkan},
 };
 
 #[derive(Debug, Default)]
@@ -38,7 +28,7 @@ impl PointLightSystem {
     pub fn render(
         &self,
         vulkan: &Vulkan,
-        entities: &Vec<GameEntity>,
+        entities: &Vec<Entity>,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
@@ -75,27 +65,31 @@ impl PointLightSystem {
             )
             .unwrap();
 
-        for (entity, light_color) in entities.iter().filter_map(|o| match &o.entity_type {
-            GameEntityType::Light { color } => Some((o, color)),
-            _ => None
-        }) {
+        for entity in entities.iter().filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some()) {
+            let transform = entity.physics.unwrap().transform;
+            let light_color = Vec4::default()
+                .with_xyz(entity.color.unwrap())
+                .with_w(entity.light.unwrap());
+
             let push_constant = vs::Push {
-                position: Vec4::splat(1.0).with_xyz(entity.transform.translation).to_array(),
+                position: Vec4::ONE.with_xyz(transform.translation).to_array(),
                 color: light_color.to_array(),
-                radius: entity.transform.scale.x
+                radius: transform.scale.x
             };
 
             command_buffer
                 .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap();
-
+            
             unsafe {
-                command_buffer.draw(6, 1, 0, 0);
+                command_buffer
+                    .draw(6, 1, 0, 0)
+                    .unwrap();
             }
         }
     }
 
-    pub fn lights_array(&self, objects: &Vec<GameEntity>) -> ([PointLight; 100], i32) {
+    pub fn lights_array(&self, entities: &Vec<Entity>) -> ([PointLight; 100], i32) {
         let mut vec = [
             PointLight {
                 position: Default::default(),
@@ -104,12 +98,14 @@ impl PointLightSystem {
             100
         ];
         let mut i: usize = 0;
-        for (object, light_color) in objects.iter().filter_map(|o| match &o.entity_type {
-            GameEntityType::Light { color } => Some((o, color)),
-            _ => None
-        }) {
+        for entity in entities.iter().filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some()) {
+            let transform = entity.physics.unwrap().transform;
+            let light_color = Vec4::default()
+                .with_xyz(entity.color.unwrap())
+                .with_w(entity.light.unwrap());
+
             vec[i] = PointLight {
-                position: Vec4::splat(1.0).with_xyz(object.transform.translation).to_array(),
+                position: Vec4::ONE.with_xyz(transform.translation).to_array(),
                 color: light_color.to_array()
             };
             i += 1;
@@ -132,7 +128,7 @@ impl PointLightSystem {
             .entry_point("main")
             .unwrap();
     
-        let vertex_input_state = MyVertex::per_vertex().definition(&vertex_shader).unwrap();
+        let vertex_input_state = VertexInputState::new();
         let stages = [
             PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
             PipelineShaderStageCreateInfo::new(fragment_shader.clone()),

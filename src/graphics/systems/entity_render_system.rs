@@ -11,7 +11,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     app::App,
-    graphics::{systems::GlobalUbo, GameEntity, GameEntityType, MyVertex, RenderContext, Vulkan},
+    graphics::{systems::GlobalUbo, Entity, MyVertex, RenderContext, Vulkan},
 };
 
 #[derive(Debug, Default)]
@@ -24,7 +24,7 @@ impl GameEntitySystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
-        enities: &Vec<GameEntity>,
+        enities: &Vec<Entity>,
         textures: &Vec<Arc<ImageView>>,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -34,6 +34,8 @@ impl GameEntitySystem {
         }
 
         let pipeline = self.pipeline.as_ref().unwrap();
+
+        command_buffer.bind_pipeline_graphics(pipeline.clone()).unwrap();
 
         let uniform_buffer = {
             let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
@@ -57,8 +59,6 @@ impl GameEntitySystem {
         .unwrap();
 
         command_buffer
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 pipeline.layout().clone(),
@@ -67,18 +67,15 @@ impl GameEntitySystem {
             )
             .unwrap();
 
-        for (entity, model, texture_index, color) in enities
-            .iter()
-            .filter_map(|o| match &o.entity_type {
-                GameEntityType::Object { model, texture_index, color } => Some((o, model, texture_index, color)),
-                _ => None
-            }) 
-        {
+        for entity in enities.iter().filter(|e| e.physics.is_some() && e.model.is_some()) {
+            let transform = entity.physics.unwrap().transform;
+            let model = entity.model.as_ref().unwrap();
+
             let push_constant = vs::Push {
-                model_matrix: entity.transform.mat4().to_cols_array_2d(),
-                normal_matrix: entity.transform.normal_matrix().to_cols_array_2d(),
-                color: color.to_array(),
-                tex_index: texture_index.unwrap_or(-1)
+                model_matrix: entity.physics.unwrap().transform.mat4().to_cols_array_2d(),
+                normal_matrix: entity.physics.unwrap().transform.normal_matrix().to_cols_array_2d(),
+                color: entity.color.unwrap_or_default().to_array(),
+                tex_index: entity.texture.unwrap_or(-1)
             };
 
             command_buffer
