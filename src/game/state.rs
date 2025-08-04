@@ -5,7 +5,7 @@ use vulkano::device::Queue;
 use vulkano::image::view::ImageView;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
-use crate::graphics::{Camera, Entity, Model, Transform};
+use crate::game::{Camera, Entity};
 use crate::input::{InputState, KeyboardMovementController};
 
 use super::map::Map;

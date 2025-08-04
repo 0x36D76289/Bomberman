@@ -3,7 +3,7 @@ use std::{error::Error, sync::Arc, time::Instant};
 use crate::{
     app::App,
     graphics::{
-        systems::{entity_render_system::GameEntitySystem, GlobalUbo}, window_size_dependent_setup, Camera, Entity, TimeInfo, Vulkan
+        window_size_dependent_setup, TimeInfo, Vulkan
     },
     input::KeyboardMovementController,
 };

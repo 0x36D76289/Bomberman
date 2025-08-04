@@ -10,17 +10,16 @@ use vulkano::{
 use winit::dpi::PhysicalSize;
 
 use crate::{
-    app::App,
-    graphics::{systems::GlobalUbo, Entity, MyVertex, RenderContext, Vulkan},
+    app::App, game::Entity, graphics::{GlobalUbo, MyVertex, RenderContext, Vulkan}
 };
 
 #[derive(Debug, Default)]
-pub struct GameEntitySystem {
+pub struct EntityRenderSystem {
     pipeline: Option<Arc<GraphicsPipeline>>,
     sampler: Option<Arc<Sampler>>
 }
 
-impl GameEntitySystem {
+impl EntityRenderSystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,

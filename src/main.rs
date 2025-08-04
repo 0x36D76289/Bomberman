@@ -1,4 +1,4 @@
-#![allow(dead_code, unused)]
+
 
 mod app;
 mod game;

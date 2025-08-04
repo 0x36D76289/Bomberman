@@ -1,4 +1,4 @@
-use crate::{graphics::Entity, input::InputState};
+use crate::{game::Entity, input::InputState};
 use glam::Vec3;
 
 #[derive(Debug, Clone, Copy, Default)]
