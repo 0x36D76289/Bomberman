@@ -2,6 +2,7 @@ use core::f32;
 
 use glam::{usize, Vec2};
 
+use super::collision::Collision;
 use crate::game::{direction::Direction, player::Player};
 
 pub enum BombState {
@@ -55,7 +56,7 @@ impl Bomb {
         if self.collision_enabled {
             return;
         }
-        if !players[self.owner_id as usize].is_colliding(self.position, 0.5) {
+        if !players[self.owner_id as usize].is_colliding_with(self.position, 0.5) {
             self.collision_enabled = true;
         }
     }
