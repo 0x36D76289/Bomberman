@@ -1,24 +1,20 @@
-pub mod camera;
 pub mod init;
+pub mod renderer;
+pub mod entity_render_system;
+pub mod point_light_render_system;
 pub mod model;
 pub mod texture;
-pub mod entity;
-pub mod renderer;
-pub mod systems;
-
-use crate::graphics::systems::{entity_render_system::GameEntitySystem, point_light_render_system::PointLightSystem};
 
 pub use {
-    camera::Camera,
     init::window_size_dependent_setup,
-    model::Model,
-    entity::{Entity, Physics, Transform},
     renderer::{Renderer, RenderContext},
+    entity_render_system::{EntityRenderSystem, vs::GlobalUbo, vs::PointLight},
+    point_light_render_system::PointLightRenderSystem,
+    model::Model,
     texture::load_texture
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
-use systems::GlobalUbo;
 use vulkano::{
     buffer::{BufferContents, allocator::SubbufferAllocator},
     command_buffer::allocator::StandardCommandBufferAllocator,
@@ -37,8 +33,8 @@ use winit::window::Window;
 pub struct Graphics {
     pub vulkan: Vulkan,
     pub renderer: Renderer,
-    pub game_object_system: GameEntitySystem,
-    pub point_light_system: PointLightSystem
+    pub game_object_system: EntityRenderSystem,
+    pub point_light_system: PointLightRenderSystem
 }
 
 pub struct Vulkan {

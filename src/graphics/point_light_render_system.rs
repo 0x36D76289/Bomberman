@@ -16,15 +16,16 @@ use winit::dpi::PhysicalSize;
 
 use crate::{
     app::App,
-    graphics::{systems::{GlobalUbo, PointLight}, Entity, MyVertex, RenderContext, Vulkan},
+    game::Entity,
+    graphics::{MyVertex, RenderContext, Vulkan, GlobalUbo, PointLight}
 };
 
 #[derive(Debug, Default)]
-pub struct PointLightSystem {
+pub struct PointLightRenderSystem {
     pub pipeline: Option<Arc<GraphicsPipeline>>,
 }
 
-impl PointLightSystem {
+impl PointLightRenderSystem {
     pub fn render(
         &self,
         vulkan: &Vulkan,
