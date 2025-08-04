@@ -1,4 +1,4 @@
-pub mod game_object_system;
-pub mod point_light_system;
+pub mod entity_render_system;
+pub mod point_light_render_system;
 
-pub use game_object_system::vs::{GlobalUbo, PointLight};
+pub use entity_render_system::vs::{GlobalUbo, PointLight};

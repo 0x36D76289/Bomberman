@@ -1,9 +1,9 @@
 use crate::game::state::State;
-use crate::graphics::systems::point_light_system::{self, PointLightSystem};
+use crate::graphics::systems::point_light_render_system::{self, PointLightSystem};
 use crate::graphics::systems::GlobalUbo;
-use crate::graphics::systems::game_object_system::{self, GameEntitySystem};
+use crate::graphics::systems::entity_render_system::{self, GameEntitySystem};
 use crate::graphics::{
-    self, load_texture, Camera, GameEntity, GameEntityType, Graphics, Model, RenderContext, Renderer, Transform, Vulkan
+    self, load_texture, Camera, Entity, Graphics, Model, Physics, RenderContext, Renderer, Transform, Vulkan
 };
 use crate::input::{InputState, KeyboardMovementController};
 use glam::{Vec3, Vec4};
@@ -33,9 +33,9 @@ impl App {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
 
-        let (objects, textures) = load_game_objects(graphics.vulkan.memory_allocator.clone(), graphics.vulkan.command_buffer_allocator.clone(), graphics.vulkan.queue.clone())?;
+        let (entities, textures) = load_entities(graphics.vulkan.memory_allocator.clone(), graphics.vulkan.command_buffer_allocator.clone(), graphics.vulkan.queue.clone())?;
 
-        let state = State::default_state(objects, textures)?;
+        let state = State::default_state(entities, textures)?;
 
         Ok(Self {
             state,
@@ -64,9 +64,12 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // TODO: main loop
         // TODO: render
-
+        
         // Event Handling
         match event {
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.state.input_state.update_keyboard_input(event)
+            }
             WindowEvent::RedrawRequested => {
                 let state = &mut self.state;
                 let renderer = &mut self.graphics.renderer;
@@ -83,8 +86,8 @@ impl ApplicationHandler for App {
                     &mut state.entities[state.controlled_object_id],
                 );
                 state.camera.set_view_xyz(
-                    state.entities[0].transform.translation,
-                    state.entities[0].transform.rotation,
+                    state.entities[0].physics.unwrap().transform.translation,
+                    state.entities[0].physics.unwrap().transform.rotation,
                 );
                 state.camera.set_perspective_projection(
                     0.872664626,
@@ -92,6 +95,11 @@ impl ApplicationHandler for App {
                     0.1,
                     100.0,
                 );
+    
+                if state.input_state.debug {
+                    state.input_state.debug = false;
+                    state.debug();
+                }
 
                 if let Some(mut command_buffer) = renderer.begin_frame(&self.graphics.vulkan) {
                     let (lights, light_number) = point_light_system.lights_array(&state.entities);
@@ -110,12 +118,9 @@ impl ApplicationHandler for App {
                     renderer.end_frame(&self.graphics.vulkan, command_buffer);
                     renderer.update_time();
                     renderer.update_title(
-                        &format!("Bomberman!! fps: {:.0} control: {}", renderer.get_rcx().time_info.avg_fps, state.entities[state.controlled_object_id].name)
+                        &format!("Bomberman!! fps: {:.0} control: {}", renderer.get_rcx().time_info.avg_fps, state.entities[state.controlled_object_id].name.as_ref().unwrap_or(&"undefined".to_string()))
                     );
                 }
-            }
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.state.input_state.update_keyboard_input(event)
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
@@ -128,11 +133,12 @@ impl ApplicationHandler for App {
     }
 }
 
-fn load_game_objects(
+fn load_entities(
     memory_allocator: Arc<StandardMemoryAllocator>,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     queue: Arc<Queue>,
-) -> Result<(Vec<GameEntity>, Vec<Arc<ImageView>>), Box<dyn Error>> {
+) -> Result<(Vec<Entity>, Vec<Arc<ImageView>>), Box<dyn Error>> {
+    // load the textures
     let mut command_buffer = AutoCommandBufferBuilder::primary(
         command_buffer_allocator.clone(),
         queue.queue_family_index(),
@@ -142,51 +148,63 @@ fn load_game_objects(
 
     let mut textures = Vec::new();
     textures.push(load_texture(include_bytes!("assets/WhiteBomberMan.png"), &mut command_buffer, memory_allocator.clone()));
-    textures.push(load_texture(&include_bytes!("assets/crate2.png").to_vec(), &mut command_buffer, memory_allocator.clone()));
-    textures.push(load_texture(&include_bytes!("assets/textureStone.png").to_vec(), &mut command_buffer, memory_allocator.clone()));
+    textures.push(load_texture(include_bytes!("assets/crate2.png"), &mut command_buffer, memory_allocator.clone()));
+    textures.push(load_texture(include_bytes!("assets/textureStone.png"), &mut command_buffer, memory_allocator.clone()));
     let _ = command_buffer.build().unwrap().execute(queue.clone()).unwrap();
 
-    let mut viewer_object = GameEntity::new(GameEntityType::Viewer);
-    viewer_object.name = "Camera".to_string();
-    viewer_object.transform.translation = Vec3::new(0.0, -5.25, -3.0);
-    viewer_object.transform.rotation.x = -1.17;
+    // load the models
+    let bomberman_model = Model::load(include_bytes!("assets/bomberman.obj"), memory_allocator.clone())?;
+    let cube_model = Model::load(include_bytes!("assets/cube.obj"), memory_allocator.clone())?;
+    let quad_model = Model::load(include_bytes!("assets/quad.obj"), memory_allocator.clone())?;
+    
+    // create the entities
+    let mut entities = Vec::new();
 
-    let model = Model::load(include_bytes!("assets/bomberman.obj"), memory_allocator.clone())?;
-    let mut bomberman = GameEntity::new_object("Bomberman", model.clone(), Some(0), Vec3::new(1.0, 1.0, 1.0));
-    bomberman.transform.translation = Vec3::new(-0.5, 0.5, 0.0);
-    bomberman.transform.scale = Vec3::splat(0.1);
+    entities.push(Entity::default()
+        .with_name("Camera")
+        .with_position(Vec3::new(0.0, -5.25, -3.0))
+        .with_rotation(Vec3::new(-1.17, 0.0, 0.0))
+    );
 
-    let model = Model::load(include_bytes!("assets/cube.obj"), memory_allocator.clone())?;
-    let mut cratee = GameEntity::new_object("Crate", model.clone(), Some(1), Vec3::new(1.0, 1.0, 1.0));
-    cratee.transform.translation = Vec3::new(0.5, 0.5, 0.0);
-    cratee.transform.scale = Vec3::splat(0.5);
+    entities.push(Entity::default()
+        .with_name("Bomberman")
+        .with_model(bomberman_model.clone())
+        .with_texture(0)
+        .with_position(Vec3::new(-0.5, 0.5, 0.0))
+        .with_scale(Vec3::splat(0.15))
+    );
 
-    let model = Model::load(include_bytes!("assets/quad.obj"), memory_allocator.clone())?;
-    let mut floor = GameEntity::new_object("Floor", model.clone(), None, Vec3::new(1.0, 1.0, 1.0));
-    floor.transform.translation = Vec3::new(0.0, 0.5, 0.0);
-    floor.transform.scale = Vec3::new(3.0, 1.0, 3.0);
+    entities.push(Entity::default()
+        .with_name("Crate1")
+        .with_model(cube_model.clone())
+        .with_texture(1)
+        .with_position(Vec3::new(0.5, 0.5, 0.0))
+        .with_scale(Vec3::splat(0.5))
+    );
 
-    let mut light1 = GameEntity::new(GameEntityType::Light { color: Vec4::splat(1.0) });
-    light1.name = "Light1".to_string();
-    light1.transform.translation = Vec3::new(-1.5, -0.75, -1.5);
-    light1.transform.scale = Vec3::splat(0.1);
+    entities.push(Entity::default()
+        .with_name("Floor")
+        .with_model(quad_model.clone())
+        .with_color(Vec3::new(1.0, 1.0, 1.0))
+        .with_position(Vec3::new(0.0, 0.5, 0.0))
+        .with_scale(Vec3::new(3.0, 1.0, 3.0))
+    );
 
-    let mut light2 = GameEntity::new(GameEntityType::Light { color: Vec4::new(1.0, 0.0, 0.0, 1.0) });
-    light2.name = "Light2".to_string();
-    light2.transform.translation = Vec3::new(-1.5, -0.75, 1.5);
-    light2.transform.scale = Vec3::splat(0.1);
+    entities.push(Entity::default()
+        .with_name("Light1")
+        .with_color(Vec3::ONE)
+        .with_light(1.0)
+        .with_position(Vec3::new(-1.0, -0.75, 0.0))
+        .with_scale(Vec3::splat(0.1))
+    );
 
-    let mut light3 = GameEntity::new(GameEntityType::Light { color: Vec4::new(0.0, 1.0, 0.0, 1.0) });
-    light3.name = "Light3".to_string();
-    light3.transform.translation = Vec3::new(1.5, -0.75, -1.5);
-    light3.transform.scale = Vec3::splat(0.1);
+    entities.push(Entity::default()
+        .with_name("Light2")
+        .with_color(Vec3::new(1.0, 0.0, 0.0))
+        .with_light(1.0)
+        .with_position(Vec3::new(1.0, -0.75, 0.0))
+        .with_scale(Vec3::splat(0.1))
+    );
 
-    let mut light4 = GameEntity::new(GameEntityType::Light { color: Vec4::new(0.0, 0.0, 1.0, 1.0) });
-    light4.name = "Light4".to_string();
-    light4.transform.translation = Vec3::new(1.5, -0.75, 1.5);
-    light4.transform.scale = Vec3::splat(0.1);
-
-    let objects = vec![viewer_object, bomberman, floor, cratee, light1, light2, light3, light4];
-
-    Ok((objects, textures))
+    Ok((entities, textures))
 }

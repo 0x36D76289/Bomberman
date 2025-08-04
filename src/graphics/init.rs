@@ -1,5 +1,5 @@
 use crate::graphics::{
-    renderer::RenderContext, systems::{game_object_system::GameEntitySystem, point_light_system::PointLightSystem, GlobalUbo}, Graphics, MyVertex, Renderer, TimeInfo, Vulkan
+    renderer::RenderContext, systems::{entity_render_system::GameEntitySystem, point_light_render_system::PointLightSystem, GlobalUbo}, Graphics, MyVertex, Renderer, TimeInfo, Vulkan
 };
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{

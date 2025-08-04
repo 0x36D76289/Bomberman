@@ -5,7 +5,7 @@ use vulkano::device::Queue;
 use vulkano::image::view::ImageView;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
-use crate::graphics::{Camera, GameEntity, Model, Transform};
+use crate::graphics::{Camera, Entity, Model, Transform};
 use crate::input::{InputState, KeyboardMovementController};
 
 use super::map::Map;
@@ -20,7 +20,7 @@ pub struct State {
     pub input_state: InputState,
     pub players: Vec<Player>,
     pub map: Map,
-    pub entities: Vec<GameEntity>,
+    pub entities: Vec<Entity>,
     pub textures: Vec<Arc<ImageView>>,
     pub camera: Camera,
     pub entity_controller: KeyboardMovementController,
@@ -37,7 +37,7 @@ impl State {
     }
 
     pub fn default_state(
-        entities: Vec<GameEntity>,
+        entities: Vec<Entity>,
         textures: Vec<Arc<ImageView>>
     ) -> Result<Self, Box<dyn Error>> {
         let input_state = InputState::default();
@@ -64,6 +64,12 @@ impl State {
             entity_controller,
             controlled_object_id: 0,
         })
+    }
+
+    pub fn debug(&self) {
+        for entity in self.entities.iter() {
+            println!("{entity:?}");
+        }
     }
 
     pub fn print(&self) {

@@ -6,13 +6,13 @@ pub mod entity;
 pub mod renderer;
 pub mod systems;
 
-use crate::graphics::systems::{game_object_system::GameEntitySystem, point_light_system::PointLightSystem};
+use crate::graphics::systems::{entity_render_system::GameEntitySystem, point_light_render_system::PointLightSystem};
 
 pub use {
     camera::Camera,
     init::window_size_dependent_setup,
     model::Model,
-    entity::{GameEntity, GameEntityType, Transform},
+    entity::{Entity, Physics, Transform},
     renderer::{Renderer, RenderContext},
     texture::load_texture
 };
