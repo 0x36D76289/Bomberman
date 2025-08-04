@@ -1,5 +1,6 @@
 use crate::game::{
     bomb::Bomb,
+    collision::Collision,
     input::Input,
     map::{Map, MapElement},
 };
@@ -36,68 +37,14 @@ impl Player {
         }
     }
 
-    fn bound(&mut self, width: usize, height: usize) {
-        self.position.x = self.position.x.max(PLAYER_RADIUS);
-        self.position.x = self.position.x.min(width as f32 - PLAYER_RADIUS);
-        self.position.y = self.position.y.max(PLAYER_RADIUS);
-        self.position.y = self.position.y.min(height as f32 - PLAYER_RADIUS);
-    }
-
-    pub fn is_colliding(&self, pos: Vec2, radius: f32) -> bool {
-        return ((self.position.x - pos.x).abs() < (PLAYER_RADIUS + radius))
-            && ((self.position.y - pos.y).abs() < (PLAYER_RADIUS + radius));
-    }
-
-    fn resolve_collision(&mut self, pos: Vec2, radius: f32, direction: Direction) {
-        if !self.is_colliding(pos, radius) {
-            return;
-        }
-        match direction {
-            Direction::Up => self.position.y = pos.y + radius + PLAYER_RADIUS,
-            Direction::Down => self.position.y = pos.y - radius - PLAYER_RADIUS,
-            Direction::Left => self.position.x = pos.x + radius + PLAYER_RADIUS,
-            Direction::Right => self.position.x = pos.x - radius - PLAYER_RADIUS,
-        }
-    }
-
-    fn does_map_collide(map: &Map, x: f32, y: f32) -> bool {
-        if x < 0.0 || y < 0.0 {
-            return false;
-        }
-        if (x as usize >= map.width) || (y as usize >= map.height) {
-            return false;
-        }
-        return map.content[y as usize * map.width + x as usize] != MapElement::Empty;
-    }
-    fn collide_map(&mut self, map: &Map, direction: Direction) {
-        for y in -1..2 {
-            for x in -1..2 {
-                if Self::does_map_collide(
-                    map,
-                    self.position.x + x as f32,
-                    self.position.y + y as f32,
-                ) {
-                    self.resolve_collision(
-                        Vec2 {
-                            x: (self.position.x + x as f32) as usize as f32 + 0.5,
-                            y: (self.position.y + y as f32) as usize as f32 + 0.5,
-                        },
-                        0.5,
-                        direction,
-                    );
-                }
-            }
-        }
-    }
-
     fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &Vec<Bomb>) {
-        self.bound(map.width, map.height);
+        self.bound(map);
         self.collide_map(map, direction);
         for bomb in bombs {
             if bomb.owner_id == self.id && !bomb.collision_enabled {
                 continue;
             }
-            self.resolve_collision(bomb.position, 0.5, direction);
+            self.resolve_collision_with(bomb.position, 0.5, direction);
         }
         //TODO:
         //collide players
@@ -160,9 +107,22 @@ impl Player {
                     // self.bound(map.width, map.height);
                     // self.collide_up_map(map);
                 }
-                self.bound(map.width, map.height);
                 self.handle_collisions(map, direction, bombs);
             }
         }
+    }
+}
+
+impl Collision for Player {
+    fn get_pos(&self) -> Vec2 {
+        self.position
+    }
+
+    fn set_pos(&mut self, pos: Vec2) {
+        self.position = pos;
+    }
+
+    fn get_size(&self) -> f32 {
+        PLAYER_RADIUS
     }
 }

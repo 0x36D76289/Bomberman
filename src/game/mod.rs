@@ -1,6 +1,7 @@
 // game/mod.rs
 
 pub mod bomb;
+pub mod collision;
 pub mod direction;
 pub mod enemy;
 pub mod input;
