@@ -1,6 +1,13 @@
-use std::{io::Cursor, sync::Arc};
+use std::sync::Arc;
 
-use vulkano::{buffer::{Buffer, BufferCreateInfo, BufferUsage}, command_buffer::{AutoCommandBufferBuilder, CopyBufferToImageInfo, PrimaryAutoCommandBuffer}, format::Format, image::{sampler::Sampler, view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator}, DeviceSize};
+use vulkano::{
+    DeviceSize,
+    buffer::{Buffer, BufferCreateInfo, BufferUsage},
+    command_buffer::{AutoCommandBufferBuilder, CopyBufferToImageInfo, PrimaryAutoCommandBuffer},
+    format::Format,
+    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+};
 
 pub fn load_texture(
     png_bytes: &[u8],
@@ -23,7 +30,7 @@ pub fn load_texture(
                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
-        (info.width * info.height * 4) as DeviceSize
+        (info.width * info.height * 4) as DeviceSize,
     )
     .unwrap();
 
@@ -40,14 +47,16 @@ pub fn load_texture(
             usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
             ..Default::default()
         },
-        AllocationCreateInfo::default()
+        AllocationCreateInfo::default(),
     )
     .unwrap();
 
     command_buffer
-        .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(upload_buffer, image.clone()))
+        .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
+            upload_buffer,
+            image.clone(),
+        ))
         .unwrap();
 
     ImageView::new_default(image).unwrap()
 }
-

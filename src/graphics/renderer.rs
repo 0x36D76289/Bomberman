@@ -1,21 +1,22 @@
-use std::{error::Error, sync::Arc, time::Instant};
-
-use crate::{
-    app::App,
-    graphics::{
-        window_size_dependent_setup, TimeInfo, Vulkan
-    },
-    input::KeyboardMovementController,
-};
-use glam::{Vec3, Vec4};
+use crate::graphics::{TimeInfo, Vulkan};
+use std::{sync::Arc, time::Instant};
 use vulkano::{
+    Validated, VulkanError,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
-    }, descriptor_set::{DescriptorSet, WriteDescriptorSet}, memory::allocator::StandardMemoryAllocator, pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint}, render_pass::{Framebuffer, RenderPass}, swapchain::{
-        acquire_next_image, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo
-    }, sync::{self, GpuFuture}, Validated, VulkanError
+    },
+    format::Format,
+    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
+    memory::allocator::AllocationCreateInfo,
+    pipeline::graphics::viewport::Viewport,
+    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
+    swapchain::{
+        Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo,
+        acquire_next_image,
+    },
+    sync::{self, GpuFuture},
 };
-use winit::{event_loop::{ActiveEventLoop, EventLoop}, window::Window};
+use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub struct Renderer {
     rcx: Option<RenderContext>,
@@ -38,7 +39,7 @@ impl Renderer {
         Self {
             rcx: None,
             image_index: 0,
-            acquire_future: None
+            acquire_future: None,
         }
     }
 
@@ -55,10 +56,6 @@ impl Renderer {
         rcx.swapchain.image_extent()[0] as f32 / rcx.swapchain.image_extent()[1] as f32
     }
 
-    pub fn get_memory_allocator(&self, vulkan: &Vulkan) -> Arc<StandardMemoryAllocator> {
-        vulkan.memory_allocator.clone()
-    }
-
     pub fn get_delta_time(&self) -> f32 {
         self.rcx.as_ref().unwrap().time_info.dt
     }
@@ -71,7 +68,10 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
-    pub fn begin_frame(&mut self, vulkan: &Vulkan) -> Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>> {
+    pub fn begin_frame(
+        &mut self,
+        vulkan: &Vulkan,
+    ) -> Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>> {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
@@ -92,12 +92,40 @@ impl Renderer {
                 .expect("failed to recreate swapchain");
 
             rcx.swapchain = new_swapchain;
-            rcx.framebuffers = window_size_dependent_setup(
-                window_size,
-                &new_images,
-                &rcx.render_pass,
-                &vulkan.memory_allocator,
-            );
+            rcx.framebuffers = {
+                let depth_buffer = ImageView::new_default(
+                    Image::new(
+                        vulkan.memory_allocator.clone(),
+                        ImageCreateInfo {
+                            image_type: ImageType::Dim2d,
+                            format: Format::D32_SFLOAT,
+                            extent: new_images[0].extent(),
+                            usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
+                                | ImageUsage::TRANSIENT_ATTACHMENT,
+                            ..Default::default()
+                        },
+                        AllocationCreateInfo::default(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+
+                new_images
+                    .iter()
+                    .map(|image| {
+                        let view = ImageView::new_default(image.clone()).unwrap();
+
+                        Framebuffer::new(
+                            rcx.render_pass.clone(),
+                            FramebufferCreateInfo {
+                                attachments: vec![view, depth_buffer.clone()],
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap()
+                    })
+                    .collect::<Vec<_>>()
+            };
             rcx.recreate_swapchain = false;
         }
 
@@ -203,7 +231,7 @@ impl Renderer {
         time_info.frame_count += 1.0;
 
         // calculate the fps every second
-        if (time_info.dt_sum > 1.0) {
+        if time_info.dt_sum > 1.0 {
             time_info.avg_fps = time_info.frame_count / time_info.dt_sum;
             time_info.dt_sum = 0.0;
             time_info.frame_count = 0.0;

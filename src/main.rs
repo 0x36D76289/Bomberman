@@ -1,5 +1,3 @@
-
-
 mod app;
 mod game;
 mod graphics;

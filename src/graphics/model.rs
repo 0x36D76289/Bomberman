@@ -1,11 +1,5 @@
 use crate::graphics::MyVertex;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::File,
-    io::{BufReader, Cursor},
-    sync::Arc,
-};
+use std::{collections::HashMap, error::Error, io::Cursor, sync::Arc};
 use tobj::LoadError;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
@@ -25,7 +19,7 @@ impl Model {
     ) -> Result<Arc<Self>, Box<dyn Error>> {
         let mut cursor = Cursor::new(obj_bytes);
 
-        let (models, _) = tobj::load_obj_buf(&mut cursor, &tobj::GPU_LOAD_OPTIONS, |p| {
+        let (models, _) = tobj::load_obj_buf(&mut cursor, &tobj::GPU_LOAD_OPTIONS, |_| {
             Err(LoadError::OpenFileFailed)
         })?;
 
@@ -53,7 +47,10 @@ impl Model {
                 }
 
                 if !model.mesh.texcoords.is_empty() {
-                    vertex.uv = [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]];
+                    vertex.uv = [
+                        model.mesh.texcoords[i * 2],
+                        1.0 - model.mesh.texcoords[i * 2 + 1],
+                    ];
                 }
 
                 if !unique_vertices.contains_key(&vertex) {

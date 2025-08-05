@@ -1,20 +1,29 @@
 use crate::graphics::{
-    renderer::RenderContext, EntityRenderSystem, Graphics, MyVertex, PointLightRenderSystem, Renderer, TimeInfo, Vulkan
+    EntityRenderSystem, Graphics, PointLightRenderSystem, Renderer, TimeInfo, Vulkan,
+    renderer::RenderContext,
 };
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
+    VulkanLibrary,
     buffer::{
-        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo}, Buffer, BufferCreateInfo, BufferUsage
-    }, command_buffer::allocator::StandardCommandBufferAllocator, descriptor_set::allocator::StandardDescriptorSetAllocator, device::{
-        physical::PhysicalDeviceType, Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, DeviceOwned, QueueCreateInfo, QueueFlags
-    }, format::Format, image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage}, instance::{Instance, InstanceCreateFlags, InstanceCreateInfo}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator}, pipeline::{
-        graphics::{
-            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition}, viewport::{Viewport, ViewportState}, GraphicsPipelineCreateInfo
-        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo
-    }, render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass}, shader::EntryPoint, swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo}, sync::{self, GpuFuture}, VulkanLibrary
+        BufferUsage,
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
+    },
+    command_buffer::allocator::StandardCommandBufferAllocator,
+    descriptor_set::allocator::StandardDescriptorSetAllocator,
+    device::{
+        Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, QueueCreateInfo, QueueFlags,
+        physical::PhysicalDeviceType,
+    },
+    format::Format,
+    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
+    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    render_pass::{Framebuffer, FramebufferCreateInfo},
+    swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
+    sync::{self, GpuFuture},
 };
 use winit::{
-    dpi::PhysicalSize,
     event_loop::{ActiveEventLoop, EventLoop},
     window::Window,
 };
@@ -27,7 +36,7 @@ impl Graphics {
             vulkan,
             renderer: Renderer::new(),
             game_object_system: EntityRenderSystem::default(),
-            point_light_system: PointLightRenderSystem::default()
+            point_light_system: PointLightRenderSystem::default(),
         })
     }
 }
@@ -222,12 +231,40 @@ impl RenderContext {
         )
         .unwrap();
 
-        let framebuffers = window_size_dependent_setup(
-            window_size,
-            &images,
-            &render_pass,
-            &vulkan.memory_allocator,
-        );
+        let framebuffers = {
+            let depth_buffer = ImageView::new_default(
+                Image::new(
+                    vulkan.memory_allocator.clone(),
+                    ImageCreateInfo {
+                        image_type: ImageType::Dim2d,
+                        format: Format::D32_SFLOAT,
+                        extent: images[0].extent(),
+                        usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
+                            | ImageUsage::TRANSIENT_ATTACHMENT,
+                        ..Default::default()
+                    },
+                    AllocationCreateInfo::default(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+
+            images
+                .iter()
+                .map(|image| {
+                    let view = ImageView::new_default(image.clone()).unwrap();
+
+                    Framebuffer::new(
+                        render_pass.clone(),
+                        FramebufferCreateInfo {
+                            attachments: vec![view, depth_buffer.clone()],
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap()
+                })
+                .collect::<Vec<_>>()
+        };
 
         let recreate_swapchain = false;
         let previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
@@ -250,48 +287,4 @@ impl RenderContext {
             time_info,
         })
     }
-}
-
-// this function creates the framebuffers and the graphics pipeline, it is called when we create the window and when we resize it
-pub fn window_size_dependent_setup(
-    window_size: PhysicalSize<u32>,
-    images: &[Arc<Image>],
-    render_pass: &Arc<RenderPass>,
-    memory_allocator: &Arc<StandardMemoryAllocator>,
-) -> (Vec<Arc<Framebuffer>>) {
-    let device = memory_allocator.device();
-
-    let depth_buffer = ImageView::new_default(
-        Image::new(
-            memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: Format::D32_SFLOAT,
-                extent: images[0].extent(),
-                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-
-    let framebuffers = images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: vec![view, depth_buffer.clone()],
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>();
-
-    framebuffers
 }

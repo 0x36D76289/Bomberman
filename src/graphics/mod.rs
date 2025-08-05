@@ -1,17 +1,16 @@
-pub mod init;
-pub mod renderer;
 pub mod entity_render_system;
-pub mod point_light_render_system;
+pub mod init;
 pub mod model;
+pub mod point_light_render_system;
+pub mod renderer;
 pub mod texture;
 
 pub use {
-    init::window_size_dependent_setup,
-    renderer::{Renderer, RenderContext},
     entity_render_system::{EntityRenderSystem, vs::GlobalUbo, vs::PointLight},
-    point_light_render_system::PointLightRenderSystem,
     model::Model,
-    texture::load_texture
+    point_light_render_system::PointLightRenderSystem,
+    renderer::Renderer,
+    texture::load_texture,
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
@@ -22,19 +21,14 @@ use vulkano::{
     device::{Device, Queue},
     instance::Instance,
     memory::allocator::StandardMemoryAllocator,
-    pipeline::{GraphicsPipeline, graphics::vertex_input::Vertex},
-    render_pass::{Framebuffer, RenderPass},
-    shader::EntryPoint,
-    swapchain::Swapchain,
-    sync::GpuFuture,
+    pipeline::graphics::vertex_input::Vertex,
 };
-use winit::window::Window;
 
 pub struct Graphics {
     pub vulkan: Vulkan,
     pub renderer: Renderer,
     pub game_object_system: EntityRenderSystem,
-    pub point_light_system: PointLightRenderSystem
+    pub point_light_system: PointLightRenderSystem,
 }
 
 pub struct Vulkan {
