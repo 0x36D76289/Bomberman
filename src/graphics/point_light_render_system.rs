@@ -1,23 +1,28 @@
-use std::{collections::HashSet, hash::RandomState, sync::Arc};
-
-use glam::{Mat4, Vec3, Vec3Swizzles, Vec4, Vec4Swizzles};
+use glam::{Vec4, Vec4Swizzles};
+use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, RenderPassBeginInfo},
+    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
     pipeline::{
+        DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
+        PipelineShaderStageCreateInfo,
         graphics::{
-            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition, VertexInputState}, viewport::{Viewport, ViewportState}, GraphicsPipelineCreateInfo
-        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo
+            GraphicsPipelineCreateInfo,
+            color_blend::{ColorBlendAttachmentState, ColorBlendState},
+            depth_stencil::{DepthState, DepthStencilState},
+            input_assembly::InputAssemblyState,
+            multisample::MultisampleState,
+            rasterization::RasterizationState,
+            vertex_input::VertexInputState,
+        },
+        layout::PipelineDescriptorSetLayoutCreateInfo,
     },
     render_pass::{RenderPass, Subpass},
-    shader::EntryPoint,
 };
-use winit::dpi::PhysicalSize;
 
 use crate::{
-    app::App,
     game::Entity,
-    graphics::{MyVertex, RenderContext, Vulkan, GlobalUbo, PointLight}
+    graphics::{GlobalUbo, PointLight, Vulkan},
 };
 
 #[derive(Debug, Default)]
@@ -66,7 +71,10 @@ impl PointLightRenderSystem {
             )
             .unwrap();
 
-        for entity in entities.iter().filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some()) {
+        for entity in entities
+            .iter()
+            .filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some())
+        {
             let transform = entity.physics.unwrap().transform;
             let light_color = Vec4::default()
                 .with_xyz(entity.color.unwrap())
@@ -75,31 +83,29 @@ impl PointLightRenderSystem {
             let push_constant = vs::Push {
                 position: Vec4::ONE.with_xyz(transform.translation).to_array(),
                 color: light_color.to_array(),
-                radius: transform.scale.x
+                radius: transform.scale.x,
             };
 
             command_buffer
                 .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap();
-            
+
             unsafe {
-                command_buffer
-                    .draw(6, 1, 0, 0)
-                    .unwrap();
+                command_buffer.draw(6, 1, 0, 0).unwrap();
             }
         }
     }
 
     pub fn lights_array(&self, entities: &Vec<Entity>) -> ([PointLight; 100], i32) {
-        let mut vec = [
-            PointLight {
-                position: Default::default(),
-                color: Default::default()
-            };
-            100
-        ];
+        let mut vec = [PointLight {
+            position: Default::default(),
+            color: Default::default(),
+        }; 100];
         let mut i: usize = 0;
-        for entity in entities.iter().filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some()) {
+        for entity in entities
+            .iter()
+            .filter(|e| e.physics.is_some() && e.light.is_some() && e.color.is_some())
+        {
             let transform = entity.physics.unwrap().transform;
             let light_color = Vec4::default()
                 .with_xyz(entity.color.unwrap())
@@ -107,19 +113,14 @@ impl PointLightRenderSystem {
 
             vec[i] = PointLight {
                 position: Vec4::ONE.with_xyz(transform.translation).to_array(),
-                color: light_color.to_array()
+                color: light_color.to_array(),
             };
             i += 1;
         }
         (vec, i as i32)
     }
 
-    pub fn create_pipeline(
-        &mut self,
-        vulkan: &Vulkan,
-        render_pass: Arc<RenderPass>,
-        window_size: PhysicalSize<u32>,
-    ) {
+    pub fn create_pipeline(&mut self, vulkan: &Vulkan, render_pass: Arc<RenderPass>) {
         let vertex_shader = vs::load(vulkan.device.clone())
             .unwrap()
             .entry_point("main")
@@ -128,7 +129,7 @@ impl PointLightRenderSystem {
             .unwrap()
             .entry_point("main")
             .unwrap();
-    
+
         let vertex_input_state = VertexInputState::new();
         let stages = [
             PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
@@ -141,36 +142,37 @@ impl PointLightRenderSystem {
                 .unwrap(),
         )
         .unwrap();
-    
+
         let subpass = Subpass::from(render_pass, 0).unwrap();
-    
-        self.pipeline = Some(GraphicsPipeline::new(
-            vulkan.device.clone(),
-            None,
-            GraphicsPipelineCreateInfo {
-                stages: stages.into_iter().collect(),
-                vertex_input_state: Some(vertex_input_state),
-                viewport_state: Some(Default::default()),
-                input_assembly_state: Some(InputAssemblyState::default()),
-                rasterization_state: Some(RasterizationState::default()),
-                depth_stencil_state: Some(DepthStencilState {
-                    depth: Some(DepthState::simple()),
-                    ..Default::default()
-                }),
-                multisample_state: Some(MultisampleState::default()),
-                color_blend_state: Some(ColorBlendState::with_attachment_states(
-                    subpass.num_color_attachments(),
-                    ColorBlendAttachmentState::default(),
-                )),
-                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                subpass: Some(subpass.into()),
-                ..GraphicsPipelineCreateInfo::layout(layout)
-            },
-        )
-        .unwrap());
+
+        self.pipeline = Some(
+            GraphicsPipeline::new(
+                vulkan.device.clone(),
+                None,
+                GraphicsPipelineCreateInfo {
+                    stages: stages.into_iter().collect(),
+                    vertex_input_state: Some(vertex_input_state),
+                    viewport_state: Some(Default::default()),
+                    input_assembly_state: Some(InputAssemblyState::default()),
+                    rasterization_state: Some(RasterizationState::default()),
+                    depth_stencil_state: Some(DepthStencilState {
+                        depth: Some(DepthState::simple()),
+                        ..Default::default()
+                    }),
+                    multisample_state: Some(MultisampleState::default()),
+                    color_blend_state: Some(ColorBlendState::with_attachment_states(
+                        subpass.num_color_attachments(),
+                        ColorBlendAttachmentState::default(),
+                    )),
+                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
+                    subpass: Some(subpass.into()),
+                    ..GraphicsPipelineCreateInfo::layout(layout)
+                },
+            )
+            .unwrap(),
+        );
     }
 }
-
 
 pub mod vs {
     vulkano_shaders::shader! {

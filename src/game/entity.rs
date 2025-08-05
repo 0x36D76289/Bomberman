@@ -1,6 +1,5 @@
 use crate::graphics::Model;
-use glam::{Mat3, Mat4, Vec3, Vec4};
-use vulkano::image::view::ImageView;
+use glam::{Mat4, Vec3, Vec4};
 use std::sync::Arc;
 
 type TextureIndex = i32;
@@ -19,7 +18,7 @@ pub struct Entity {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Physics {
     pub transform: Transform,
-    pub velocity: Vec3
+    pub velocity: Vec3,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -50,19 +49,19 @@ impl Entity {
         self
     }
 
-    pub fn with_position(mut self, position: Vec3) -> Self {
+    pub fn with_position(self, position: Vec3) -> Self {
         let mut physics = self.physics.unwrap_or_default();
         physics.transform.translation = position;
         self.with_physics(physics)
     }
-       
-    pub fn with_rotation(mut self, rotation: Vec3) -> Self {
+
+    pub fn with_rotation(self, rotation: Vec3) -> Self {
         let mut physics = self.physics.unwrap_or_default();
         physics.transform.rotation = rotation;
         self.with_physics(physics)
     }
 
-    pub fn with_scale(mut self, scale: Vec3) -> Self {
+    pub fn with_scale(self, scale: Vec3) -> Self {
         let mut physics = self.physics.unwrap_or_default();
         physics.transform.scale = scale;
         self.with_physics(physics)
@@ -78,34 +77,6 @@ impl Entity {
         self
     }
 }
-
-// impl Entity {
-//     pub fn new(entity_type: GameEntityType) -> Self {
-//         Self {
-//             name: String::new(),
-//             transform: Transform {
-//                 scale: Vec3::splat(1.0),
-//                 ..Default::default()
-//             },
-//             entity_type
-//         }
-//     }
-
-//     pub fn new_object(name: &str, model: Arc<Model>, texture_index: Option<i32>, color: Vec3) -> Self {
-//         Self {
-//             name: name.to_string(),
-//             transform: Transform {
-//                 scale: Vec3::splat(1.0),
-//                 ..Default::default()
-//             },
-//             entity_type: GameEntityType::Object { 
-//                 model,
-//                 texture_index,
-//                 color
-//             }
-//         }
-//     }
-// }
 
 impl Transform {
     // Matrix corrsponds to Translate * Ry * Rx * Rz * Scale
