@@ -58,7 +58,7 @@ pub trait Collision {
         if (x as usize >= map.width) || (y as usize >= map.height) {
             return true;
         }
-        return match map.content[y as usize * map.width + x as usize] {
+        return match map.get_elem(x as usize, y as usize) {
             MapElement::Empty => false,
             MapElement::Breakable => true,
             MapElement::Unbreakable => true,
