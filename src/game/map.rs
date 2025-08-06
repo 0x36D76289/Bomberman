@@ -20,7 +20,7 @@ impl MapElement {
 pub struct Map {
     pub width: usize,
     pub height: usize,
-    pub content: Vec<MapElement>,
+    content: Vec<MapElement>,
 }
 
 impl Map {
