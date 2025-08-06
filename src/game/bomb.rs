@@ -3,7 +3,11 @@ use core::f32;
 use glam::{usize, Vec2};
 
 use super::collision::Collision;
-use crate::game::{direction::Direction, player::Player};
+use crate::game::{
+    direction::Direction,
+    map::{Map, MapElement},
+    player::Player,
+};
 
 pub enum BombState {
     // TODO: Define the states of a bomb
@@ -13,7 +17,7 @@ pub enum BombState {
 }
 
 #[derive(Default)]
-struct Explosion {
+pub struct Explosion {
     up: u8,
     down: u8,
     left: u8,
@@ -23,7 +27,7 @@ struct Explosion {
 pub struct Bomb {
     pub position: Vec2,
     pub timer: f32,
-    pub power: u32,
+    pub power: u8,
     pub owner_id: u32,
     pub state: BombState,
     pub collision_enabled: bool,
@@ -32,8 +36,8 @@ pub struct Bomb {
 }
 
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
-const BOMB_POWER_DEFAULT: u32 = 1;
-const BOMB_EXPLOSION_TIME: f32 = 3.0;
+const BOMB_POWER_DEFAULT: u8 = 2;
+const BOMB_EXPLOSION_TIME: f32 = 2.0;
 
 impl Bomb {
     pub fn new(owner: u32, x: usize, y: usize) -> Self {
@@ -66,20 +70,38 @@ impl Bomb {
         self.position.y = self.position.y as usize as f32 + 0.5;
     }
 
-    fn explode(&mut self) {
-        self.state = BombState::Exploding;
-        self.center();
-        //TODO:
-        //FIXME:
-        //NOTE:
-        //HACK:
-        // ADD the thingie where it deletes blocks and creates Explosion object
+    fn find_wall(&self, map: &mut Map, dirvec: Vec2) -> u8 {
+        for i in 1..self.power + 1 {
+            let pos = self.position + dirvec * i as f32;
+            let elem = map.get_elem_pos(pos);
+            if elem == MapElement::Empty {
+                continue;
+            }
+            match elem {
+                MapElement::Empty => (),
+                MapElement::Breakable => {
+                    let _ = map.set_elem_pos(pos, MapElement::Empty);
+                }
+                MapElement::Unbreakable => (),
+            }
+            return i - 1;
+        }
+        self.power
     }
 
-    fn live_bomb(&mut self, delta: f32) {
+    fn explode(&mut self, map: &mut Map) {
+        self.state = BombState::Exploding;
+        self.center();
+        self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 });
+        self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 });
+        self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 });
+        self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 });
+    }
+
+    fn live_bomb(&mut self, delta: f32, map: &mut Map) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode();
+            self.explode(map);
             return;
         }
         self.timer -= delta;
@@ -94,12 +116,12 @@ impl Bomb {
         //TODO: kill players
     }
 
-    pub fn tick(&mut self, delta: f32, players: &mut Vec<Player>) {
+    pub fn tick(&mut self, delta: f32, players: &mut Vec<Player>, map: &mut Map) {
         match self.state {
-            BombState::Planted => self.live_bomb(delta),
+            BombState::Planted => self.live_bomb(delta, map),
             BombState::Sliding(direction) => {
                 // self.slide(direction);
-                self.live_bomb(delta);
+                self.live_bomb(delta, map);
             }
             BombState::Exploding => self.exploding_bomb(delta, players),
         }

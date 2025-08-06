@@ -1,4 +1,6 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
+use glam::{bool, Vec2};
+
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum MapElement {
     Empty,
     Breakable,
@@ -70,6 +72,35 @@ impl Map {
             str.push('\n');
         }
         str
+    }
+
+    pub fn get_elem(&self, x: usize, y: usize) -> MapElement {
+        if x >= self.width || y >= self.height {
+            return MapElement::Unbreakable;
+        }
+        self.content[y * self.width + x]
+    }
+
+    pub fn get_elem_pos(&self, pos: Vec2) -> MapElement {
+        if pos.x < 0.0 || pos.y < 0.0 {
+            return MapElement::Unbreakable;
+        }
+        self.get_elem(pos.x as usize, pos.y as usize)
+    }
+
+    pub fn set_elem(&mut self, x: usize, y: usize, elem: MapElement) -> Result<(), ()> {
+        if x >= self.width || y >= self.height {
+            return Err(());
+        }
+        self.content[y * self.width + x] = elem;
+        return Ok(());
+    }
+
+    pub fn set_elem_pos(&mut self, pos: Vec2, elem: MapElement) -> Result<(), ()> {
+        if pos.x < 0.0 || pos.y < 0.0 {
+            return Err(());
+        }
+        self.set_elem(pos.x as usize, pos.y as usize, elem)
     }
 }
 

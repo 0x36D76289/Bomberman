@@ -31,16 +31,14 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        // TODO: main loop
-        self.state.tick();
-        // TODO: render
-
         // Event Handling
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                self.state.tick();
+
                 self.draw_frame();
                 let rcx = self.rcx.as_mut().unwrap();
                 rcx.window.request_redraw();
@@ -57,7 +55,7 @@ impl ApplicationHandler for App {
                     }
                 }
             }
-            _ => (),
+            _ => {}
         }
         self.state.fps.register_frame();
     }
