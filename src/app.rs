@@ -1,9 +1,9 @@
-use crate::game::Entity;
 use crate::game::state::State;
-use crate::graphics::{GlobalUbo, Graphics, Model, load_texture};
+use crate::game::Entity;
+use crate::graphics::{load_texture, GlobalUbo, Graphics, Model};
+use core::f32;
 use glam::Vec3;
 use rand::Rng;
-use core::f32;
 use std::error::Error;
 use std::sync::Arc;
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
@@ -13,6 +13,7 @@ use vulkano::command_buffer::{
 use vulkano::device::Queue;
 use vulkano::image::view::ImageView;
 use vulkano::memory::allocator::StandardMemoryAllocator;
+use winit::keyboard::KeyCode;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -44,17 +45,17 @@ impl App {
         let state = &mut self.state;
 
         if state.input_state.next_entity {
-            state.controlled_object_id =
-                (state.controlled_object_id + 1) % state.entities.len();
+            state.controlled_object_id = (state.controlled_object_id + 1) % state.entities.len();
             state.input_state.next_entity = false;
         }
         if state.input_state.previous_entity {
-            state.controlled_object_id =
-                (state.controlled_object_id - 1) % state.entities.len();
+            state.controlled_object_id = (state.controlled_object_id - 1) % state.entities.len();
             state.input_state.previous_entity = false;
         }
 
-        if let Some(name) = &state.entities[state.controlled_object_id].name && name == "Player" {
+        if let Some(name) = &state.entities[state.controlled_object_id].name
+            && name == "Player"
+        {
             state.entity_controller.move_in_plane_xz_player(
                 &state.input_state,
                 self.graphics.renderer.get_delta_time(),
@@ -155,12 +156,7 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        // Event Handling
         match event {
-            // Handle inputs
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.state.input_state.update_keyboard_input(event)
-            }
             WindowEvent::RedrawRequested => {
                 self.state.tick();
                 self.update_world();
@@ -180,6 +176,7 @@ impl ApplicationHandler for App {
                         event_loop.exit();
                     }
                 }
+                self.state.input_state.update_keyboard_input(event);
             }
             _ => (),
         }
@@ -245,16 +242,16 @@ fn load_entities(
         Entity::default()
             .with_name("Camera")
             .with_position(Vec3::new(0.0, -19.0, -9.0))
-            .with_rotation(Vec3::new(-1.17, 0.0, 0.0))
+            .with_rotation(Vec3::new(-1.17, 0.0, 0.0)),
     );
-    
+
     entities.push(
         Entity::default()
             .with_name("Player")
             .with_model(bomberman_model.clone())
             .with_texture(0)
             .with_position(Vec3::new(0.0, 0.5, 0.0))
-            .with_scale(Vec3::new(0.3, 0.3, 0.3))
+            .with_scale(Vec3::new(0.3, 0.3, 0.3)),
     );
 
     entities.push(
@@ -263,7 +260,7 @@ fn load_entities(
             .with_color(Vec3::ONE)
             .with_light(40.0)
             .with_position(Vec3::new(0.0, -7.0, 2.0))
-            .with_scale(Vec3::splat(0.1))
+            .with_scale(Vec3::splat(0.1)),
     );
 
     create_map(&mut entities, &memory_allocator).unwrap();
@@ -274,7 +271,10 @@ fn load_entities(
 const MAP_WIDTH: usize = 13;
 const MAP_HEIGTH: usize = 11;
 
-fn create_map(entities: &mut Vec<Entity>, memory_allocator: &Arc<StandardMemoryAllocator>) -> Result<(), Box<dyn Error>> {
+fn create_map(
+    entities: &mut Vec<Entity>,
+    memory_allocator: &Arc<StandardMemoryAllocator>,
+) -> Result<(), Box<dyn Error>> {
     let cube_model = Model::load(include_bytes!("assets/cube.obj"), memory_allocator.clone())?;
     let quad_model = Model::load(include_bytes!("assets/quad.obj"), memory_allocator.clone())?;
 
@@ -291,7 +291,7 @@ fn create_map(entities: &mut Vec<Entity>, memory_allocator: &Arc<StandardMemoryA
                 floor_base
                     .clone()
                     .with_name(&format!("floor_{row}_{col}"))
-                    .with_position(Vec3::new(x, 0.5, z))
+                    .with_position(Vec3::new(x, 0.5, z)),
             );
         }
     }
@@ -329,16 +329,18 @@ fn create_map(entities: &mut Vec<Entity>, memory_allocator: &Arc<StandardMemoryA
                     wall_block
                         .clone()
                         .with_name(&format!("wall_block_{row}_{col}"))
-                        .with_position(Vec3::new(x, 0.5, z))
+                        .with_position(Vec3::new(x, 0.5, z)),
                 );
             } else {
-                if rng.random_range(0..=1) == 1 {continue;}
+                if rng.random_range(0..=1) == 1 {
+                    continue;
+                }
                 entities.push(
                     crate_block
                         .clone()
                         .with_name(&format!("crate_block_{row}_{col}"))
                         .with_position(Vec3::new(x, 0.5, z))
-                        .with_rotation(Vec3::new(0.0, rng.random_range(-0.05..0.05), 0.0))
+                        .with_rotation(Vec3::new(0.0, rng.random_range(-0.05..0.05), 0.0)),
                 );
             }
         }

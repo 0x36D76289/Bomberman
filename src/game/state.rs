@@ -2,7 +2,7 @@ use glam::Vec3;
 use vulkano::image::view::ImageView;
 
 use crate::game::{Camera, Entity};
-use crate::input::{InputState, KeyboardMovementController};
+use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
 use glam::Vec2;
 use winit::event::{ElementState, WindowEvent};
@@ -15,9 +15,9 @@ use crate::settings::fps::FpsManager;
 
 use super::map::Map;
 use super::player::Player;
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
-use std::collections::HashMap;
 use std::vec::Vec;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -27,7 +27,7 @@ enum Mode {
 
 pub struct State {
     keys: HashMap<PhysicalKey, ElementState>,
-    pub input_state: InputState,
+    pub input_state: SamyInputState,
     pub players: Vec<Player>,
     bombs: Vec<Bomb>,
     inputs: Vec<Input>,
@@ -46,7 +46,7 @@ impl State {
         entities: Vec<Entity>,
         textures: Vec<Arc<ImageView>>,
     ) -> Result<Self, Box<dyn Error>> {
-        let input_state = InputState::default();
+        let input_state = SamyInputState::default();
 
         // let players = Vec::new();
 
@@ -60,15 +60,25 @@ impl State {
             look_speed: 1.5,
         };
 
+        let mut players = Vec::<Player>::new();
+        players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
+        let mut inputs = Vec::<Input>::new();
+        inputs.push(Input::default());
+
         Ok(Self {
-            input_state,
-            // players,
-            // map,
-            entities,
-            textures,
-            camera,
-            entity_controller,
+            keys: HashMap::<PhysicalKey, ElementState>::new(),
+            input_state: input_state,
+            players: players,
+            bombs: Vec::<Bomb>::new(),
+            inputs: inputs,
+            map: Map::new(16, 16),
+            entities: entities,
+            textures: textures,
+            camera: camera,
+            entity_controller: entity_controller,
             controlled_object_id: 1,
+            fps: FpsManager::default(),
+            mode: Mode::MpGame,
         })
     }
 
@@ -78,21 +88,21 @@ impl State {
         }
     }
 
-    pub fn new() -> Self {
-        let mut players = Vec::<Player>::new();
-        players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
-        let mut inputs = Vec::<Input>::new();
-        inputs.push(Input::default());
-        State {
-            keys: HashMap::<PhysicalKey, ElementState>::new(),
-            players: players,
-            bombs: Vec::<Bomb>::new(),
-            inputs: inputs,
-            map: Map::new(16, 16),
-            fps: FpsManager::default(),
-            mode: Mode::MpGame,
-        }
-    }
+    // pub fn new() -> Self {
+    //     let mut players = Vec::<Player>::new();
+    //     players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
+    //     let mut inputs = Vec::<Input>::new();
+    //     inputs.push(Input::default());
+    //     State {
+    //         keys: HashMap::<PhysicalKey, ElementState>::new(),
+    //         players: players,
+    //         bombs: Vec::<Bomb>::new(),
+    //         inputs: inputs,
+    //         map: Map::new(16, 16),
+    //         fps: FpsManager::default(),
+    //         mode: Mode::MpGame,
+    //     }
+    // }
     pub fn print(&self) {
         let mut display = self.map.to_str();
         for player in &self.players {
@@ -221,8 +231,8 @@ impl State {
     }
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for State {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
