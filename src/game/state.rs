@@ -1,3 +1,9 @@
+use glam::Vec3;
+use vulkano::image::view::ImageView;
+
+use crate::game::{Camera, Entity};
+use crate::input::{InputState, KeyboardMovementController};
+
 use glam::Vec2;
 use winit::event::{ElementState, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -9,6 +15,8 @@ use crate::settings::fps::FpsManager;
 
 use super::map::Map;
 use super::player::Player;
+use std::error::Error;
+use std::sync::Arc;
 use std::collections::HashMap;
 use std::vec::Vec;
 
@@ -19,15 +27,57 @@ enum Mode {
 
 pub struct State {
     keys: HashMap<PhysicalKey, ElementState>,
-    players: Vec<Player>,
+    pub input_state: InputState,
+    pub players: Vec<Player>,
     bombs: Vec<Bomb>,
     inputs: Vec<Input>,
-    map: Map,
+    pub map: Map,
+    pub entities: Vec<Entity>,
+    pub textures: Vec<Arc<ImageView>>,
+    pub camera: Camera,
+    pub entity_controller: KeyboardMovementController,
+    pub controlled_object_id: usize,
     pub fps: FpsManager,
     mode: Mode,
 }
 
 impl State {
+    pub fn default_state(
+        entities: Vec<Entity>,
+        textures: Vec<Arc<ImageView>>,
+    ) -> Result<Self, Box<dyn Error>> {
+        let input_state = InputState::default();
+
+        // let players = Vec::new();
+
+        // let map = Map::new(16, 16);
+
+        let mut camera = Camera::new();
+        camera.set_view_target(Vec3::new(1.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 0.0));
+
+        let entity_controller = KeyboardMovementController {
+            move_speed: 3.0,
+            look_speed: 1.5,
+        };
+
+        Ok(Self {
+            input_state,
+            // players,
+            // map,
+            entities,
+            textures,
+            camera,
+            entity_controller,
+            controlled_object_id: 1,
+        })
+    }
+
+    pub fn debug(&self) {
+        for entity in self.entities.iter() {
+            println!("{entity:?}");
+        }
+    }
+
     pub fn new() -> Self {
         let mut players = Vec::<Player>::new();
         players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
