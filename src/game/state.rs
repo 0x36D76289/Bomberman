@@ -10,7 +10,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::game::bomb::Bomb;
 use crate::game::direction::Direction;
-use crate::game::input::{Input, InputState};
+use crate::game::input::{Input, InputName, InputState};
 use crate::settings::fps::FpsManager;
 
 use super::map::Map;
@@ -129,76 +129,15 @@ impl State {
 
     fn update_inputs(&mut self) {
         //HACK: manually mapping inputs of P1 for testing
-        match self.keys.get(&PhysicalKey::Code(KeyCode::KeyW)) {
-            Some(state) => {
-                if state.is_pressed() {
-                    if self.inputs[0].up == InputState::Released {
-                        self.inputs[0].up = InputState::Pressed;
-                    } else {
-                        self.inputs[0].up = InputState::Held;
-                    }
-                } else {
-                    self.inputs[0].up = InputState::Released;
-                }
-            }
-            None => (),
-        }
-        match self.keys.get(&PhysicalKey::Code(KeyCode::KeyS)) {
-            Some(state) => {
-                if state.is_pressed() {
-                    if self.inputs[0].down == InputState::Released {
-                        self.inputs[0].down = InputState::Pressed;
-                    } else {
-                        self.inputs[0].down = InputState::Held;
-                    }
-                } else {
-                    self.inputs[0].down = InputState::Released;
-                }
-            }
-            None => (),
-        }
-        match self.keys.get(&PhysicalKey::Code(KeyCode::KeyA)) {
-            Some(state) => {
-                if state.is_pressed() {
-                    if self.inputs[0].left == InputState::Released {
-                        self.inputs[0].left = InputState::Pressed;
-                    } else {
-                        self.inputs[0].left = InputState::Held;
-                    }
-                } else {
-                    self.inputs[0].left = InputState::Released;
-                }
-            }
-            None => (),
-        }
-        match self.keys.get(&PhysicalKey::Code(KeyCode::KeyD)) {
-            Some(state) => {
-                if state.is_pressed() {
-                    if self.inputs[0].right == InputState::Released {
-                        self.inputs[0].right = InputState::Pressed;
-                    } else {
-                        self.inputs[0].right = InputState::Held;
-                    }
-                } else {
-                    self.inputs[0].right = InputState::Released;
-                }
-            }
-            None => (),
-        }
-        match self.keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
-            Some(state) => {
-                if state.is_pressed() {
-                    if self.inputs[0].bomb == InputState::Released {
-                        self.inputs[0].bomb = InputState::Pressed;
-                    } else {
-                        self.inputs[0].bomb = InputState::Held;
-                    }
-                } else {
-                    self.inputs[0].bomb = InputState::Released;
-                }
-            }
-            None => (),
-        }
+        //using F35 as a default
+        let mut p1_binds = [KeyCode::F35; 5];
+        p1_binds[InputName::Up.value()] = KeyCode::KeyW;
+        p1_binds[InputName::Down.value()] = KeyCode::KeyS;
+        p1_binds[InputName::Left.value()] = KeyCode::KeyA;
+        p1_binds[InputName::Right.value()] = KeyCode::KeyD;
+        p1_binds[InputName::Bomb.value()] = KeyCode::Enter;
+
+        self.inputs[0].update_input_player(&self.keys, p1_binds);
     }
 
     fn mp_game_tick(&mut self, delta: f32) {
@@ -211,7 +150,7 @@ impl State {
         self.bombs.retain(|bomb| bomb.despawn == false);
         // for player in players: summon bomb if Pressed
         for i in 0..self.players.len() {
-            if self.inputs[i].bomb == InputState::Pressed {
+            if self.inputs[i].bomb() == InputState::Pressed {
                 match self.players[i].create_bomb() {
                     Some(bomb) => self.bombs.push(bomb),
                     None => (),
