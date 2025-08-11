@@ -32,7 +32,7 @@ pub enum InputName {
 }
 
 impl InputName {
-    pub fn iterator() -> Iter<'static, InputName> {
+    pub fn iterator() -> impl Iterator<Item = &'static InputName> {
         static DIRECTIONS: [InputName; 5] = [
             InputName::Up,
             InputName::Down,

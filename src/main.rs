@@ -1,8 +1,10 @@
+#![allow(dead_code, unused)]
+
 mod app;
 mod game;
 mod graphics;
-mod settings;
 mod input;
+mod settings;
 
 use app::App;
 use winit::event_loop::{ControlFlow, EventLoop};

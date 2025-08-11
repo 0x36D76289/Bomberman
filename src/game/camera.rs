@@ -16,13 +16,25 @@ impl Camera {
         }
     }
 
-
-    pub fn set_orthographic_projection(&mut self, left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32) {
+    pub fn set_orthographic_projection(
+        &mut self,
+        left: f32,
+        right: f32,
+        top: f32,
+        bottom: f32,
+        near: f32,
+        far: f32,
+    ) {
         self.projection_matrix = Mat4::from_cols(
             Vec4::new(2.0 / (right - left), 0.0, 0.0, 0.0),
             Vec4::new(0.0, 2.0 / (bottom - top), 0.0, 0.0),
             Vec4::new(0.0, 0.0, 1.0 / (far - near), 0.0),
-            Vec4::new(-(right + left) / (right - left), -(bottom + top) / (bottom - top), -near / (far - near), 1.0),
+            Vec4::new(
+                -(right + left) / (right - left),
+                -(bottom + top) / (bottom - top),
+                -near / (far - near),
+                1.0,
+            ),
         )
     }
 

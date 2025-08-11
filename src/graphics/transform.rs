@@ -1,81 +1,10 @@
-use crate::graphics::Model;
 use glam::{Mat4, Vec3, Vec4};
-use std::sync::Arc;
-
-type TextureIndex = i32;
-type LightIntensity = f32;
-
-#[derive(Debug, Clone, Default)]
-pub struct Entity {
-    pub name: Option<String>,
-    pub model: Option<Arc<Model>>,
-    pub texture: Option<TextureIndex>,
-    pub physics: Option<Physics>,
-    pub light: Option<LightIntensity>,
-    pub color: Option<Vec3>,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Physics {
-    pub transform: Transform,
-    pub velocity: Vec3,
-}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Transform {
     pub translation: Vec3,
     pub scale: Vec3,
     pub rotation: Vec3,
-}
-
-impl Entity {
-    pub fn with_name(mut self, name: &str) -> Self {
-        self.name = Some(name.to_string());
-        self
-    }
-
-    pub fn with_model(mut self, model: Arc<Model>) -> Self {
-        self.model = Some(model);
-        self
-    }
-
-    pub fn with_texture(mut self, texture: TextureIndex) -> Self {
-        self.texture = Some(texture);
-        self
-    }
-
-    pub fn with_physics(mut self, physics: Physics) -> Self {
-        self.physics = Some(physics);
-        self
-    }
-
-    pub fn with_position(self, position: Vec3) -> Self {
-        let mut physics = self.physics.unwrap_or_default();
-        physics.transform.translation = position;
-        self.with_physics(physics)
-    }
-
-    pub fn with_rotation(self, rotation: Vec3) -> Self {
-        let mut physics = self.physics.unwrap_or_default();
-        physics.transform.rotation = rotation;
-        self.with_physics(physics)
-    }
-
-    pub fn with_scale(self, scale: Vec3) -> Self {
-        let mut physics = self.physics.unwrap_or_default();
-        physics.transform.scale = scale;
-        self.with_physics(physics)
-    }
-
-    pub fn with_light(mut self, light: LightIntensity) -> Self {
-        self.light = Some(light);
-        self
-    }
-
-    pub fn with_color(mut self, color: Vec3) -> Self {
-        self.color = Some(color);
-        self
-    }
 }
 
 impl Transform {
