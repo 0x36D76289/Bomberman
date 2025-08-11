@@ -51,7 +51,7 @@ impl Renderer {
         self.rcx.as_ref().unwrap()
     }
 
-    pub fn get_aspect_ration(&self) -> f32 {
+    pub fn get_aspect_ratio(&self) -> f32 {
         let rcx = self.rcx.as_ref().unwrap();
         rcx.swapchain.image_extent()[0] as f32 / rcx.swapchain.image_extent()[1] as f32
     }

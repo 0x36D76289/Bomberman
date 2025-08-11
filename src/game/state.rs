@@ -1,7 +1,10 @@
 use glam::Vec3;
 use vulkano::image::view::ImageView;
+use vulkano::pipeline::graphics;
 
-use crate::game::{Camera, Entity};
+use crate::game::resources::{self, Resources};
+use crate::game::Camera;
+use crate::graphics::Graphics;
 use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
 use glam::Vec2;
@@ -31,9 +34,8 @@ pub struct State {
     pub players: Vec<Player>,
     bombs: Vec<Bomb>,
     inputs: Vec<Input>,
+    pub resources: Resources,
     pub map: Map,
-    pub entities: Vec<Entity>,
-    pub textures: Vec<Arc<ImageView>>,
     pub camera: Camera,
     pub entity_controller: KeyboardMovementController,
     pub controlled_object_id: usize,
@@ -42,10 +44,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn default_state(
-        entities: Vec<Entity>,
-        textures: Vec<Arc<ImageView>>,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
         let input_state = SamyInputState::default();
 
         // let players = Vec::new();
@@ -65,27 +64,27 @@ impl State {
         let mut inputs = Vec::<Input>::new();
         inputs.push(Input::default());
 
+        let resources = Resources::load_resources(
+            graphics.vulkan.memory_allocator.clone(),
+            graphics.vulkan.command_buffer_allocator.clone(),
+            graphics.vulkan.queue.clone(),
+        );
+        let map = Map::new(16, 16, &resources);
+
         Ok(Self {
             keys: HashMap::<PhysicalKey, ElementState>::new(),
-            input_state: input_state,
-            players: players,
+            input_state,
+            players,
             bombs: Vec::<Bomb>::new(),
-            inputs: inputs,
-            map: Map::new(16, 16),
-            entities: entities,
-            textures: textures,
-            camera: camera,
+            inputs,
+            map,
+            resources,
+            camera,
             entity_controller: entity_controller,
             controlled_object_id: 1,
             fps: FpsManager::default(),
             mode: Mode::MpGame,
         })
-    }
-
-    pub fn debug(&self) {
-        for entity in self.entities.iter() {
-            println!("{entity:?}");
-        }
     }
 
     // pub fn new() -> Self {

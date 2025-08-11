@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use glam::Vec3;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{DescriptorSet, WriteDescriptorSet, layout::DescriptorBindingFlags},
@@ -24,8 +25,7 @@ use vulkano::{
 };
 
 use crate::{
-    game::Entity,
-    graphics::{GlobalUbo, MyVertex, Vulkan},
+    game::{resources::ResourceName, state::State}, graphics::{object::{Object, TextureIndex}, transform::Transform, GlobalUbo, MyVertex, PointLight, Vulkan}
 };
 
 #[derive(Debug, Default)]
@@ -38,8 +38,7 @@ impl EntityRenderSystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
-        enities: &Vec<Entity>,
-        textures: &Vec<Arc<ImageView>>,
+        state: &State,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
@@ -64,11 +63,11 @@ impl EntityRenderSystem {
         let descriptor_set = DescriptorSet::new_variable(
             vulkan.descriptor_set_allocator.clone(),
             layout.clone(),
-            textures.len() as u32,
+            state.resources.textures.len() as u32,
             [
                 WriteDescriptorSet::buffer(0, uniform_buffer),
                 WriteDescriptorSet::sampler(1, self.sampler.as_ref().unwrap().clone()),
-                WriteDescriptorSet::image_view_array(2, 0, textures.clone()),
+                WriteDescriptorSet::image_view_array(2, 0, state.resources.textures.clone()),
             ],
             [],
         )
@@ -83,33 +82,63 @@ impl EntityRenderSystem {
             )
             .unwrap();
 
-        for entity in enities
-            .iter()
-            .filter(|e| e.physics.is_some() && e.model.is_some())
-        {
-            let transform = entity.physics.unwrap().transform;
-            let model = entity.model.as_ref().unwrap();
+        // for map_el in state.map.iter() {
+        //     if map_el.object.is_none() { continue; }
 
-            let push_constant = vs::Push {
-                model_matrix: transform.mat4().to_cols_array_2d(),
-                normal_matrix: transform.normal_matrix().to_cols_array_2d(),
-                color: entity.color.unwrap_or_default().to_array(),
-                tex_index: entity.texture.unwrap_or(-1),
-            };
+        //     let object = map_el.object.as_ref().unwrap();
 
+        //     let push_constant = vs::Push {
+        //         model_matrix: object.transform.mat4().to_cols_array_2d(),
+        //         normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+        //         color: object.color.to_array(),
+        //         tex_index: object.texture.unwrap_or(-1),
+        //     };
+
+        //     command_buffer
+        //         .push_constants(pipeline.layout().clone(), 0, push_constant)
+        //         .unwrap()
+        //         .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+        //         .unwrap()
+        //         .bind_index_buffer(object.model.index_buffer.clone())
+        //         .unwrap();
+
+        //     unsafe {
+        //         command_buffer
+        //             .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+        //             .unwrap();
+        //     }
+        // }
+
+        let object = Object {
+            model: state.resources.models[ResourceName::Breakable as usize].clone(),
+            texture: None,
+            transform: Transform {
+                translation: Vec3::ZERO,
+                scale: Vec3::ONE,
+                rotation: Vec3::ZERO
+            },
+            color: Vec3::ONE,
+        };
+
+        let push_constant = vs::Push {
+            model_matrix: object.transform.mat4().to_cols_array_2d(),
+            normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+            color: object.color.to_array(),
+            tex_index: object.texture.unwrap_or(-1),
+        };
+
+        command_buffer
+            .push_constants(pipeline.layout().clone(), 0, push_constant)
+            .unwrap()
+            .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+            .unwrap()
+            .bind_index_buffer(object.model.index_buffer.clone())
+            .unwrap();
+
+        unsafe {
             command_buffer
-                .push_constants(pipeline.layout().clone(), 0, push_constant)
-                .unwrap()
-                .bind_vertex_buffers(0, model.vertex_buffer.clone())
-                .unwrap()
-                .bind_index_buffer(model.index_buffer.clone())
+                .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
                 .unwrap();
-
-            unsafe {
-                command_buffer
-                    .draw_indexed(model.index_buffer.len() as u32, 1, 0, 0, 0)
-                    .unwrap();
-            }
         }
     }
 

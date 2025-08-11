@@ -1,5 +1,5 @@
 use crate::graphics::{
-    EntityRenderSystem, Graphics, PointLightRenderSystem, Renderer, TimeInfo, Vulkan,
+    EntityRenderSystem, Graphics, /*PointLightRenderSystem,*/ Renderer, TimeInfo, Vulkan,
     renderer::RenderContext,
 };
 use std::{error::Error, sync::Arc, time::Instant};
@@ -36,7 +36,7 @@ impl Graphics {
             vulkan,
             renderer: Renderer::new(),
             game_object_system: EntityRenderSystem::default(),
-            point_light_system: PointLightRenderSystem::default(),
+            // point_light_system: PointLightRenderSystem::default(),
         })
     }
 }

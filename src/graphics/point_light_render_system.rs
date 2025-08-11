@@ -21,7 +21,6 @@ use vulkano::{
 };
 
 use crate::{
-    game::Entity,
     graphics::{GlobalUbo, PointLight, Vulkan},
 };
 

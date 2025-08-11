@@ -2,7 +2,7 @@ use glam::Vec2;
 
 use crate::game::{
     direction::Direction,
-    map::{Map, MapElement},
+    map::{Map, MapElement, MapElementState},
 };
 
 pub trait Collision {
@@ -59,9 +59,9 @@ pub trait Collision {
             return true;
         }
         return match map.get_elem(x as usize, y as usize) {
-            MapElement::Empty => false,
-            MapElement::Breakable => true,
-            MapElement::Unbreakable => true,
+            MapElementState::Empty => false,
+            MapElementState::Breakable => true,
+            MapElementState::Unbreakable => true,
         };
     }
 

@@ -1,4 +1,4 @@
-use crate::{game::Entity, input::InputState};
+use crate::{graphics::transform::Transform, input::InputState};
 use glam::Vec3;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -8,9 +8,7 @@ pub struct KeyboardMovementController {
 }
 
 impl KeyboardMovementController {
-    pub fn move_in_plane_xz(&self, input_state: &InputState, dt: f32, entity: &mut Entity) {
-        let transform = &mut entity.physics.as_mut().unwrap().transform;
-
+    pub fn move_in_plane_xz(&self, input_state: &InputState, dt: f32, transform: &mut Transform) {
         let mut rotate = Vec3::splat(0.0);
 
         if input_state.look_right {
@@ -64,9 +62,7 @@ impl KeyboardMovementController {
         }
     }
 
-    pub fn move_in_plane_xz_player(&self, input_state: &InputState, dt: f32, entity: &mut Entity) {
-        let transform = &mut entity.physics.as_mut().unwrap().transform;
-
+    pub fn move_in_plane_xz_player(&self, input_state: &InputState, dt: f32, transform: &mut Transform) {
         // let mut rotate = Vec3::splat(0.0);
 
         // if input_state.look_right {

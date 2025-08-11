@@ -1,11 +1,11 @@
 use core::f32;
 
-use glam::{usize, Vec2};
+use glam::{Vec2, usize};
 
 use super::collision::Collision;
 use crate::game::{
     direction::Direction,
-    map::{Map, MapElement},
+    map::{Map, MapElement, MapElementState},
     player::Player,
 };
 
@@ -74,15 +74,15 @@ impl Bomb {
         for i in 1..self.power + 1 {
             let pos = self.position + dirvec * i as f32;
             let elem = map.get_elem_pos(pos);
-            if elem == MapElement::Empty {
+            if elem == MapElementState::Empty {
                 continue;
             }
             match elem {
-                MapElement::Empty => (),
-                MapElement::Breakable => {
-                    let _ = map.set_elem_pos(pos, MapElement::Empty);
+                MapElementState::Empty => (),
+                MapElementState::Breakable => {
+                    let _ = map.set_elem_pos(pos, MapElementState::Empty);
                 }
-                MapElement::Unbreakable => (),
+                MapElementState::Unbreakable => (),
             }
             return i - 1;
         }

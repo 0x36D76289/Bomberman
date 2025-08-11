@@ -1,14 +1,16 @@
 pub mod entity_render_system;
 pub mod init;
 pub mod model;
-pub mod point_light_render_system;
+pub mod object;
+// pub mod point_light_render_system;
 pub mod renderer;
 pub mod texture;
+pub mod transform;
 
 pub use {
     entity_render_system::{EntityRenderSystem, vs::GlobalUbo, vs::PointLight},
     model::Model,
-    point_light_render_system::PointLightRenderSystem,
+    // point_light_render_system::PointLightRenderSystem,
     renderer::Renderer,
     texture::load_texture,
 };
@@ -28,7 +30,7 @@ pub struct Graphics {
     pub vulkan: Vulkan,
     pub renderer: Renderer,
     pub game_object_system: EntityRenderSystem,
-    pub point_light_system: PointLightRenderSystem,
+    // pub point_light_system: PointLightRenderSystem,
 }
 
 pub struct Vulkan {
