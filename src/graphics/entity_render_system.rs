@@ -82,64 +82,64 @@ impl EntityRenderSystem {
             )
             .unwrap();
 
-        // for map_el in state.map.iter() {
-        //     if map_el.object.is_none() { continue; }
+        for map_el in state.map.iter() {
+            if map_el.object.is_none() { continue; }
 
-        //     let object = map_el.object.as_ref().unwrap();
+            let object = map_el.object.as_ref().unwrap();
 
-        //     let push_constant = vs::Push {
-        //         model_matrix: object.transform.mat4().to_cols_array_2d(),
-        //         normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-        //         color: object.color.to_array(),
-        //         tex_index: object.texture.unwrap_or(-1),
-        //     };
+            let push_constant = vs::Push {
+                model_matrix: object.transform.mat4().to_cols_array_2d(),
+                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+                color: object.color.to_array(),
+                tex_index: object.texture.unwrap_or(-1),
+            };
 
-        //     command_buffer
-        //         .push_constants(pipeline.layout().clone(), 0, push_constant)
-        //         .unwrap()
-        //         .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
-        //         .unwrap()
-        //         .bind_index_buffer(object.model.index_buffer.clone())
-        //         .unwrap();
-
-        //     unsafe {
-        //         command_buffer
-        //             .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
-        //             .unwrap();
-        //     }
-        // }
-
-        let object = Object {
-            model: state.resources.models[ResourceName::Breakable as usize].clone(),
-            texture: None,
-            transform: Transform {
-                translation: Vec3::ZERO,
-                scale: Vec3::ONE,
-                rotation: Vec3::ZERO
-            },
-            color: Vec3::ONE,
-        };
-
-        let push_constant = vs::Push {
-            model_matrix: object.transform.mat4().to_cols_array_2d(),
-            normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-            color: object.color.to_array(),
-            tex_index: object.texture.unwrap_or(-1),
-        };
-
-        command_buffer
-            .push_constants(pipeline.layout().clone(), 0, push_constant)
-            .unwrap()
-            .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
-            .unwrap()
-            .bind_index_buffer(object.model.index_buffer.clone())
-            .unwrap();
-
-        unsafe {
             command_buffer
-                .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+                .push_constants(pipeline.layout().clone(), 0, push_constant)
+                .unwrap()
+                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+                .unwrap()
+                .bind_index_buffer(object.model.index_buffer.clone())
                 .unwrap();
+
+            unsafe {
+                command_buffer
+                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+                    .unwrap();
+            }
         }
+
+        // let object = Object {
+        //     model: state.resources.models[ResourceName::Bomb as usize].clone(),
+        //     texture: Some(ResourceName::Bomb as TextureIndex),
+        //     transform: Transform {
+        //         translation: Vec3::ZERO,
+        //         scale: Vec3::splat(0.08),
+        //         rotation: Vec3::ZERO
+        //     },
+        //     color: Vec3::ONE,
+        // };
+
+        // let push_constant = vs::Push {
+        //     model_matrix: object.transform.mat4().to_cols_array_2d(),
+        //     normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+        //     color: object.color.to_array(),
+        //     tex_index: object.texture.unwrap_or(-1),
+        // };
+
+        // command_buffer
+        //     .push_constants(pipeline.layout().clone(), 0, push_constant)
+        //     .unwrap()
+        //     .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+        //     .unwrap()
+        //     .bind_index_buffer(object.model.index_buffer.clone())
+        //     .unwrap();
+
+        // unsafe {
+        //     command_buffer
+        //         .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+        //         .unwrap();
+        // }
     }
 
     pub fn create_pipeline(&mut self, vulkan: &Vulkan, render_pass: Arc<RenderPass>) {

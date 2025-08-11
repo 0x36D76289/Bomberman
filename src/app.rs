@@ -42,12 +42,12 @@ impl App {
         //     state.entities[0].physics.unwrap().transform.translation,
         //     state.entities[0].physics.unwrap().transform.rotation,
         // );
-        state.camera.set_view_target(Vec3::new(-5.0, -5.0, -2.0), Vec3::new(0.0, 0.0, 0.0));
+        state.camera.set_view_xyz(Vec3::new(0.0, -19.0, -9.0), Vec3::new(-1.17, 0.0, 0.0));
         state.camera.set_perspective_projection(
             0.6,
             self.graphics.renderer.get_aspect_ratio(),
             0.1,
-            100.0,
+            1000.0,
         );
 
     }
@@ -60,6 +60,7 @@ impl App {
 
         if let Some(mut command_buffer) = renderer.begin_frame(&self.graphics.vulkan) {
             // let (lights, light_number) = point_light_system.lights_array(&state.entities);
+
             let global_ubo = GlobalUbo {
                 projection: state.camera.projection_matrix.to_cols_array_2d(),
                 view: state.camera.view_matrix.to_cols_array_2d(),

@@ -74,7 +74,7 @@ impl Resources {
             memory_allocator.clone(),
         ));
         textures[ResourceName::Bomb as usize] = Some(load_texture(
-            include_bytes!("../assets/000-floor.png"),
+            include_bytes!("../assets/miku.png"),
             &mut command_buffer,
             memory_allocator.clone(),
         ));
@@ -111,7 +111,7 @@ impl Resources {
         )
         .unwrap());
         models[ResourceName::Bomb as usize] = Some(Model::load(
-            include_bytes!("../assets/bomb.obj"),
+            include_bytes!("../assets/miku.obj"),
             memory_allocator.clone(),
         )
         .unwrap());
