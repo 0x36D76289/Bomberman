@@ -97,14 +97,14 @@ impl Map {
                     MapElement::Empty => (),
                     MapElement::Breakable(obj) => {
                         obj.transform = Transform {
-                            translation: Vec3::new(x as f32, 0.0, y as f32),
+                            translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
                             scale: Vec3::splat(0.9),
                             rotation: Vec3::ZERO,
                         }
                     }
                     MapElement::Unbreakable(obj) => {
                         obj.transform = Transform {
-                            translation: Vec3::new(x as f32, 0.0, y as f32),
+                            translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
                             scale: Vec3::ONE,
                             rotation: Vec3::ZERO,
                         }
