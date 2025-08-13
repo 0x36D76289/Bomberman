@@ -5,7 +5,7 @@ use glam::{Vec2, usize};
 use super::collision::Collision;
 use crate::game::{
     direction::Direction,
-    map::{Map, MapElement, MapElementState},
+    map::{Map, MapElement},
     player::Player,
 };
 
@@ -74,15 +74,12 @@ impl Bomb {
         for i in 1..self.power + 1 {
             let pos = self.position + dirvec * i as f32;
             let elem = map.get_elem_pos(pos);
-            if elem == MapElementState::Empty {
-                continue;
-            }
             match elem {
-                MapElementState::Empty => (),
-                MapElementState::Breakable => {
-                    let _ = map.set_elem_pos(pos, MapElementState::Empty);
+                MapElement::Empty => continue,
+                MapElement::Breakable(_) => {
+                    let _ = map.set_elem_pos(pos, MapElement::Empty);
                 }
-                MapElementState::Unbreakable => (),
+                MapElement::Unbreakable(_) => (),
             }
             return i - 1;
         }

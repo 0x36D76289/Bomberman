@@ -42,7 +42,9 @@ impl App {
         //     state.entities[0].physics.unwrap().transform.translation,
         //     state.entities[0].physics.unwrap().transform.rotation,
         // );
-        state.camera.set_view_xyz(Vec3::new(0.0, -19.0, -9.0), Vec3::new(-1.17, 0.0, 0.0));
+        let map_center = Vec3::new(state.map.width as f32 / 2.0, 0.0, state.map.height as f32 / 2.0);
+        state.camera.set_view_target(Vec3::new(map_center.x, -19.0, 20.0), map_center);
+        // state.camera.set_view_xyz(Vec3::new(0.0, -19.0, -9.0), Vec3::new(-1.17, 0.0, 0.0));
         state.camera.set_perspective_projection(
             0.6,
             self.graphics.renderer.get_aspect_ratio(),
@@ -117,10 +119,9 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
-                self.state.tick();
+                self.state.tick(self.graphics.renderer.get_delta_time());
                 self.update_world();
                 self.draw_frame();
-                self.state.fps.register_frame();
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
