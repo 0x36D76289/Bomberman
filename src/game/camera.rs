@@ -61,9 +61,9 @@ impl Camera {
         let v = w.cross(u);
 
         self.view_matrix = Mat4::from_cols(
-            Vec4::new(u.x, v.x, w.x, 1.0),
-            Vec4::new(u.y, v.y, w.y, 1.0),
-            Vec4::new(u.z, v.z, w.z, 1.0),
+            Vec4::new(u.x, v.x, w.x, 0.0),
+            Vec4::new(u.y, v.y, w.y, 0.0),
+            Vec4::new(u.z, v.z, w.z, 0.0),
             Vec4::new(-u.dot(position), -v.dot(position), -w.dot(position), 1.0),
         );
 

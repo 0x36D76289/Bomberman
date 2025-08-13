@@ -2,8 +2,10 @@ use glam::Vec3;
 use vulkano::image::view::ImageView;
 use vulkano::pipeline::graphics;
 
+use crate::game::map::MapElement;
 use crate::game::resources::{self, Resources};
 use crate::game::Camera;
+use crate::graphics::object::Object;
 use crate::graphics::Graphics;
 use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
@@ -39,7 +41,6 @@ pub struct State {
     pub camera: Camera,
     pub entity_controller: KeyboardMovementController,
     pub controlled_object_id: usize,
-    pub fps: FpsManager,
     mode: Mode,
 }
 
@@ -51,24 +52,24 @@ impl State {
 
         // let map = Map::new(16, 16);
 
-        let mut camera = Camera::new();
-        camera.set_view_target(Vec3::new(1.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 0.0));
-
-        let entity_controller = KeyboardMovementController {
-            move_speed: 3.0,
-            look_speed: 1.5,
-        };
-
-        let mut players = Vec::<Player>::new();
-        players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
-        let mut inputs = Vec::<Input>::new();
-        inputs.push(Input::default());
-
         let resources = Resources::load_resources(
             graphics.vulkan.memory_allocator.clone(),
             graphics.vulkan.command_buffer_allocator.clone(),
             graphics.vulkan.queue.clone(),
         );
+
+        let mut camera = Camera::new();
+
+        let entity_controller = KeyboardMovementController {
+            move_speed: 3.0,
+            look_speed: 1.5,
+        };
+    
+        let mut players = Vec::<Player>::new();
+        players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down, &resources));
+        let mut inputs = Vec::<Input>::new();
+        inputs.push(Input::default());
+
         let map = Map::new(16, 16, &resources);
 
         Ok(Self {
@@ -82,9 +83,26 @@ impl State {
             camera,
             entity_controller: entity_controller,
             controlled_object_id: 1,
-            fps: FpsManager::default(),
             mode: Mode::MpGame,
         })
+    }
+
+    pub fn objects(&self) -> impl Iterator<Item = &Object> {
+        let map_objects = self.map
+            .iter()
+            .filter_map(|el| match el {
+                MapElement::Empty => None,
+                MapElement::Breakable(obj) => Some(obj),
+                MapElement::Unbreakable(obj) => Some(obj)
+            })
+            .chain(std::iter::once(&self.map.floor));
+
+        let players_objects = self.players
+            .iter()
+            .map(|p| &p.object);
+
+        map_objects
+            .chain(players_objects)
     }
 
     // pub fn new() -> Self {
@@ -161,11 +179,11 @@ impl State {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, delta_time: f32) {
         let state_func = match self.mode {
             Mode::MpGame => Self::mp_game_tick,
         };
-        state_func(self, self.fps.get_delta());
+        state_func(self, delta_time);
     }
 }
 

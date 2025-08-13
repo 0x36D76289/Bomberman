@@ -1,12 +1,12 @@
-use crate::game::{
+use crate::{game::{
     bomb::Bomb,
     collision::Collision,
     input::Input,
-    map::{Map, MapElement},
-};
+    map::{Map, MapElement}, resources::{ResourceName, Resources},
+}, graphics::{object::Object, transform::Transform}};
 
 use super::direction::Direction;
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 
 const PLAYER_RADIUS: f32 = 0.4;
 
@@ -20,10 +20,11 @@ pub struct Player {
     pub bombs_remaining: u32,
     pub is_human: bool,
     pub can_kick_bomb: bool,
+    pub object: Object
 }
 
 impl Player {
-    pub fn new(id: u32, position: Vec2, direction: Direction) -> Self {
+    pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
         Player {
             id: id,
             position: position,
@@ -34,6 +35,16 @@ impl Player {
             bombs_remaining: 1,
             is_human: true,
             can_kick_bomb: false,
+            object: Object {
+                model: resources.models[ResourceName::Player as usize].clone(),
+                texture: Some(ResourceName::Player as i32),
+                color: Vec3::ONE,
+                transform: Transform {
+                    translation: Vec3::new(position.x, 0.0, position.y),
+                    scale: Vec3::splat(0.35),
+                    rotation: Vec3::ZERO
+                }
+            }
         }
     }
 
@@ -110,6 +121,7 @@ impl Player {
                 self.handle_collisions(map, direction, bombs);
             }
         }
+        self.object.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
     }
 }
 

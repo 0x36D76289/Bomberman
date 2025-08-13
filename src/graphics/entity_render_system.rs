@@ -25,7 +25,7 @@ use vulkano::{
 };
 
 use crate::{
-    game::{resources::ResourceName, state::State}, graphics::{object::{Object, TextureIndex}, transform::Transform, GlobalUbo, MyVertex, PointLight, Vulkan}
+    game::{map::MapElement, resources::ResourceName, state::State}, graphics::{object::{Object, TextureIndex}, transform::Transform, GlobalUbo, MyVertex, PointLight, Vulkan}
 };
 
 #[derive(Debug, Default)]
@@ -82,11 +82,7 @@ impl EntityRenderSystem {
             )
             .unwrap();
 
-        for map_el in state.map.iter() {
-            if map_el.object.is_none() { continue; }
-
-            let object = map_el.object.as_ref().unwrap();
-
+        for object in state.objects() {
             let push_constant = vs::Push {
                 model_matrix: object.transform.mat4().to_cols_array_2d(),
                 normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
