@@ -93,44 +93,47 @@ impl Player {
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &Vec<Bomb>) {
         let mut motion = input.to_vec2() * delta * self.speed;
 
-        let mut direction: Direction;
         let mut dist: f32;
         while motion.x != 0.0 || motion.y != 0.0 {
             // X tick
             if motion.x != 0.0 {
                 if motion.x > 0.0 {
-                    direction = Direction::Right;
+                    self.direction = Direction::Right;
                     dist = motion.x.abs().min(1.0);
                     motion.x -= dist;
                     self.position.x += dist;
                 } else {
-                    direction = Direction::Left;
+                    self.direction = Direction::Left;
                     dist = motion.x.abs().min(1.0);
                     motion.x += dist;
                     self.position.x -= dist;
                 }
-                self.handle_collisions(map, direction, bombs);
+                self.handle_collisions(map, self.direction, bombs);
             }
             if motion.y != 0.0 {
                 if motion.y > 0.0 {
-                    direction = Direction::Down;
+                    self.direction = Direction::Down;
                     dist = motion.y.abs().min(1.0);
                     motion.y -= dist;
                     self.position.y += dist;
                     // self.bound(map.width, map.height);
                     // self.collide_down_map(map);
                 } else {
-                    direction = Direction::Up;
+                    self.direction = Direction::Up;
                     dist = motion.y.abs().min(1.0);
                     motion.y += dist;
                     self.position.y -= dist;
                     // self.bound(map.width, map.height);
                     // self.collide_up_map(map);
                 }
-                self.handle_collisions(map, direction, bombs);
+                self.handle_collisions(map, self.direction, bombs);
             }
         }
         self.object.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
+        let (x, y) = input.to_vec2().into();
+        if x != 0.0 || y != 0.0 {
+            self.object.transform.rotation.y = x.atan2(y);
+        }
     }
 }
 

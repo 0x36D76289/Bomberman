@@ -9,7 +9,7 @@ pub enum Direction {
 }
 
 impl Direction {
-    #[allow(unused)]
+    #[allow(dead_code)]
     pub fn to_vec2(self) -> Vec2 {
         match self {
             Direction::Up => Vec2::new(0.0, 1.0),
