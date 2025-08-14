@@ -62,7 +62,12 @@ impl KeyboardMovementController {
         }
     }
 
-    pub fn move_in_plane_xz_player(&self, input_state: &InputState, dt: f32, transform: &mut Transform) {
+    pub fn move_in_plane_xz_player(
+        &self,
+        input_state: &InputState,
+        dt: f32,
+        transform: &mut Transform,
+    ) {
         // let mut rotate = Vec3::splat(0.0);
 
         // if input_state.look_right {

@@ -1,6 +1,6 @@
 use crate::game::map::Map;
 use crate::game::state::{self, State};
-use crate::graphics::{GlobalUbo, Graphics, Model, load_texture, PointLight};
+use crate::graphics::{GlobalUbo, Graphics, Model, PointLight, load_texture};
 use core::f32;
 use glam::{Vec3, Vec4};
 use rand::Rng;
@@ -42,8 +42,14 @@ impl App {
         //     state.entities[0].physics.unwrap().transform.translation,
         //     state.entities[0].physics.unwrap().transform.rotation,
         // );
-        let map_center = Vec3::new(state.map.width as f32 / 2.0, 0.0, state.map.height as f32 / 2.0);
-        state.camera.set_view_target(Vec3::new(map_center.x, -19.0, 20.0), map_center);
+        let map_center = Vec3::new(
+            state.map.width as f32 / 2.0,
+            0.0,
+            state.map.height as f32 / 2.0,
+        );
+        state
+            .camera
+            .set_view_target(Vec3::new(map_center.x, -19.0, 20.0), map_center);
         // state.camera.set_view_xyz(Vec3::new(0.0, -19.0, -9.0), Vec3::new(-1.17, 0.0, 0.0));
         state.camera.set_perspective_projection(
             0.6,
@@ -51,7 +57,6 @@ impl App {
             0.1,
             1000.0,
         );
-
     }
 
     fn draw_frame(&mut self) {

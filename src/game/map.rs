@@ -56,21 +56,23 @@ impl Map {
             color: Default::default(),
         };
 
-        let mut content: Vec<MapElement> = vec![
-            MapElement::Breakable(breakable_object.clone());
-            width as usize * height as usize
-        ];
+        let mut content: Vec<MapElement> =
+            vec![MapElement::Breakable(breakable_object.clone()); width as usize * height as usize];
         for x in 0..width {
             content[x as usize] = MapElement::Unbreakable(unbreakable_object.clone());
-            content[width as usize * (height - 1) as usize + x as usize] = MapElement::Unbreakable(unbreakable_object.clone());
+            content[width as usize * (height - 1) as usize + x as usize] =
+                MapElement::Unbreakable(unbreakable_object.clone());
         }
         for y in 0..height {
-            content[y as usize * width as usize] = MapElement::Unbreakable(unbreakable_object.clone());
-            content[(y + 1) as usize * width as usize - 1] = MapElement::Unbreakable(unbreakable_object.clone());
+            content[y as usize * width as usize] =
+                MapElement::Unbreakable(unbreakable_object.clone());
+            content[(y + 1) as usize * width as usize - 1] =
+                MapElement::Unbreakable(unbreakable_object.clone());
         }
         for y in (0..height).step_by(2) {
             for x in (0..width).step_by(2) {
-                content[y as usize * width as usize + x as usize] = MapElement::Unbreakable(unbreakable_object.clone());
+                content[y as usize * width as usize + x as usize] =
+                    MapElement::Unbreakable(unbreakable_object.clone());
             }
         }
         // Top left corner
@@ -92,8 +94,7 @@ impl Map {
 
         for y in 0..height {
             for x in 0..width {
-                match &mut content[y as usize * width as usize + x as usize]
-                {
+                match &mut content[y as usize * width as usize + x as usize] {
                     MapElement::Empty => (),
                     MapElement::Breakable(obj) => {
                         obj.transform = Transform {
@@ -119,16 +120,16 @@ impl Map {
             transform: Transform {
                 translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
                 scale: Vec3::new(width as f32, 1.0, height as f32),
-                rotation: Vec3::ZERO
+                rotation: Vec3::ZERO,
             },
-            color: Vec3::ONE
+            color: Vec3::ONE,
         };
 
         Map {
             width: width as usize,
             height: height as usize,
             content: content,
-            floor
+            floor,
         }
     }
 
