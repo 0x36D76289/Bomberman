@@ -1,12 +1,8 @@
-use glam::Vec3;
 use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{DescriptorSet, WriteDescriptorSet, layout::DescriptorBindingFlags},
-    image::{
-        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
-        view::ImageView,
-    },
+    image::sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
     pipeline::{
         DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
         PipelineShaderStageCreateInfo,
@@ -25,12 +21,8 @@ use vulkano::{
 };
 
 use crate::{
-    game::{map::MapElement, resources::ResourceName, state::State},
-    graphics::{
-        GlobalUbo, MyVertex, PointLight, Vulkan,
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    game::state::State,
+    graphics::{GlobalUbo, MyVertex, Vulkan},
 };
 
 #[derive(Debug, Default)]

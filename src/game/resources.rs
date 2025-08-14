@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, mem, sync::Arc};
+use std::sync::Arc;
 
 use vulkano::{
     command_buffer::{
@@ -10,10 +10,7 @@ use vulkano::{
     memory::allocator::StandardMemoryAllocator,
 };
 
-use crate::{
-    game::bomb::Bomb,
-    graphics::{Model, load_texture},
-};
+use crate::graphics::{Model, load_texture};
 
 pub enum ResourceName {
     Breakable,

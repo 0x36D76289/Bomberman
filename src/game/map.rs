@@ -1,6 +1,4 @@
-use std::slice::Iter;
-
-use glam::{Vec2, Vec3, bool};
+use glam::{Vec2, Vec3};
 
 use crate::{
     game::resources::{ResourceName, Resources},
@@ -26,12 +24,6 @@ impl MapElement {
         }
     }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct MapElement {
-//     state: MapElementState,
-//     pub object: Option<Object>,
-// }
 
 pub struct Map {
     pub width: usize,
