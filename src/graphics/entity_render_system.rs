@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use glam::Vec3;
+use std::sync::Arc;
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     descriptor_set::{DescriptorSet, WriteDescriptorSet, layout::DescriptorBindingFlags},
@@ -25,7 +25,12 @@ use vulkano::{
 };
 
 use crate::{
-    game::{map::MapElement, resources::ResourceName, state::State}, graphics::{object::{Object, TextureIndex}, transform::Transform, GlobalUbo, MyVertex, PointLight, Vulkan}
+    game::{map::MapElement, resources::ResourceName, state::State},
+    graphics::{
+        GlobalUbo, MyVertex, PointLight, Vulkan,
+        object::{Object, TextureIndex},
+        transform::Transform,
+    },
 };
 
 #[derive(Debug, Default)]

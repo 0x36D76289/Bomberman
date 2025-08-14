@@ -2,8 +2,8 @@ use std::{collections::HashMap, hash::Hash, mem, sync::Arc};
 
 use vulkano::{
     command_buffer::{
-        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
-        PrimaryCommandBufferAbstract,
+        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract,
+        allocator::StandardCommandBufferAllocator,
     },
     device::Queue,
     image::view::ImageView,
@@ -12,7 +12,7 @@ use vulkano::{
 
 use crate::{
     game::bomb::Bomb,
-    graphics::{load_texture, Model},
+    graphics::{Model, load_texture},
 };
 
 pub enum ResourceName {
