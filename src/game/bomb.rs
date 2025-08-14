@@ -1,12 +1,19 @@
 use core::f32;
 
-use glam::{Vec2, usize};
+use glam::{usize, Vec2, Vec3};
 
 use super::collision::Collision;
-use crate::game::{
-    direction::Direction,
-    map::{Map, MapElement},
-    player::Player,
+use crate::{
+    game::{
+        direction::Direction,
+        map::{Map, MapElement},
+        player::Player,
+        resources::{self, ResourceName, Resources},
+    },
+    graphics::{
+        object::{Object, TextureIndex},
+        transform::Transform,
+    },
 };
 
 pub enum BombState {
@@ -33,6 +40,9 @@ pub struct Bomb {
     pub collision_enabled: bool,
     pub explosion: Explosion,
     pub despawn: bool,
+    // TODO: I'm thinking that when the explosion starts it'll place all the explosion bits in
+    // there ?
+    pub objects: Vec<Object>,
 }
 
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
@@ -40,7 +50,7 @@ const BOMB_POWER_DEFAULT: u8 = 2;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
 
 impl Bomb {
-    pub fn new(owner: u32, x: usize, y: usize) -> Self {
+    pub fn new(owner: u32, x: usize, y: usize, resources: &Resources) -> Self {
         Self {
             position: Vec2 {
                 x: x as f32 + 0.5,
@@ -53,6 +63,20 @@ impl Bomb {
             collision_enabled: false,
             explosion: Explosion::default(),
             despawn: false,
+            objects: vec![Self::create_object(x, y, resources)],
+        }
+    }
+
+    fn create_object(x: usize, y: usize, resources: &Resources) -> Object {
+        Object {
+            model: resources.models[ResourceName::Bomb as usize].clone(),
+            texture: Some(ResourceName::Bomb as TextureIndex),
+            color: Vec3::ONE,
+            transform: Transform {
+                translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
+                scale: Vec3::splat(0.5),
+                rotation: Vec3::ZERO,
+            },
         }
     }
 
@@ -86,19 +110,38 @@ impl Bomb {
         self.power
     }
 
-    fn explode(&mut self, map: &mut Map) {
+    fn set_explosion_objects(&mut self, resources: &Resources) {
+        self.objects.clear();
+        for y in -(self.explosion.up as i16)..=(self.explosion.down as i16) {
+            self.objects.push(Self::create_object(
+                self.position.x as usize,
+                (self.position.y as i16 + y) as usize,
+                resources,
+            ));
+        }
+        for x in -(self.explosion.left as i16)..=(self.explosion.right as i16) {
+            self.objects.push(Self::create_object(
+                (self.position.x as i16 + x) as usize,
+                self.position.y as usize,
+                resources,
+            ));
+        }
+    }
+
+    fn explode(&mut self, map: &mut Map, resources: &Resources) {
         self.state = BombState::Exploding;
         self.center();
         self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 });
         self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 });
         self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 });
         self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 });
+        self.set_explosion_objects(resources);
     }
 
-    fn live_bomb(&mut self, delta: f32, map: &mut Map) {
+    fn live_bomb(&mut self, delta: f32, map: &mut Map, resources: &Resources) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode(map);
+            self.explode(map, resources);
             return;
         }
         self.timer -= delta;
@@ -113,12 +156,18 @@ impl Bomb {
         //TODO: kill players
     }
 
-    pub fn tick(&mut self, delta: f32, players: &mut Vec<Player>, map: &mut Map) {
+    pub fn tick(
+        &mut self,
+        delta: f32,
+        players: &mut Vec<Player>,
+        map: &mut Map,
+        resources: &Resources,
+    ) {
         match self.state {
-            BombState::Planted => self.live_bomb(delta, map),
+            BombState::Planted => self.live_bomb(delta, map, resources),
             BombState::Sliding(direction) => {
                 // self.slide(direction);
-                self.live_bomb(delta, map);
+                self.live_bomb(delta, map, resources);
             }
             BombState::Exploding => self.exploding_bomb(delta, players),
         }

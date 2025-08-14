@@ -1,9 +1,16 @@
-use crate::{game::{
-    bomb::Bomb,
-    collision::Collision,
-    input::Input,
-    map::{Map, MapElement}, resources::{ResourceName, Resources},
-}, graphics::{object::Object, transform::Transform}};
+use crate::{
+    game::{
+        bomb::Bomb,
+        collision::Collision,
+        input::Input,
+        map::{Map, MapElement},
+        resources::{ResourceName, Resources},
+    },
+    graphics::{
+        object::{Object, TextureIndex},
+        transform::Transform,
+    },
+};
 
 use super::direction::Direction;
 use glam::{Vec2, Vec3};
@@ -20,7 +27,7 @@ pub struct Player {
     pub bombs_remaining: u32,
     pub is_human: bool,
     pub can_kick_bomb: bool,
-    pub object: Object
+    pub object: Object,
 }
 
 impl Player {
@@ -37,14 +44,15 @@ impl Player {
             can_kick_bomb: false,
             object: Object {
                 model: resources.models[ResourceName::Player as usize].clone(),
-                texture: Some(ResourceName::Player as i32),
+                texture: Some(ResourceName::Player as TextureIndex),
                 color: Vec3::ONE,
                 transform: Transform {
                     translation: Vec3::new(position.x, 0.0, position.y),
                     scale: Vec3::splat(0.35),
-                    rotation: Vec3::ZERO
-                }
-            }
+                    // TODO: use direction
+                    rotation: Vec3::ZERO,
+                },
+            },
         }
     }
 
@@ -64,7 +72,7 @@ impl Player {
         //collide powerups
     }
 
-    pub fn create_bomb(&mut self) -> Option<Bomb> {
+    pub fn create_bomb(&mut self, resources: &Resources) -> Option<Bomb> {
         if self.bombs_remaining == 0 {
             return None;
         }
@@ -77,6 +85,7 @@ impl Player {
             self.id,
             self.position.x as usize,
             self.position.y as usize,
+            resources,
         ));
     }
 
