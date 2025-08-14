@@ -2,8 +2,8 @@ use std::{collections::HashMap, hash::Hash, mem, sync::Arc};
 
 use vulkano::{
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract,
-        allocator::StandardCommandBufferAllocator,
+        allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
+        PrimaryCommandBufferAbstract,
     },
     device::Queue,
     image::view::ImageView,
@@ -12,7 +12,7 @@ use vulkano::{
 
 use crate::{
     game::bomb::Bomb,
-    graphics::{Model, load_texture},
+    graphics::{load_texture, Model},
 };
 
 pub enum ResourceName {
@@ -85,36 +85,48 @@ impl Resources {
             .unwrap();
 
         // load the models
-        models[ResourceName::Player as usize] = Some(Model::load(
-            include_bytes!("../assets/bomberman.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
-        models[ResourceName::Breakable as usize] = Some(Model::load(
-            include_bytes!("../assets/cube.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
-        models[ResourceName::Unbreakable as usize] = Some(Model::load(
-            include_bytes!("../assets/cube.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
-        models[ResourceName::Wall as usize] = Some(Model::load(
-            include_bytes!("../assets/cube.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
-        models[ResourceName::Floor as usize] = Some(Model::load(
-            include_bytes!("../assets/quad.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
-        models[ResourceName::Bomb as usize] = Some(Model::load(
-            include_bytes!("../assets/miku.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap());
+        models[ResourceName::Player as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/bomberman.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
+        models[ResourceName::Breakable as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/cube.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
+        models[ResourceName::Unbreakable as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/cube.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
+        models[ResourceName::Wall as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/cube.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
+        models[ResourceName::Floor as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/quad.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
+        models[ResourceName::Bomb as usize] = Some(
+            Model::load(
+                include_bytes!("../assets/bomb.obj"),
+                memory_allocator.clone(),
+            )
+            .unwrap(),
+        );
 
         // println!("{:?}", textures);
 
@@ -123,7 +135,7 @@ impl Resources {
 
         Self {
             models: models.try_into().unwrap(),
-            textures: textures.try_into().unwrap()
+            textures: textures.try_into().unwrap(),
         }
     }
 }

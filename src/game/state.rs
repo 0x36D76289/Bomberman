@@ -64,9 +64,14 @@ impl State {
             move_speed: 3.0,
             look_speed: 1.5,
         };
-    
+
         let mut players = Vec::<Player>::new();
-        players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down, &resources));
+        players.push(Player::new(
+            0,
+            Vec2 { x: 1.5, y: 1.5 },
+            Direction::Down,
+            &resources,
+        ));
         let mut inputs = Vec::<Input>::new();
         inputs.push(Input::default());
 
@@ -88,21 +93,20 @@ impl State {
     }
 
     pub fn objects(&self) -> impl Iterator<Item = &Object> {
-        let map_objects = self.map
+        let map_objects = self
+            .map
             .iter()
             .filter_map(|el| match el {
                 MapElement::Empty => None,
                 MapElement::Breakable(obj) => Some(obj),
-                MapElement::Unbreakable(obj) => Some(obj)
+                MapElement::Unbreakable(obj) => Some(obj),
             })
             .chain(std::iter::once(&self.map.floor));
 
-        let players_objects = self.players
-            .iter()
-            .map(|p| &p.object);
+        let players_objects = self.players.iter().map(|p| &p.object);
+        let bomb_objects = self.bombs.iter().map(|b| &b.objects).flatten();
 
-        map_objects
-            .chain(players_objects)
+        map_objects.chain(players_objects).chain(bomb_objects)
     }
 
     // pub fn new() -> Self {
@@ -162,13 +166,13 @@ impl State {
         self.update_inputs();
         // tick bombs
         for bomb in &mut self.bombs {
-            bomb.tick(delta, &mut self.players, &mut self.map);
+            bomb.tick(delta, &mut self.players, &mut self.map, &self.resources);
         }
         self.bombs.retain(|bomb| bomb.despawn == false);
         // for player in players: summon bomb if Pressed
         for i in 0..self.players.len() {
             if self.inputs[i].bomb() == InputState::Pressed {
-                match self.players[i].create_bomb() {
+                match self.players[i].create_bomb(&self.resources) {
                     Some(bomb) => self.bombs.push(bomb),
                     None => (),
                 }
