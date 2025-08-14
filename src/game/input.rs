@@ -1,6 +1,5 @@
 use glam::Vec2;
 use std::collections::HashMap;
-use std::slice::Iter;
 use winit::{
     event::ElementState,
     keyboard::{KeyCode, PhysicalKey},
@@ -75,7 +74,7 @@ impl Input {
     pub fn to_vec2(&self) -> Vec2 {
         Vec2 {
             x: Self::axis_to_float(self.left(), self.right()),
-            y: Self::axis_to_float(self.up(), self.down()),
+            y: Self::axis_to_float(self.down(), self.up()),
         }
     }
 

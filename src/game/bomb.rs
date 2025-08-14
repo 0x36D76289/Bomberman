@@ -8,7 +8,7 @@ use crate::{
         direction::Direction,
         map::{Map, MapElement},
         player::Player,
-        resources::{self, ResourceName, Resources},
+        resources::{ResourceName, Resources},
     },
     graphics::{
         object::{Object, TextureIndex},
@@ -16,6 +16,7 @@ use crate::{
     },
 };
 
+#[allow(unused)]
 pub enum BombState {
     // TODO: Define the states of a bomb
     Planted,
@@ -165,7 +166,7 @@ impl Bomb {
     ) {
         match self.state {
             BombState::Planted => self.live_bomb(delta, map, resources),
-            BombState::Sliding(direction) => {
+            BombState::Sliding(_) => {
                 // self.slide(direction);
                 self.live_bomb(delta, map, resources);
             }

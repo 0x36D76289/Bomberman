@@ -1,28 +1,21 @@
-use glam::Vec3;
-use vulkano::image::view::ImageView;
-use vulkano::pipeline::graphics;
-
 use crate::game::Camera;
 use crate::game::map::MapElement;
-use crate::game::resources::{self, Resources};
+use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::graphics::object::Object;
-use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
 use glam::Vec2;
-use winit::event::{ElementState, WindowEvent};
+use winit::event::ElementState;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::game::bomb::Bomb;
 use crate::game::direction::Direction;
 use crate::game::input::{Input, InputName, InputState};
-use crate::settings::fps::FpsManager;
 
 use super::map::Map;
 use super::player::Player;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
 use std::vec::Vec;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -32,38 +25,24 @@ enum Mode {
 
 pub struct State {
     keys: HashMap<PhysicalKey, ElementState>,
-    pub input_state: SamyInputState,
     pub players: Vec<Player>,
     bombs: Vec<Bomb>,
     inputs: Vec<Input>,
     pub resources: Resources,
     pub map: Map,
     pub camera: Camera,
-    pub entity_controller: KeyboardMovementController,
-    pub controlled_object_id: usize,
     mode: Mode,
 }
 
 impl State {
     pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
-        let input_state = SamyInputState::default();
-
-        // let players = Vec::new();
-
-        // let map = Map::new(16, 16);
-
         let resources = Resources::load_resources(
             graphics.vulkan.memory_allocator.clone(),
             graphics.vulkan.command_buffer_allocator.clone(),
             graphics.vulkan.queue.clone(),
         );
 
-        let mut camera = Camera::new();
-
-        let entity_controller = KeyboardMovementController {
-            move_speed: 3.0,
-            look_speed: 1.5,
-        };
+        let camera = Camera::new();
 
         let mut players = Vec::<Player>::new();
         players.push(Player::new(
@@ -79,15 +58,12 @@ impl State {
 
         Ok(Self {
             keys: HashMap::<PhysicalKey, ElementState>::new(),
-            input_state,
             players,
             bombs: Vec::<Bomb>::new(),
             inputs,
             map,
             resources,
             camera,
-            entity_controller: entity_controller,
-            controlled_object_id: 1,
             mode: Mode::MpGame,
         })
     }

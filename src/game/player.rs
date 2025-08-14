@@ -3,7 +3,7 @@ use crate::{
         bomb::Bomb,
         collision::Collision,
         input::Input,
-        map::{Map, MapElement},
+        map::Map,
         resources::{ResourceName, Resources},
     },
     graphics::{
@@ -17,6 +17,7 @@ use glam::{Vec2, Vec3};
 
 const PLAYER_RADIUS: f32 = 0.4;
 
+#[allow(unused)]
 pub struct Player {
     pub id: u32,
     pub position: Vec2,
@@ -38,7 +39,7 @@ impl Player {
             direction: direction,
             alive: true,
             power_level: 1,
-            speed: 1.0,
+            speed: 1.5,
             bombs_remaining: 1,
             is_human: true,
             can_kick_bomb: false,
@@ -90,8 +91,7 @@ impl Player {
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &Vec<Bomb>) {
-        let mut motion = input.to_vec2();
-        motion *= delta;
+        let mut motion = input.to_vec2() * delta * self.speed;
 
         let mut direction: Direction;
         let mut dist: f32;

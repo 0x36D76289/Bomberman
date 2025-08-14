@@ -9,10 +9,11 @@ pub enum Direction {
 }
 
 impl Direction {
+    #[allow(unused)]
     pub fn to_vec2(self) -> Vec2 {
         match self {
-            Direction::Up => Vec2::new(0.0, -1.0),
-            Direction::Down => Vec2::new(0.0, 1.0),
+            Direction::Up => Vec2::new(0.0, 1.0),
+            Direction::Down => Vec2::new(0.0, -1.0),
             Direction::Left => Vec2::new(-1.0, 0.0),
             Direction::Right => Vec2::new(1.0, 0.0),
         }
