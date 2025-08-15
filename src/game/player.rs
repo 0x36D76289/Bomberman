@@ -33,6 +33,7 @@ pub struct Player {
 
 impl Player {
     pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
+        let dir_vec = direction.to_vec2();
         Player {
             id: id,
             position: position,
@@ -51,7 +52,7 @@ impl Player {
                     translation: Vec3::new(position.x, 0.0, position.y),
                     scale: Vec3::splat(0.35),
                     // TODO: use direction
-                    rotation: Vec3::ZERO,
+                    rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
                 },
             }),
         }

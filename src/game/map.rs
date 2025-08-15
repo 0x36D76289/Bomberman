@@ -1,4 +1,4 @@
-use glam::{usize, Vec2, Vec3};
+use glam::{Vec2, Vec3, usize};
 use rand::random_range;
 
 use crate::{

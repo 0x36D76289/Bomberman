@@ -1,8 +1,8 @@
+use crate::game::Camera;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
-use crate::game::Camera;
-use crate::graphics::object::Object;
 use crate::graphics::Graphics;
+use crate::graphics::object::Object;
 
 use glam::Vec2;
 use winit::event::ElementState;
