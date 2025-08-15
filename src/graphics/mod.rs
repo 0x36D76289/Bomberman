@@ -1,16 +1,16 @@
 pub mod entity_render_system;
 pub mod init;
+pub mod light;
 pub mod model;
 pub mod object;
-// pub mod point_light_render_system;
 pub mod renderer;
 pub mod texture;
 pub mod transform;
 
 pub use {
-    entity_render_system::{EntityRenderSystem, vs::GlobalUbo, vs::PointLight},
+    entity_render_system::{EntityRenderSystem, vs::GlobalUbo},
+    light::LightInfo,
     model::Model,
-    // point_light_render_system::PointLightRenderSystem,
     renderer::Renderer,
     texture::load_texture,
 };

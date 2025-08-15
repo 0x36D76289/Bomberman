@@ -1,7 +1,5 @@
 use crate::game::state::State;
-use crate::graphics::{GlobalUbo, Graphics, PointLight};
-use core::f32;
-use glam::{Vec3, Vec4};
+use crate::graphics::{GlobalUbo, Graphics};
 use std::error::Error;
 use winit::keyboard::KeyCode;
 use winit::{
@@ -28,24 +26,15 @@ impl App {
     fn update_world(&mut self) {
         let state = &mut self.state;
 
-        // state.camera.set_view_xyz(
-        //     state.entities[0].physics.unwrap().transform.translation,
-        //     state.entities[0].physics.unwrap().transform.rotation,
-        // );
-        let map_center = Vec3::new(
-            state.map.width as f32 / 2.0,
-            0.0,
-            state.map.height as f32 / 2.0,
+        state.camera.set_view_xyz(
+            state.camera.transform.translation,
+            state.camera.transform.rotation,
         );
-        state
-            .camera
-            .set_view_target(Vec3::new(map_center.x, -19.0, -10.0), map_center);
-        // state.camera.set_view_xyz(Vec3::new(0.0, -19.0, -9.0), Vec3::new(-1.17, 0.0, 0.0));
         state.camera.set_perspective_projection(
             0.6,
             self.graphics.renderer.get_aspect_ratio(),
             0.1,
-            1000.0,
+            100.0,
         );
     }
 
@@ -59,12 +48,9 @@ impl App {
                 projection: state.camera.projection_matrix.to_cols_array_2d(),
                 view: state.camera.view_matrix.to_cols_array_2d(),
                 inverse_view: state.camera.inverse_view_matrix.to_cols_array_2d(),
-                ambient_light_color: [1.0, 1.0, 1.0, 0.8],
-                lights: [PointLight {
-                    position: Vec4::ONE.to_array(),
-                    color: Vec4::ONE.to_array(),
-                }; 100],
-                light_number: 0,
+                ambient_light_color: state.light.ambient_light_color.into(),
+                direction_to_light: state.light.direction_to_light.to_array().into(),
+                directional_light_color: state.light.directional_light_color.into(),
             };
 
             game_object_system.render_game_objects(
@@ -76,8 +62,10 @@ impl App {
             renderer.end_frame(&self.graphics.vulkan, command_buffer);
             renderer.update_time();
             renderer.update_title(&format!(
-                "Bomberman!! fps: {:.0}",
+                "Bomberman!! fps: {:.0} camera: {} {}",
                 renderer.get_rcx().time_info.avg_fps,
+                state.camera.transform.translation,
+                state.camera.transform.rotation
             ));
         }
     }
