@@ -102,7 +102,7 @@ impl Map {
             model: ressources.models[ResourceName::Breakable as usize].clone(),
             texture: Some(ResourceName::Breakable as TextureIndex),
             transform: Default::default(),
-            color: Default::default(),
+            color: Vec3::ONE,
         }
     }
 
@@ -111,7 +111,7 @@ impl Map {
             model: ressources.models[ResourceName::Unbreakable as usize].clone(),
             texture: Some(ResourceName::Unbreakable as TextureIndex),
             transform: Default::default(),
-            color: Default::default(),
+            color: Vec3::ONE,
         }
     }
 

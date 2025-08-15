@@ -61,7 +61,8 @@ void main() {
 
     vec3 color;
     if (push.tex_index >= 0) {
-        color = texture(nonuniformEXT(sampler2D(tex[push.tex_index], s)), in_uv).xyz;
+        vec3 texture_color = texture(nonuniformEXT(sampler2D(tex[push.tex_index], s)), in_uv).xyz;
+        color = texture_color * in_color;
     } else {
         color = in_color;
     }
