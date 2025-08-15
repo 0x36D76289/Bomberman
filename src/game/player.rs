@@ -32,6 +32,21 @@ pub struct Player {
 }
 
 impl Player {
+    /// Returns a unique color based on the player's ID
+    fn get_player_color(id: u32) -> Vec3 {
+        match id % 8 {
+            0 => Vec3::new(1.0, 0.2, 0.2),  // Red
+            1 => Vec3::new(0.2, 0.2, 1.0),  // Blue
+            2 => Vec3::new(0.2, 1.0, 0.2),  // Green
+            3 => Vec3::new(1.0, 1.0, 0.2),  // Yellow
+            4 => Vec3::new(1.0, 0.2, 1.0),  // Magenta
+            5 => Vec3::new(0.2, 1.0, 1.0),  // Cyan
+            6 => Vec3::new(1.0, 0.6, 0.2),  // Orange
+            7 => Vec3::new(0.8, 0.2, 0.8),  // Violet
+            _ => Vec3::ONE,                         // Default to white
+        }
+    }
+
     pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
         let dir_vec = direction.to_vec2();
         Player {
@@ -47,7 +62,7 @@ impl Player {
             object: Some(Object {
                 model: resources.models[ResourceName::Player as usize].clone(),
                 texture: Some(ResourceName::Player as TextureIndex),
-                color: Vec3::ONE,
+                color: Self::get_player_color(id),
                 transform: Transform {
                     translation: Vec3::new(position.x, 0.0, position.y),
                     scale: Vec3::splat(0.35),
