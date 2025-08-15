@@ -1,6 +1,6 @@
 use core::f32;
 
-use glam::{Vec2, Vec3, usize};
+use glam::{usize, Vec2, Vec3};
 
 use super::collision::Collision;
 use crate::{
@@ -24,7 +24,7 @@ pub enum BombState {
     Exploding,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Explosion {
     up: u8,
     down: u8,
@@ -49,6 +49,8 @@ pub struct Bomb {
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
 const BOMB_POWER_DEFAULT: u8 = 2;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
+const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
+const BOMB_RADIUS: f32 = 0.5;
 
 impl Bomb {
     pub fn new(owner: u32, x: usize, y: usize, resources: &Resources) -> Self {
@@ -154,7 +156,37 @@ impl Bomb {
             players[self.owner_id as usize].bombs_remaining += 1;
         }
         self.timer += delta;
-        //TODO: kill players
+
+        // kill players
+        for player in players.iter_mut().filter(|p| p.alive) {
+            let mut kill = false;
+
+            let (px, py) = player.position.into();
+            let (bx, by) = self.position.into();
+
+            if (px - bx).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()) {
+                if ((py + player.get_size())
+                    > (by - self.explosion.up as f32 - BOMB_EXPLOSION_RADIUS))
+                    && ((py - player.get_size())
+                        < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
+                {
+                    kill = true;
+                }
+            }
+            if (py - by).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()) {
+                if ((px + player.get_size())
+                    > (bx - self.explosion.left as f32 - BOMB_EXPLOSION_RADIUS))
+                    && ((px - player.get_size())
+                        < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
+                {
+                    kill = true;
+                }
+            }
+
+            if kill {
+                player.kill();
+            }
+        }
     }
 
     pub fn tick(
@@ -173,5 +205,20 @@ impl Bomb {
             BombState::Exploding => self.exploding_bomb(delta, players),
         }
         self.enable_collision(players);
+    }
+}
+
+impl Collision for Bomb {
+    fn get_pos(&self) -> Vec2 {
+        self.position
+    }
+    fn set_pos(&mut self, pos: Vec2) {
+        self.position = pos
+    }
+    fn get_size(&self) -> f32 {
+        match self.state {
+            BombState::Exploding => 0.0,
+            _ => BOMB_RADIUS,
+        }
     }
 }

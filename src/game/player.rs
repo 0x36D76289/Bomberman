@@ -28,7 +28,7 @@ pub struct Player {
     pub bombs_remaining: u32,
     pub is_human: bool,
     pub can_kick_bomb: bool,
-    pub object: Object,
+    pub object: Option<Object>,
 }
 
 impl Player {
@@ -43,7 +43,7 @@ impl Player {
             bombs_remaining: 1,
             is_human: true,
             can_kick_bomb: false,
-            object: Object {
+            object: Some(Object {
                 model: resources.models[ResourceName::Player as usize].clone(),
                 texture: Some(ResourceName::Player as TextureIndex),
                 color: Vec3::ONE,
@@ -53,7 +53,7 @@ impl Player {
                     // TODO: use direction
                     rotation: Vec3::ZERO,
                 },
-            },
+            }),
         }
     }
 
@@ -64,7 +64,7 @@ impl Player {
             if bomb.owner_id == self.id && !bomb.collision_enabled {
                 continue;
             }
-            self.resolve_collision_with(bomb.position, 0.5, direction);
+            self.resolve_collision_with(bomb.position, bomb.get_size(), direction);
         }
         //TODO:
         //collide players
@@ -129,11 +129,21 @@ impl Player {
                 self.handle_collisions(map, self.direction, bombs);
             }
         }
-        self.object.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
-        let (x, y) = input.to_vec2().into();
-        if x != 0.0 || y != 0.0 {
-            self.object.transform.rotation.y = x.atan2(y);
+        match &mut self.object {
+            None => (),
+            Some(obj) => {
+                obj.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
+                let (x, y) = input.to_vec2().into();
+                if x != 0.0 || y != 0.0 {
+                    obj.transform.rotation.y = x.atan2(y);
+                }
+            }
         }
+    }
+
+    pub fn kill(&mut self) {
+        self.alive = false;
+        self.object = None;
     }
 }
 
