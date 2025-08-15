@@ -2,11 +2,11 @@ use glam::Vec3;
 use vulkano::image::view::ImageView;
 use vulkano::pipeline::graphics;
 
+use crate::game::Camera;
 use crate::game::map::MapElement;
 use crate::game::resources::{self, Resources};
-use crate::game::Camera;
-use crate::graphics::object::Object;
 use crate::graphics::Graphics;
+use crate::graphics::object::Object;
 use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
 use glam::Vec2;
