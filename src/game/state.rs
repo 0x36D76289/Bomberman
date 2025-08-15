@@ -1,10 +1,11 @@
 use crate::game::Camera;
 use crate::game::map::MapElement;
 use crate::game::resources::Resources;
-use crate::graphics::Graphics;
 use crate::graphics::object::Object;
+use crate::graphics::transform::Transform;
+use crate::graphics::{Graphics, LightInfo};
 
-use glam::Vec2;
+use glam::{Vec2, Vec3, Vec4};
 use winit::event::ElementState;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -31,6 +32,7 @@ pub struct State {
     pub resources: Resources,
     pub map: Map,
     pub camera: Camera,
+    pub light: LightInfo,
     mode: Mode,
 }
 
@@ -42,7 +44,12 @@ impl State {
             graphics.vulkan.queue.clone(),
         );
 
-        let camera = Camera::new();
+        let mut camera = Camera::new();
+        camera.transform = Transform {
+            translation: Vec3::new(8.0, -27.5, -1.5),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
 
         let mut players = Vec::<Player>::new();
         players.push(Player::new(
@@ -56,6 +63,12 @@ impl State {
 
         let map = Map::new(16, 16, &resources);
 
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.5),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.8),
+        };
+
         Ok(Self {
             keys: HashMap::<PhysicalKey, ElementState>::new(),
             players,
@@ -64,11 +77,12 @@ impl State {
             map,
             resources,
             camera,
+            light,
             mode: Mode::MpGame,
         })
     }
 
-    pub fn objects(&self) -> impl Iterator<Item = &Object> {
+    pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
         let map_objects = self
             .map
             .iter()
@@ -85,21 +99,6 @@ impl State {
         map_objects.chain(players_objects).chain(bomb_objects)
     }
 
-    // pub fn new() -> Self {
-    //     let mut players = Vec::<Player>::new();
-    //     players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
-    //     let mut inputs = Vec::<Input>::new();
-    //     inputs.push(Input::default());
-    //     State {
-    //         keys: HashMap::<PhysicalKey, ElementState>::new(),
-    //         players: players,
-    //         bombs: Vec::<Bomb>::new(),
-    //         inputs: inputs,
-    //         map: Map::new(16, 16),
-    //         fps: FpsManager::default(),
-    //         mode: Mode::MpGame,
-    //     }
-    // }
     pub fn print(&self) {
         let mut display = self.map.to_str();
         for player in &self.players {
@@ -157,6 +156,8 @@ impl State {
         for i in 0..self.players.len() {
             self.players[i].player_move(self.inputs[i], delta, &self.map, &self.bombs);
         }
+        // uncomment this and comment the previous line to control the camera
+        // self.camera.keyboard_move(&self.inputs[0], delta);
     }
 
     pub fn tick(&mut self, delta_time: f32) {
