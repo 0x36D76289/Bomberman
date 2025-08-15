@@ -27,7 +27,7 @@ pub struct Player {
     pub bombs_remaining: u32,
     pub is_human: bool,
     pub can_kick_bomb: bool,
-    pub object: Object,
+    pub object: Option<Object>,
 }
 
 impl Player {
@@ -42,7 +42,7 @@ impl Player {
             bombs_remaining: 1,
             is_human: true,
             can_kick_bomb: false,
-            object: Object {
+            object: Some(Object {
                 model: resources.models[ResourceName::Player as usize].clone(),
                 texture: Some(ResourceName::Player as TextureIndex),
                 color: Vec3::ONE,
@@ -52,7 +52,7 @@ impl Player {
                     // TODO: use direction
                     rotation: Vec3::ZERO,
                 },
-            },
+            }),
         }
     }
 
@@ -130,7 +130,17 @@ impl Player {
                 self.handle_collisions(map, direction, bombs);
             }
         }
-        self.object.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
+        match &mut self.object {
+            None => (),
+            Some(obj) => {
+                obj.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y)
+            }
+        }
+    }
+
+    pub fn kill(&mut self) {
+        self.alive = false;
+        self.object = None;
     }
 }
 

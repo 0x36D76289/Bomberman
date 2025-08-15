@@ -1,6 +1,6 @@
 use core::f32;
 
-use glam::{Vec2, Vec3, usize};
+use glam::{usize, Vec2, Vec3};
 
 use super::collision::Collision;
 use crate::{
@@ -48,6 +48,7 @@ pub struct Bomb {
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
 const BOMB_POWER_DEFAULT: u8 = 2;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
+const BOMB_EXPLOSION_SIZE: f32 = 0.4;
 
 impl Bomb {
     pub fn new(owner: u32, x: usize, y: usize, resources: &Resources) -> Self {
@@ -153,7 +154,37 @@ impl Bomb {
             players[self.owner_id as usize].bombs_remaining += 1;
         }
         self.timer += delta;
-        //TODO: kill players
+
+        // kill players
+        for player in players.iter_mut().filter(|p| p.alive) {
+            let mut kill = false;
+
+            let (px, py) = player.position.into();
+            let (bx, by) = self.position.into();
+
+            if (px - bx).abs() < (BOMB_EXPLOSION_SIZE + player.get_size()) {
+                if ((py - player.get_size())
+                    < (by + BOMB_EXPLOSION_SIZE + self.explosion.down as f32))
+                    && ((py + player.get_size())
+                        > (by - BOMB_EXPLOSION_TIME - self.explosion.up as f32))
+                {
+                    kill = true;
+                }
+            }
+            if (py - by).abs() < (BOMB_EXPLOSION_SIZE + player.get_size()) {
+                if ((px - player.get_size())
+                    < (bx + BOMB_EXPLOSION_SIZE + self.explosion.right as f32))
+                    && ((px + player.get_size())
+                        > (bx - BOMB_EXPLOSION_TIME - self.explosion.left as f32))
+                {
+                    kill = true;
+                }
+            }
+
+            if kill {
+                player.kill();
+            }
+        }
     }
 
     pub fn tick(
