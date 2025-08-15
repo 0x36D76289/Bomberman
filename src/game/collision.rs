@@ -5,6 +5,8 @@ use crate::game::{
     map::{Map, MapElement},
 };
 
+const PUSHBACK: f32 = 0.01;
+
 pub trait Collision {
     fn get_pos(&self) -> Vec2;
     fn set_pos(&mut self, pos: Vec2);
@@ -26,10 +28,11 @@ pub trait Collision {
             && ((self.get_pos().y - pos.y).abs() < (self.get_size() + radius));
     }
 
-    fn resolve_collision_with(&mut self, pos: Vec2, radius: f32, direction: Direction) {
+    fn resolve_collision_with(&mut self, pos: Vec2, mut radius: f32, direction: Direction) {
         if !self.is_colliding_with(pos, radius) {
             return;
         }
+        radius += PUSHBACK;
         match direction {
             Direction::Up => self.set_pos(Vec2 {
                 x: self.get_pos().x,
