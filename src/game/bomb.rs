@@ -1,6 +1,6 @@
 use core::f32;
 
-use glam::{usize, Vec2, Vec3};
+use glam::{Vec2, Vec3, usize};
 
 use super::collision::Collision;
 use crate::{
