@@ -1,8 +1,8 @@
-use crate::game::map::MapElement;
-use crate::game::resources::Resources;
 use crate::game::Camera;
-use crate::graphics::object::Object;
+use crate::game::map::{MapElement, MapSettings};
+use crate::game::resources::Resources;
 use crate::graphics::Graphics;
+use crate::graphics::object::Object;
 
 use glam::Vec2;
 use winit::event::ElementState;
@@ -45,16 +45,33 @@ impl State {
         let camera = Camera::new();
 
         let mut players = Vec::<Player>::new();
-        players.push(Player::new(
-            0,
-            Vec2 { x: 1.5, y: 1.5 },
-            Direction::Down,
-            &resources,
-        ));
         let mut inputs = Vec::<Input>::new();
-        inputs.push(Input::default());
 
-        let map = Map::new(16, 16, &resources);
+        //HACK: this is not safe, map can fail creation
+        let map = Map::new(MapSettings::default_cheese(), &resources).unwrap();
+
+        let mut id: u32 = 0;
+        for y in 0..map.height {
+            for x in 0..map.width {
+                match map.get_elem(x, y) {
+                    MapElement::SpawnPoint => {
+                        players.push(Player::new(
+                            id,
+                            Vec2 {
+                                x: x as f32 + 0.5,
+                                y: y as f32 + 0.5,
+                            },
+                            Direction::Down,
+                            &resources,
+                        ));
+
+                        inputs.push(Input::default());
+                        id += 1;
+                    }
+                    _ => (),
+                }
+            }
+        }
 
         Ok(Self {
             keys: HashMap::<PhysicalKey, ElementState>::new(),
@@ -74,6 +91,7 @@ impl State {
             .iter()
             .filter_map(|el| match el {
                 MapElement::Empty => None,
+                MapElement::SpawnPoint => None,
                 MapElement::Breakable(obj) => Some(obj),
                 MapElement::Unbreakable(obj) => Some(obj),
             })
@@ -85,21 +103,6 @@ impl State {
         map_objects.chain(players_objects).chain(bomb_objects)
     }
 
-    // pub fn new() -> Self {
-    //     let mut players = Vec::<Player>::new();
-    //     players.push(Player::new(0, Vec2 { x: 1.5, y: 1.5 }, Direction::Down));
-    //     let mut inputs = Vec::<Input>::new();
-    //     inputs.push(Input::default());
-    //     State {
-    //         keys: HashMap::<PhysicalKey, ElementState>::new(),
-    //         players: players,
-    //         bombs: Vec::<Bomb>::new(),
-    //         inputs: inputs,
-    //         map: Map::new(16, 16),
-    //         fps: FpsManager::default(),
-    //         mode: Mode::MpGame,
-    //     }
-    // }
     pub fn print(&self) {
         let mut display = self.map.to_str();
         for player in &self.players {
@@ -146,7 +149,10 @@ impl State {
         }
         self.bombs.retain(|bomb| bomb.despawn == false);
         // for player in players: summon bomb if Pressed
-        for (i, player) in self.players.iter_mut().filter(|p| p.alive).enumerate() {
+        for (i, player) in self.players.iter_mut().enumerate() {
+            if !player.alive {
+                continue;
+            }
             if self.inputs[i].bomb() == InputState::Pressed {
                 match player.create_bomb(&self.resources) {
                     Some(bomb) => self.bombs.push(bomb),
@@ -154,8 +160,8 @@ impl State {
                 }
             }
         }
-        for i in 0..self.players.len() {
-            self.players[i].player_move(self.inputs[i], delta, &self.map, &self.bombs);
+        for (i, player) in self.players.iter_mut().enumerate() {
+            player.player_move(self.inputs[i], delta, &self.map, &self.bombs);
         }
     }
 
@@ -166,9 +172,3 @@ impl State {
         state_func(self, delta_time);
     }
 }
-
-// impl Default for State {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }

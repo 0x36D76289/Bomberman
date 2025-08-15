@@ -160,3 +160,13 @@ impl Collision for Player {
         PLAYER_RADIUS
     }
 }
+
+pub trait Alive {
+    fn alive(&mut self) -> impl Iterator<Item = &'_ mut Player>;
+}
+
+impl Alive for Vec<Player> {
+    fn alive(&mut self) -> impl Iterator<Item = &'_ mut Player> {
+        self.iter_mut().filter(|p| p.alive)
+    }
+}
