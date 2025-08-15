@@ -2,11 +2,11 @@ use glam::Vec3;
 use vulkano::image::view::ImageView;
 use vulkano::pipeline::graphics;
 
-use crate::game::Camera;
 use crate::game::map::MapElement;
 use crate::game::resources::{self, Resources};
-use crate::graphics::Graphics;
+use crate::game::Camera;
 use crate::graphics::object::Object;
+use crate::graphics::Graphics;
 use crate::input::{InputState as SamyInputState, KeyboardMovementController};
 
 use glam::Vec2;
@@ -22,6 +22,7 @@ use super::map::Map;
 use super::player::Player;
 use std::collections::HashMap;
 use std::error::Error;
+use std::iter;
 use std::sync::Arc;
 use std::vec::Vec;
 
@@ -103,7 +104,7 @@ impl State {
             })
             .chain(std::iter::once(&self.map.floor));
 
-        let players_objects = self.players.iter().map(|p| &p.object);
+        let players_objects = self.players.iter().map(|p| &p.object).flatten();
         let bomb_objects = self.bombs.iter().map(|b| &b.objects).flatten();
 
         map_objects.chain(players_objects).chain(bomb_objects)
@@ -170,9 +171,9 @@ impl State {
         }
         self.bombs.retain(|bomb| bomb.despawn == false);
         // for player in players: summon bomb if Pressed
-        for i in 0..self.players.len() {
+        for (i, player) in self.players.iter_mut().filter(|p| p.alive).enumerate() {
             if self.inputs[i].bomb() == InputState::Pressed {
-                match self.players[i].create_bomb(&self.resources) {
+                match player.create_bomb(&self.resources) {
                     Some(bomb) => self.bombs.push(bomb),
                     None => (),
                 }
