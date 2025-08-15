@@ -12,10 +12,12 @@ pub trait Collision {
 
     fn bound(&mut self, map: &Map) {
         let mut pos = self.get_pos();
-        pos.x = pos.x.max(self.get_size());
-        pos.x = pos.x.min(map.width as f32 - self.get_size());
-        pos.y = pos.y.max(self.get_size());
-        pos.y = pos.y.min(map.height as f32 - self.get_size());
+        pos.x = pos
+            .x
+            .clamp(self.get_size(), map.width as f32 - self.get_size());
+        pos.y = pos
+            .y
+            .clamp(self.get_size(), map.height as f32 - self.get_size());
         self.set_pos(pos);
     }
 
@@ -60,6 +62,7 @@ pub trait Collision {
         }
         return match map.get_elem(x as usize, y as usize) {
             MapElement::Empty => false,
+            MapElement::SpawnPoint => false,
             MapElement::Breakable(_) => true,
             MapElement::Unbreakable(_) => true,
         };

@@ -1,13 +1,13 @@
 use core::f32;
 
-use glam::{usize, Vec2, Vec3};
+use glam::{Vec2, Vec3, usize};
 
 use super::collision::Collision;
 use crate::{
     game::{
         direction::Direction,
         map::{Map, MapElement},
-        player::Player,
+        player::{Alive, Player},
         resources::{ResourceName, Resources},
     },
     graphics::{
@@ -103,6 +103,7 @@ impl Bomb {
             let elem = map.get_elem_pos(pos);
             match elem {
                 MapElement::Empty => continue,
+                MapElement::SpawnPoint => continue,
                 MapElement::Breakable(_) => {
                     let _ = map.set_elem_pos(pos, MapElement::Empty);
                 }
@@ -158,7 +159,7 @@ impl Bomb {
         self.timer += delta;
 
         // kill players
-        for player in players.iter_mut().filter(|p| p.alive) {
+        for player in players.alive() {
             let mut kill = false;
 
             let (px, py) = player.position.into();
