@@ -1,15 +1,14 @@
-use crate::game::Camera;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
-use crate::graphics::Graphics;
+use crate::game::Camera;
 use crate::graphics::object::Object;
+use crate::graphics::Graphics;
 
 use glam::Vec2;
 use winit::event::ElementState;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::game::bomb::Bomb;
-use crate::game::direction::Direction;
 use crate::game::input::{Input, InputName, InputState};
 
 use super::map::Map;
@@ -54,14 +53,14 @@ impl State {
         for y in 0..map.height {
             for x in 0..map.width {
                 match map.get_elem(x, y) {
-                    MapElement::SpawnPoint => {
+                    MapElement::SpawnPoint(dir) => {
                         players.push(Player::new(
                             id,
                             Vec2 {
                                 x: x as f32 + 0.5,
                                 y: y as f32 + 0.5,
                             },
-                            Direction::Down,
+                            dir.clone(),
                             &resources,
                         ));
 
@@ -91,7 +90,7 @@ impl State {
             .iter()
             .filter_map(|el| match el {
                 MapElement::Empty => None,
-                MapElement::SpawnPoint => None,
+                MapElement::SpawnPoint(_) => None,
                 MapElement::Breakable(obj) => Some(obj),
                 MapElement::Unbreakable(obj) => Some(obj),
             })

@@ -1,6 +1,6 @@
 use core::f32;
 
-use glam::{Vec2, Vec3, usize};
+use glam::{usize, Vec2, Vec3};
 
 use super::collision::Collision;
 use crate::{
@@ -103,7 +103,7 @@ impl Bomb {
             let elem = map.get_elem_pos(pos);
             match elem {
                 MapElement::Empty => continue,
-                MapElement::SpawnPoint => continue,
+                MapElement::SpawnPoint(_) => continue,
                 MapElement::Breakable(_) => {
                     let _ = map.set_elem_pos(pos, MapElement::Empty);
                 }

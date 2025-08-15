@@ -1,8 +1,11 @@
-use glam::{Vec2, Vec3, usize};
+use glam::{usize, Vec2, Vec3};
 use rand::random_range;
 
 use crate::{
-    game::resources::{ResourceName, Resources},
+    game::{
+        direction::Direction,
+        resources::{ResourceName, Resources},
+    },
     graphics::{
         object::{Object, TextureIndex},
         transform::Transform,
@@ -12,7 +15,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub enum MapElement {
     Empty,
-    SpawnPoint,
+    SpawnPoint(Direction),
     Breakable(Object),
     Unbreakable(Object),
 }
@@ -21,10 +24,19 @@ impl MapElement {
     fn value(&self) -> char {
         match *self {
             MapElement::Empty => ' ',
-            MapElement::SpawnPoint => '*',
+            MapElement::SpawnPoint(_) => '*',
             MapElement::Breakable(_) => '#',
             MapElement::Unbreakable(_) => 'X',
         }
+    }
+
+    fn random_spawn_point() -> Self {
+        Self::SpawnPoint(match random_range(0..=3) {
+            0 => Direction::Up,
+            1 => Direction::Down,
+            2 => Direction::Left,
+            _ => Direction::Right,
+        })
     }
 }
 
@@ -108,7 +120,7 @@ impl Map {
             for x in 0..self.width {
                 match &mut self.content[y as usize * self.width as usize + x as usize] {
                     MapElement::Empty => (),
-                    MapElement::SpawnPoint => (),
+                    MapElement::SpawnPoint(_) => (),
                     MapElement::Breakable(obj) => {
                         obj.transform = Transform {
                             translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
@@ -200,22 +212,23 @@ impl Map {
 
     fn corners(mut self) -> Self {
         // Top left corner
-        self.content[(0 * self.width) as usize + 0 as usize] = MapElement::SpawnPoint;
+        self.content[(0 * self.width) as usize + 0 as usize] =
+            MapElement::SpawnPoint(Direction::Right);
         self.content[(0 * self.width) as usize + 1 as usize] = MapElement::Empty;
         self.content[(1 * self.width) as usize + 0 as usize] = MapElement::Empty;
         // Top right corner
         self.content[(0 * self.width) as usize + (self.width - 1) as usize] =
-            MapElement::SpawnPoint;
+            MapElement::SpawnPoint(Direction::Left);
         self.content[(0 * self.width) as usize + (self.width - 2) as usize] = MapElement::Empty;
         self.content[(1 * self.width) as usize + (self.width - 1) as usize] = MapElement::Empty;
         // Bottom left corner
         self.content[((self.height - 1) * self.width) as usize + 0 as usize] =
-            MapElement::SpawnPoint;
+            MapElement::SpawnPoint(Direction::Right);
         self.content[((self.height - 1) * self.width) as usize + 1 as usize] = MapElement::Empty;
         self.content[((self.height - 2) * self.width) as usize + 0 as usize] = MapElement::Empty;
         // Bottom right corner
         self.content[((self.height - 1) * self.width) as usize + (self.width - 1) as usize] =
-            MapElement::SpawnPoint;
+            MapElement::SpawnPoint(Direction::Left);
         self.content[((self.height - 1) * self.width) as usize + (self.width - 2) as usize] =
             MapElement::Empty;
         self.content[((self.height - 2) * self.width) as usize + (self.width - 1) as usize] =
@@ -255,12 +268,13 @@ impl Map {
                 (x - safe_range as i16).max(0)..=(x + safe_range as i16).min(self.width as i16 - 1)
             {
                 match self.content[y as usize * self.width as usize + x as usize] {
-                    MapElement::SpawnPoint => return false,
+                    MapElement::SpawnPoint(_) => return false,
                     _ => (),
                 }
             }
         }
-        self.content[y as usize * self.width as usize + x as usize] = MapElement::SpawnPoint;
+        self.content[y as usize * self.width as usize + x as usize] =
+            MapElement::random_spawn_point();
         for y in
             (y - spawn_size as i16).max(0)..=(y + spawn_size as i16).min(self.height as i16 - 1)
         {
