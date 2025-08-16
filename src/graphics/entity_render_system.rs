@@ -21,7 +21,7 @@ use vulkano::{
 };
 
 use crate::{
-    game::state::State,
+    game::game_state::GameState,
     graphics::{GlobalUbo, MyVertex, Vulkan},
 };
 
@@ -35,7 +35,7 @@ impl EntityRenderSystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
-        state: &State,
+        state: &GameState,
         global_ubo: GlobalUbo,
         command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {

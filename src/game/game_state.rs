@@ -1,30 +1,23 @@
+use crate::app_state::{AppState, CommandBuffer, KeyMap};
 use crate::game::Camera;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
-use crate::graphics::{Graphics, LightInfo};
+use crate::graphics::{GlobalUbo, Graphics, LightInfo};
 
 use glam::{Vec2, Vec3, Vec4};
-use winit::event::ElementState;
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::KeyCode;
 
 use crate::game::bomb::Bomb;
 use crate::game::input::{Input, InputName, InputState};
 
 use super::map::Map;
 use super::player::Player;
-use std::collections::HashMap;
 use std::error::Error;
 use std::vec::Vec;
 
-#[derive(Debug, PartialEq, Eq)]
-enum Mode {
-    MpGame,
-}
-
-pub struct State {
-    keys: HashMap<PhysicalKey, ElementState>,
+pub struct GameState {
     pub players: Vec<Player>,
     bombs: Vec<Bomb>,
     inputs: Vec<Input>,
@@ -32,10 +25,9 @@ pub struct State {
     pub map: Map,
     pub camera: Camera,
     pub light: LightInfo,
-    mode: Mode,
 }
 
-impl State {
+impl GameState {
     pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
         let resources = Resources::load_resources(
             graphics.vulkan.memory_allocator.clone(),
@@ -86,7 +78,6 @@ impl State {
         };
 
         Ok(Self {
-            keys: HashMap::<PhysicalKey, ElementState>::new(),
             players,
             bombs: Vec::<Bomb>::new(),
             inputs,
@@ -94,7 +85,6 @@ impl State {
             resources,
             camera,
             light,
-            mode: Mode::MpGame,
         })
     }
 
@@ -116,6 +106,8 @@ impl State {
         map_objects.chain(players_objects).chain(bomb_objects)
     }
 
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
     pub fn print(&self) {
         let mut display = self.map.to_str();
         for player in &self.players {
@@ -136,11 +128,7 @@ impl State {
         print!("{}", display);
     }
 
-    pub fn record_key(&mut self, code: PhysicalKey, state: ElementState) {
-        self.keys.insert(code, state);
-    }
-
-    fn update_inputs(&mut self) {
+    fn update_inputs(&mut self, keys: &KeyMap) {
         //HACK: manually mapping inputs of P1 for testing
         //using F35 as a default
         let mut p1_binds = [KeyCode::F35; 5];
@@ -150,12 +138,12 @@ impl State {
         p1_binds[InputName::Right.value()] = KeyCode::KeyD;
         p1_binds[InputName::Bomb.value()] = KeyCode::Enter;
 
-        self.inputs[0].update_input_player(&self.keys, p1_binds);
+        self.inputs[0].update_input_player(keys, p1_binds);
     }
 
-    fn mp_game_tick(&mut self, delta: f32) {
+    fn mp_game_tick(&mut self, delta: f32, keys: &KeyMap) {
         //update inputs
-        self.update_inputs();
+        self.update_inputs(keys);
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(delta, &mut self.players, &mut self.map, &self.resources);
@@ -180,10 +168,45 @@ impl State {
         // self.camera.keyboard_move(&self.inputs[0], delta);
     }
 
-    pub fn tick(&mut self, delta_time: f32) {
-        let state_func = match self.mode {
-            Mode::MpGame => Self::mp_game_tick,
+    fn update_camera(&mut self, aspect_ratio: f32) {
+        self.camera.set_view_xyz(
+            self.camera.transform.translation,
+            self.camera.transform.rotation,
+        );
+        self.camera
+            .set_perspective_projection(0.6, aspect_ratio, 0.1, 100.0);
+    }
+
+    pub fn tick(
+        &mut self,
+        delta_time: f32,
+        keys: &KeyMap,
+        window_size: (u32, u32),
+    ) -> (Option<AppState>, u8) {
+        // let state_func = match self.mode {
+        //     Mode::MpGame => Self::mp_game_tick,
+        // };
+        self.mp_game_tick(delta_time, keys);
+        self.update_camera(window_size.0 as f32 / window_size.1 as f32);
+
+        //TODO return new AppState if needed and number of elements to pop from appstate_stack
+        (None, 0)
+    }
+
+    pub fn render(&self, graphics: &Graphics, command_buffer: &mut CommandBuffer) {
+        let global_ubo = GlobalUbo {
+            projection: self.camera.projection_matrix.to_cols_array_2d(),
+            view: self.camera.view_matrix.to_cols_array_2d(),
+            inverse_view: self.camera.inverse_view_matrix.to_cols_array_2d(),
+            ambient_light_color: self.light.ambient_light_color.into(),
+            direction_to_light: self.light.direction_to_light.to_array().into(),
+            directional_light_color: self.light.directional_light_color.into(),
         };
-        state_func(self, delta_time);
+        graphics.game_object_system.render_game_objects(
+            &graphics.vulkan,
+            self,
+            global_ubo,
+            command_buffer,
+        );
     }
 }

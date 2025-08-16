@@ -1,7 +1,9 @@
-use crate::game::state::State;
-use crate::graphics::{GlobalUbo, Graphics};
+use crate::app_state::{AppState, KeyMap};
+use crate::game::game_state::GameState;
+use crate::graphics::Graphics;
 use std::error::Error;
-use winit::keyboard::KeyCode;
+use winit::event::ElementState;
+use winit::keyboard::PhysicalKey;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -10,7 +12,8 @@ use winit::{
 };
 
 pub struct App {
-    pub state: State,
+    pub state_stack: Vec<AppState>,
+    keys: KeyMap,
     pub graphics: Graphics,
 }
 
@@ -18,54 +21,48 @@ impl App {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
 
-        let state = State::default_state(&graphics)?;
+        let keys = KeyMap::new();
 
-        Ok(Self { state, graphics })
+        let default_state = AppState::Game(GameState::default_state(&graphics)?);
+        let state_stack = vec![default_state];
+
+        Ok(Self {
+            state_stack,
+            keys,
+            graphics,
+        })
     }
 
-    fn update_world(&mut self) {
-        let state = &mut self.state;
+    fn record_key(&mut self, code: PhysicalKey, state: ElementState) {
+        self.keys.insert(code, state);
+    }
 
-        state.camera.set_view_xyz(
-            state.camera.transform.translation,
-            state.camera.transform.rotation,
-        );
-        state.camera.set_perspective_projection(
-            0.6,
-            self.graphics.renderer.get_aspect_ratio(),
-            0.1,
-            100.0,
+    fn update_state(&mut self) {
+        let app_state = self.state_stack.last_mut().unwrap();
+        let renderer = &self.graphics.renderer;
+
+        //TODO handle result
+        app_state.tick(
+            renderer.get_delta_time(),
+            &self.keys,
+            renderer.get_rcx().swapchain.image_extent().into(),
         );
     }
 
     fn draw_frame(&mut self) {
-        let state = &self.state;
-        let renderer = &mut self.graphics.renderer;
-        let game_object_system = &self.graphics.game_object_system;
+        let app_state = self.state_stack.last().unwrap();
 
-        if let Some(mut command_buffer) = renderer.begin_frame(&self.graphics.vulkan) {
-            let global_ubo = GlobalUbo {
-                projection: state.camera.projection_matrix.to_cols_array_2d(),
-                view: state.camera.view_matrix.to_cols_array_2d(),
-                inverse_view: state.camera.inverse_view_matrix.to_cols_array_2d(),
-                ambient_light_color: state.light.ambient_light_color.into(),
-                direction_to_light: state.light.direction_to_light.to_array().into(),
-                directional_light_color: state.light.directional_light_color.into(),
-            };
+        if let Some(mut command_buffer) = self.graphics.renderer.begin_frame(&self.graphics.vulkan)
+        {
+            app_state.render(&self.graphics, &mut command_buffer);
 
-            game_object_system.render_game_objects(
-                &self.graphics.vulkan,
-                &self.state,
-                global_ubo,
-                &mut command_buffer,
-            );
-            renderer.end_frame(&self.graphics.vulkan, command_buffer);
-            renderer.update_time();
-            renderer.update_title(&format!(
-                "Bomberman!! fps: {:.0} camera: {} {}",
-                renderer.get_rcx().time_info.avg_fps,
-                state.camera.transform.translation,
-                state.camera.transform.rotation
+            self.graphics
+                .renderer
+                .end_frame(&self.graphics.vulkan, command_buffer);
+            self.graphics.renderer.update_time();
+            self.graphics.renderer.update_title(&format!(
+                "Bomberman!! fps: {:.0}",
+                self.graphics.renderer.get_rcx().time_info.avg_fps
             ));
         }
     }
@@ -88,23 +85,13 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
-                self.state.tick(self.graphics.renderer.get_delta_time());
-                self.update_world();
+                self.update_state();
                 self.draw_frame();
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::KeyboardInput { event, .. } => {
-                self.state.record_key(event.physical_key, event.state);
-                #[cfg(debug_assertions)]
-                if event.state.is_pressed() && event.repeat == false {
-                    if event.physical_key == KeyCode::Space {
-                        self.state.print();
-                    }
-                    if event.physical_key == KeyCode::Escape {
-                        event_loop.exit();
-                    }
-                }
+                self.record_key(event.physical_key, event.state)
             }
             _ => (),
         }
