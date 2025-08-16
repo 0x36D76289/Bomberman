@@ -43,13 +43,6 @@ impl State {
             graphics.vulkan.queue.clone(),
         );
 
-        let mut camera = Camera::new();
-        camera.transform = Transform {
-            translation: Vec3::new(8.0, -27.5, -1.5),
-            scale: Vec3::ONE,
-            rotation: Vec3::new(-1.25, 0.0, 0.0),
-        };
-
         let mut players = Vec::<Player>::new();
         let mut inputs = Vec::<Input>::new();
 
@@ -79,10 +72,17 @@ impl State {
             }
         }
 
+        let mut camera = Camera::new();
+        camera.transform = Transform {
+            translation: Vec3::new(map.width as f32 / 2.0, -27.5, -1.25),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
+
         let light = LightInfo {
-            ambient_light_color: Vec4::ONE.with_w(0.5),
+            ambient_light_color: Vec4::ONE.with_w(0.8),
             direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
-            directional_light_color: Vec4::ONE.with_w(0.8),
+            directional_light_color: Vec4::ONE.with_w(0.6),
         };
 
         Ok(Self {
