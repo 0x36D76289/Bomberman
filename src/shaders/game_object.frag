@@ -35,6 +35,7 @@ void main() {
     // diffuse lighting
     vec3 diffuse_light = ubo.directional_light_color.rgb * ubo.directional_light_color.a;
     float light_intensity = max(dot(surface_normal, ubo.direction_to_light), 0);
+    diffuse_light *= light_intensity;
 
     // specular lighting
     vec3 camera_world_pos = ubo.inverse_view[3].xyz;
@@ -53,5 +54,5 @@ void main() {
         color = in_color;
     }
 
-    f_color = vec4((ambient_light + light_intensity + specular_light) * color, 1.0);
+    f_color = vec4((ambient_light + diffuse_light + specular_light) * color, 1.0);
 }
