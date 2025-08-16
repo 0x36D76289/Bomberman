@@ -1,10 +1,11 @@
 use crate::game::Camera;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
-use crate::graphics::Graphics;
 use crate::graphics::object::Object;
+use crate::graphics::transform::Transform;
+use crate::graphics::{Graphics, LightInfo};
 
-use glam::Vec2;
+use glam::{Vec2, Vec3, Vec4};
 use winit::event::ElementState;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -30,6 +31,7 @@ pub struct State {
     pub resources: Resources,
     pub map: Map,
     pub camera: Camera,
+    pub light: LightInfo,
     mode: Mode,
 }
 
@@ -41,7 +43,12 @@ impl State {
             graphics.vulkan.queue.clone(),
         );
 
-        let camera = Camera::new();
+        let mut camera = Camera::new();
+        camera.transform = Transform {
+            translation: Vec3::new(8.0, -27.5, -1.5),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
 
         let mut players = Vec::<Player>::new();
         let mut inputs = Vec::<Input>::new();
@@ -72,6 +79,12 @@ impl State {
             }
         }
 
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.5),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.8),
+        };
+
         Ok(Self {
             keys: HashMap::<PhysicalKey, ElementState>::new(),
             players,
@@ -80,11 +93,12 @@ impl State {
             map,
             resources,
             camera,
+            light,
             mode: Mode::MpGame,
         })
     }
 
-    pub fn objects(&self) -> impl Iterator<Item = &Object> {
+    pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
         let map_objects = self
             .map
             .iter()
@@ -162,6 +176,8 @@ impl State {
         for (i, player) in self.players.iter_mut().enumerate() {
             player.player_move(self.inputs[i], delta, &self.map, &self.bombs);
         }
+        // uncomment this and comment the previous line to control the camera
+        // self.camera.keyboard_move(&self.inputs[0], delta);
     }
 
     pub fn tick(&mut self, delta_time: f32) {
