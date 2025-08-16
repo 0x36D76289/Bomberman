@@ -21,6 +21,8 @@ pub enum MapElement {
 }
 
 impl MapElement {
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
     fn value(&self) -> char {
         match *self {
             MapElement::Empty => ' ',
@@ -332,6 +334,8 @@ impl Map {
         Some(ret.fix_objects())
     }
 
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
     pub fn to_str(&self) -> String {
         let mut str: String = Default::default();
         for y in 0..self.height {
