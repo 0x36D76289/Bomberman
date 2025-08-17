@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer};
 use winit::{event::ElementState, keyboard::PhysicalKey};
 
-use crate::{game::game_state::GameState, graphics::Graphics, ui::UiState};
+use crate::{game::game_state::GameState, graphics::Graphics, input::input::Input, ui::UiState};
 
 pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 pub type CommandBuffer = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
@@ -24,11 +24,12 @@ impl AppState {
     pub fn tick(
         &mut self,
         delta: f32,
-        input_state: &KeyMap,
+        inputs: &Vec<Input>,
+        keys: &KeyMap,
         window_size: (u32, u32),
     ) -> (Option<AppState>, u8) {
         match self {
-            AppState::Game(game_state) => game_state.tick(delta, input_state, window_size),
+            AppState::Game(game_state) => game_state.tick(delta, inputs, keys, window_size),
             AppState::Ui(_) => (None, 0),
         }
     }

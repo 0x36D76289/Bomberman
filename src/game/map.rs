@@ -49,21 +49,21 @@ pub struct Map {
     pub floor: Object,
 }
 
-enum MapType {
+pub enum MapType {
     Corners,
     Random,
 }
 
 pub struct MapSettings {
-    width: u8,
-    height: u8,
-    cheesiness: u8,
-    spawns: u8,
-    spawn_size: u8,
-    safe_range: u8,
-    map_type: MapType,
-    walls: bool,
-    attempts: u8,
+    pub width: u8,
+    pub height: u8,
+    pub cheesiness: u8,
+    pub spawns: u8,
+    pub spawn_size: u8,
+    pub safe_range: u8,
+    pub map_type: MapType,
+    pub walls: bool,
+    pub attempts: u8,
 }
 
 impl Default for MapSettings {

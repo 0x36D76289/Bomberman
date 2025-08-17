@@ -23,6 +23,7 @@ pub enum ResourceName {
 
 const RESOURCE_NAME_SIZE: usize = ResourceName::Bomb as usize + 1;
 
+#[derive(Debug, Clone)]
 pub struct Resources {
     pub textures: [Arc<ImageView>; RESOURCE_NAME_SIZE],
     pub models: [Arc<Model>; RESOURCE_NAME_SIZE],

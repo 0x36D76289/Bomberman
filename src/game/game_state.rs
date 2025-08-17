@@ -1,47 +1,36 @@
+use super::map::Map;
+use super::player::Player;
 use crate::app_state::{AppState, CommandBuffer, KeyMap};
 use crate::game::Camera;
+use crate::game::bomb::Bomb;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, Graphics, LightInfo};
-
-use glam::{Vec2, Vec3, Vec4};
-use winit::keyboard::KeyCode;
-
-use crate::game::bomb::Bomb;
-use crate::game::input::{Input, InputName, InputState};
-
-use super::map::Map;
-use super::player::Player;
+use crate::input::input::{GetOrDefault, Input};
+use crate::input::input_state::InputState;
+use glam::{Vec2, Vec3, Vec4, bool};
+use rand::random_range;
 use std::error::Error;
+use std::sync::Mutex;
 use std::vec::Vec;
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 pub struct GameState {
-    pub players: Vec<Player>,
+    players: Vec<Player>,
     bombs: Vec<Bomb>,
-    inputs: Vec<Input>,
     pub resources: Resources,
-    pub map: Map,
-    pub camera: Camera,
-    pub light: LightInfo,
+    map: Map,
+    camera: Camera,
+    light: LightInfo,
 }
 
 impl GameState {
-    pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
-        let resources = Resources::load_resources(
-            graphics.vulkan.memory_allocator.clone(),
-            graphics.vulkan.command_buffer_allocator.clone(),
-            graphics.vulkan.queue.clone(),
-        );
-
+    fn create_players(map: &Map, resources: &Resources) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
-        let mut inputs = Vec::<Input>::new();
-
-        //HACK: this is not safe, map can fail creation
-        let map = Map::new(MapSettings::default_cheese(), &resources).unwrap();
-
         let mut id: u32 = 0;
+
         for y in 0..map.height {
             for x in 0..map.width {
                 match map.get_elem(x, y) {
@@ -56,13 +45,26 @@ impl GameState {
                             &resources,
                         ));
 
-                        inputs.push(Input::default());
                         id += 1;
                     }
                     _ => (),
                 }
             }
         }
+        players
+    }
+
+    //TODO: add get_input_player -> returns Released if p doesn't exist
+    pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
+        let resources = Resources::load_resources(
+            graphics.vulkan.memory_allocator.clone(),
+            graphics.vulkan.command_buffer_allocator.clone(),
+            graphics.vulkan.queue.clone(),
+        );
+
+        //HACK: this is not safe, map can fail creation
+        let map = Map::new(MapSettings::default(), &resources).unwrap();
+        let players = Self::create_players(&map, &resources);
 
         let mut camera = Camera::new();
         camera.transform = Transform {
@@ -80,12 +82,24 @@ impl GameState {
         Ok(Self {
             players,
             bombs: Vec::<Bomb>::new(),
-            inputs,
             map,
             resources,
             camera,
             light,
         })
+    }
+
+    fn recreate(&self) -> Self {
+        let map = Map::new(MapSettings::default(), &self.resources).unwrap();
+        let players = Self::create_players(&map, &self.resources);
+        Self {
+            players,
+            bombs: Vec::<Bomb>::new(),
+            map,
+            resources: self.resources.clone(),
+            camera: self.camera,
+            light: self.light,
+        }
     }
 
     pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
@@ -128,22 +142,7 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn update_inputs(&mut self, keys: &KeyMap) {
-        //HACK: manually mapping inputs of P1 for testing
-        //using F35 as a default
-        let mut p1_binds = [KeyCode::F35; 5];
-        p1_binds[InputName::Up.value()] = KeyCode::KeyW;
-        p1_binds[InputName::Down.value()] = KeyCode::KeyS;
-        p1_binds[InputName::Left.value()] = KeyCode::KeyA;
-        p1_binds[InputName::Right.value()] = KeyCode::KeyD;
-        p1_binds[InputName::Bomb.value()] = KeyCode::Enter;
-
-        self.inputs[0].update_input_player(keys, p1_binds);
-    }
-
-    fn mp_game_tick(&mut self, delta: f32, keys: &KeyMap) {
-        //update inputs
-        self.update_inputs(keys);
+    fn mp_game_tick(&mut self, delta: f32, inputs: &Vec<Input>) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(delta, &mut self.players, &mut self.map, &self.resources);
@@ -154,7 +153,7 @@ impl GameState {
             if !player.alive {
                 continue;
             }
-            if self.inputs[i].bomb() == InputState::Pressed {
+            if inputs.get_or_default(i).bomb() == InputState::Pressed {
                 match player.create_bomb(&self.resources) {
                     Some(bomb) => self.bombs.push(bomb),
                     None => (),
@@ -162,7 +161,7 @@ impl GameState {
             }
         }
         for (i, player) in self.players.iter_mut().enumerate() {
-            player.player_move(self.inputs[i], delta, &self.map, &self.bombs);
+            player.player_move(inputs.get_or_default(i), delta, &self.map, &self.bombs);
         }
         // uncomment this and comment the previous line to control the camera
         // self.camera.keyboard_move(&self.inputs[0], delta);
@@ -177,17 +176,55 @@ impl GameState {
             .set_perspective_projection(0.6, aspect_ratio, 0.1, 100.0);
     }
 
+    fn restart_inside(&mut self, keys: &KeyMap) {
+        static WAS_PRESSED: Mutex<bool> = Mutex::new(false);
+
+        let mut was_pressed = WAS_PRESSED.lock().unwrap();
+        let is_pressed = keys
+            .get(&PhysicalKey::Code(KeyCode::KeyR))
+            .unwrap_or(&winit::event::ElementState::Released)
+            .is_pressed();
+
+        if is_pressed && !*was_pressed {
+            //HACK: this is the only part that would be kept if this wasn't a silly bind
+            self.map = Map::new(
+                MapSettings {
+                    spawns: random_range(2..=8),
+                    ..MapSettings::default_cheese()
+                },
+                &self.resources,
+            )
+            .unwrap();
+            self.players = Self::create_players(&self.map, &self.resources);
+            self.bombs = Vec::new();
+        }
+        *was_pressed = is_pressed;
+    }
+
     pub fn tick(
         &mut self,
         delta_time: f32,
+        inputs: &Vec<Input>,
         keys: &KeyMap,
         window_size: (u32, u32),
     ) -> (Option<AppState>, u8) {
+        #[cfg(debug_assertions)]
+        self.restart_inside(keys);
+
         // let state_func = match self.mode {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
-        self.mp_game_tick(delta_time, keys);
+        self.mp_game_tick(delta_time, inputs);
         self.update_camera(window_size.0 as f32 / window_size.1 as f32);
+
+        #[cfg(debug_assertions)]
+        if keys
+            .get(&PhysicalKey::Code(KeyCode::KeyT))
+            .unwrap_or(&winit::event::ElementState::Released)
+            .is_pressed()
+        {
+            return (Some(AppState::Game(self.recreate())), 0);
+        }
 
         //TODO return new AppState if needed and number of elements to pop from appstate_stack
         (None, 0)
