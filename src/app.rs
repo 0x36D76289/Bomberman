@@ -1,9 +1,12 @@
-use crate::app_state::{AppState, KeyMap};
+use crate::app_state::{AppState, CommandBuffer, KeyMap};
 use crate::game::game_state::GameState;
 use crate::graphics::Graphics;
+use crate::input::input::Input;
+use crate::input::input_name::InputName;
+use glam::usize;
 use std::error::Error;
 use winit::event::ElementState;
-use winit::keyboard::PhysicalKey;
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -12,9 +15,10 @@ use winit::{
 };
 
 pub struct App {
-    pub state_stack: Vec<AppState>,
+    state_stack: Vec<AppState>,
     keys: KeyMap,
-    pub graphics: Graphics,
+    inputs: Vec<Input>,
+    graphics: Graphics,
 }
 
 impl App {
@@ -22,6 +26,7 @@ impl App {
         let graphics = Graphics::new(event_loop)?;
 
         let keys = KeyMap::new();
+        let inputs = vec![Input::default()];
 
         let default_state = AppState::Game(GameState::default_state(&graphics)?);
         let state_stack = vec![default_state];
@@ -29,6 +34,7 @@ impl App {
         Ok(Self {
             state_stack,
             keys,
+            inputs,
             graphics,
         })
     }
@@ -37,25 +43,50 @@ impl App {
         self.keys.insert(code, state);
     }
 
+    fn update_inputs(&mut self) {
+        //HACK: manually mapping inputs of P1 for testing
+        //using F35 as a default
+        let mut p1_binds = [KeyCode::F35; 5];
+        p1_binds[InputName::Up as usize] = KeyCode::KeyW;
+        p1_binds[InputName::Down as usize] = KeyCode::KeyS;
+        p1_binds[InputName::Left as usize] = KeyCode::KeyA;
+        p1_binds[InputName::Right as usize] = KeyCode::KeyD;
+        p1_binds[InputName::Bomb as usize] = KeyCode::Enter;
+
+        self.inputs[0].update_input_player(&self.keys, p1_binds);
+    }
+
     fn update_state(&mut self) {
+        self.update_inputs();
+
         let app_state = self.state_stack.last_mut().unwrap();
         let renderer = &self.graphics.renderer;
 
-        //TODO handle result
-        app_state.tick(
+        let res = app_state.tick(
             renderer.get_delta_time(),
+            &self.inputs,
             &self.keys,
             renderer.get_rcx().swapchain.image_extent().into(),
         );
+        for _ in 0..res.1 {
+            self.state_stack.pop();
+        }
+        if res.0.is_some() {
+            self.state_stack.push(res.0.unwrap());
+        }
+    }
+
+    fn render_state(&self, command_buffer: &mut CommandBuffer, pos: usize) {
+        if self.state_stack[pos].is_transparent() && pos != 0 {
+            self.render_state(command_buffer, pos - 1);
+        }
+        self.state_stack[pos].render(&self.graphics, command_buffer);
     }
 
     fn draw_frame(&mut self) {
-        let app_state = self.state_stack.last().unwrap();
-
         if let Some(mut command_buffer) = self.graphics.renderer.begin_frame(&self.graphics.vulkan)
         {
-            app_state.render(&self.graphics, &mut command_buffer);
-
+            self.render_state(&mut command_buffer, self.state_stack.len() - 1);
             self.graphics
                 .renderer
                 .end_frame(&self.graphics.vulkan, command_buffer);

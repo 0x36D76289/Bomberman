@@ -2,7 +2,6 @@ use crate::{
     game::{
         bomb::Bomb,
         collision::Collision,
-        input::Input,
         map::Map,
         resources::{ResourceName, Resources},
     },
@@ -10,6 +9,7 @@ use crate::{
         object::{Object, TextureIndex},
         transform::Transform,
     },
+    input::input::Input,
 };
 
 use super::direction::Direction;
@@ -51,7 +51,6 @@ impl Player {
                 transform: Transform {
                     translation: Vec3::new(position.x, 0.0, position.y),
                     scale: Vec3::splat(0.35),
-                    // TODO: use direction
                     rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
                 },
             }),
@@ -61,6 +60,8 @@ impl Player {
     fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &Vec<Bomb>) {
         self.bound(map);
         self.collide_map(map, direction);
+        //TODO:
+        //collide players
         for bomb in bombs {
             if bomb.owner_id == self.id && !bomb.collision_enabled {
                 continue;
@@ -68,9 +69,6 @@ impl Player {
             self.resolve_collision_with(bomb.position, bomb.get_size(), direction);
         }
         //TODO:
-        //collide players
-        //collide bombs
-        // check if bomb is ours and has collision disabled
         //collide powerups
     }
 
@@ -78,7 +76,6 @@ impl Player {
         if self.bombs_remaining == 0 {
             return None;
         }
-        //check position
         //TODO:
         // check position doesn't have another player
         // check position isn't already bomb

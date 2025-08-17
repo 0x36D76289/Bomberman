@@ -18,7 +18,6 @@ use crate::{
 
 #[allow(unused)]
 pub enum BombState {
-    // TODO: Define the states of a bomb
     Planted,
     Sliding(Direction),
     Exploding,
@@ -41,8 +40,6 @@ pub struct Bomb {
     pub collision_enabled: bool,
     pub explosion: Explosion,
     pub despawn: bool,
-    // TODO: I'm thinking that when the explosion starts it'll place all the explosion bits in
-    // there ?
     pub objects: Vec<Object>,
 }
 
