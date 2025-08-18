@@ -1,12 +1,13 @@
-use crate::app_state::{AppState, CommandBuffer, KeyMap};
+use crate::app_state::{AppState, KeyMap};
 use crate::game::Camera;
 use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
-use crate::graphics::{GlobalUbo, Graphics, LightInfo};
+use crate::graphics::{GlobalUbo, Graphics, LightInfo, Renderer, Vulkan};
 
 use glam::{Vec2, Vec3, Vec4};
+use vulkano::command_buffer::SecondaryAutoCommandBuffer;
 use winit::keyboard::KeyCode;
 
 use crate::game::bomb::Bomb;
@@ -15,6 +16,7 @@ use crate::game::input::{Input, InputName, InputState};
 use super::map::Map;
 use super::player::Player;
 use std::error::Error;
+use std::sync::Arc;
 use std::vec::Vec;
 
 pub struct GameState {
@@ -193,7 +195,7 @@ impl GameState {
         (None, 0)
     }
 
-    pub fn render(&self, graphics: &Graphics, command_buffer: &mut CommandBuffer) {
+    pub fn render(&self, renderer: &Renderer, vulkan: &Vulkan) -> Arc<SecondaryAutoCommandBuffer> {
         let global_ubo = GlobalUbo {
             projection: self.camera.projection_matrix.to_cols_array_2d(),
             view: self.camera.view_matrix.to_cols_array_2d(),
@@ -202,11 +204,12 @@ impl GameState {
             direction_to_light: self.light.direction_to_light.to_array().into(),
             directional_light_color: self.light.directional_light_color.into(),
         };
-        graphics.game_object_system.render_game_objects(
-            &graphics.vulkan,
+        renderer.game_render_system().render_game_objects(
+            vulkan,
+            renderer.rcx().render_pass.clone(),
+            renderer.window_size(),
             self,
             global_ubo,
-            command_buffer,
-        );
+        )
     }
 }

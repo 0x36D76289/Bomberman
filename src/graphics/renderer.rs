@@ -1,20 +1,11 @@
-use crate::graphics::{TimeInfo, Vulkan};
+use crate::{app_state::AppState, graphics::{GameRenderSystem, TimeInfo, UiRenderSystem, Vulkan}};
 use std::{sync::Arc, time::Instant};
 use vulkano::{
-    Validated, VulkanError,
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo,
-    },
-    format::Format,
-    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
-    memory::allocator::AllocationCreateInfo,
-    pipeline::graphics::viewport::Viewport,
-    render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
-    swapchain::{
-        Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo,
-        acquire_next_image,
-    },
-    sync::{self, GpuFuture},
+        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, RenderPassBeginInfo, SubpassBeginInfo, SubpassContents,
+    }, format::Format, image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage}, memory::allocator::AllocationCreateInfo, pipeline::graphics::viewport::Viewport, render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass}, swapchain::{
+        acquire_next_image, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo
+    }, sync::{self, GpuFuture}, Validated, VulkanError
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -22,6 +13,9 @@ pub struct Renderer {
     rcx: Option<RenderContext>,
     image_index: u32,
     acquire_future: Option<SwapchainAcquireFuture>,
+    primary_command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
+    game_render_system: Option<GameRenderSystem>,
+    ui_render_system: Option<UiRenderSystem>
 }
 
 pub struct RenderContext {
@@ -40,6 +34,9 @@ impl Renderer {
             rcx: None,
             image_index: 0,
             acquire_future: None,
+            primary_command_buffer: None,
+            game_render_system: None,
+            ui_render_system: None
         }
     }
 
@@ -47,12 +44,35 @@ impl Renderer {
         self.rcx = Some(RenderContext::init(event_loop, &vulkan).unwrap())
     }
 
-    pub fn get_rcx(&self) -> &RenderContext {
+    pub fn init_game_render_system(&mut self, vulkan: &Vulkan) {
+        let mut game_render_system = GameRenderSystem::default();
+        game_render_system.create_pipeline(vulkan, self.rcx().render_pass.clone());
+        self.game_render_system = Some(game_render_system);
+    }
+
+    pub fn init_ui_render_system(&mut self, _vulkan: &Vulkan) {
+        let ui_render_system = UiRenderSystem{};
+        self.ui_render_system = Some(ui_render_system);
+    }
+
+    pub fn rcx(&self) -> &RenderContext {
         self.rcx.as_ref().unwrap()
+    }
+
+    pub fn game_render_system(&self) -> &GameRenderSystem {
+        self.game_render_system.as_ref().unwrap()
+    }
+
+    pub fn ui_render_system(&self) -> &UiRenderSystem {
+        self.ui_render_system.as_ref().unwrap()
     }
 
     pub fn get_delta_time(&self) -> f32 {
         self.rcx.as_ref().unwrap().time_info.dt
+    }
+
+    pub fn window_size(&self) -> [u32; 2] {
+        self.rcx().swapchain.image_extent()
     }
 
     pub fn recreate_swapchain(&mut self, b: bool) {
@@ -63,16 +83,13 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
-    pub fn begin_frame(
-        &mut self,
-        vulkan: &Vulkan,
-    ) -> Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>> {
+    fn begin_frame(&mut self, vulkan: &Vulkan) {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
 
         if window_size.width == 0 || window_size.height == 0 {
-            return None;
+            return;
         }
 
         rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
@@ -129,7 +146,7 @@ impl Renderer {
                 Ok(r) => r,
                 Err(VulkanError::OutOfDate) => {
                     rcx.recreate_swapchain = true;
-                    return None;
+                    return;
                 }
                 Err(e) => panic!("failed to acquire next image: {e}"),
             };
@@ -156,30 +173,26 @@ impl Renderer {
                         rcx.framebuffers[image_index as usize].clone(),
                     )
                 },
-                Default::default(),
-            )
-            .unwrap()
-            .set_viewport(
-                0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: window_size.into(),
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
+                SubpassBeginInfo { 
+                    contents: SubpassContents::SecondaryCommandBuffers,
+                    ..Default::default()
+                }
             )
             .unwrap();
 
-        Some(builder)
+        self.primary_command_buffer = Some(builder);
     }
 
-    pub fn end_frame(
+    fn end_frame(
         &mut self,
         vulkan: &Vulkan,
-        mut command_buffer: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     ) {
         let rcx = self.rcx.as_mut().unwrap();
+
+        let mut command_buffer = match self.primary_command_buffer.take() {
+            Some(cb) => cb,
+            None => return
+        };
 
         command_buffer.end_render_pass(Default::default()).unwrap();
 
@@ -215,6 +228,54 @@ impl Renderer {
                 rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
         }
+    }
+
+    fn render_frame(&mut self, vulkan: &Vulkan, game_state_back: Option<&AppState>, game_state_front: Option<&AppState>) {
+        let mut primary_cb = match self.primary_command_buffer.take() {
+            Some(cb) => cb,
+            None => return
+        };
+
+        match (game_state_back, game_state_front) {
+            (None, None) => (),
+            (Some(state), None) | (None, Some(state)) => {
+                
+                primary_cb.next_subpass(
+                    Default::default(),
+                    SubpassBeginInfo {
+                        contents: SubpassContents::SecondaryCommandBuffers,
+                        ..Default::default()
+                    }
+                )
+                .unwrap();
+                let secondary_cb = state.render(self, vulkan);
+                primary_cb.execute_commands(secondary_cb).unwrap();
+            }
+            (Some(state1), Some(state2)) => {
+                let secondary_cb = state1.render(self, vulkan);
+                primary_cb.execute_commands(secondary_cb).unwrap();
+                primary_cb.next_subpass(
+                    Default::default(),
+                    SubpassBeginInfo {
+                        contents: SubpassContents::SecondaryCommandBuffers,
+                        ..Default::default()
+                    }
+                )
+                .unwrap();
+                let secondary_cb = state2.render(self, vulkan);
+                primary_cb.execute_commands(secondary_cb).unwrap();
+            }
+        }
+
+        self.primary_command_buffer = Some(primary_cb);
+    }
+
+    pub fn render(&mut self, vulkan: &Vulkan, states: &Vec<AppState>) {
+        let state = states.last().unwrap();
+
+        self.begin_frame(vulkan);
+        self.render_frame(vulkan, Some(state), None);
+        self.end_frame(vulkan);
     }
 
     pub fn update_time(&mut self) {
