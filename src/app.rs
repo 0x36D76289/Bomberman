@@ -45,48 +45,36 @@ impl App {
         app_state.tick(
             renderer.get_delta_time(),
             &self.keys,
-            renderer.get_rcx().swapchain.image_extent().into(),
+            renderer.rcx().swapchain.image_extent().into(),
         );
     }
 
-    fn draw_frame(&mut self) {
-        let app_state = self.state_stack.last().unwrap();
-
-        if let Some(mut command_buffer) = self.graphics.renderer.begin_frame(&self.graphics.vulkan)
-        {
-            app_state.render(&self.graphics, &mut command_buffer);
-
-            self.graphics
-                .renderer
-                .end_frame(&self.graphics.vulkan, command_buffer);
-            self.graphics.renderer.update_time();
-            self.graphics.renderer.update_title(&format!(
-                "Bomberman!! fps: {:.0}",
-                self.graphics.renderer.get_rcx().time_info.avg_fps
-            ));
-        }
+    fn render(&mut self) {
+        self.graphics.renderer.render(&self.graphics.vulkan, &self.state_stack);
+        self.graphics.renderer.update_time();
+        self.graphics.renderer.update_title(&format!(
+            "Bomberman!! fps: {:.0}",
+            self.graphics.renderer.rcx().time_info.avg_fps
+        ));
     }
 }
 
 impl ApplicationHandler for App {
     // This is called when the window is created
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let graphics = &mut self.graphics;
+        let renderer = &mut self.graphics.renderer;
+        let vulkan = &self.graphics.vulkan;
 
-        graphics
-            .renderer
-            .init_render_context(event_loop, &graphics.vulkan);
-        graphics.game_object_system.create_pipeline(
-            &graphics.vulkan,
-            graphics.renderer.get_rcx().render_pass.clone(),
-        );
+        renderer.init_render_context(event_loop, vulkan);
+        renderer.init_game_render_system(vulkan);
+        renderer.init_ui_render_system(vulkan);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
                 self.update_state();
-                self.draw_frame();
+                self.render()
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),

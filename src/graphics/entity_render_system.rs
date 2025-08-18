@@ -1,21 +1,12 @@
 use std::sync::Arc;
 use vulkano::{
-    command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    descriptor_set::{DescriptorSet, WriteDescriptorSet, layout::DescriptorBindingFlags},
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferInheritanceInfo, CommandBufferUsage, SecondaryAutoCommandBuffer},
+    descriptor_set::{layout::DescriptorBindingFlags, DescriptorSet, WriteDescriptorSet},
     image::sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
     pipeline::{
-        DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
-        PipelineShaderStageCreateInfo,
         graphics::{
-            GraphicsPipelineCreateInfo,
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{DepthState, DepthStencilState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            vertex_input::{Vertex, VertexDefinition},
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
+            color_blend::{ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, vertex_input::{Vertex, VertexDefinition}, viewport::Viewport, GraphicsPipelineCreateInfo
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo
     },
     render_pass::{RenderPass, Subpass},
 };
@@ -26,27 +17,50 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct EntityRenderSystem {
+pub struct GameRenderSystem {
     pipeline: Option<Arc<GraphicsPipeline>>,
     sampler: Option<Arc<Sampler>>,
 }
 
-impl EntityRenderSystem {
+impl GameRenderSystem {
     pub fn render_game_objects(
         &self,
         vulkan: &Vulkan,
+        render_pass: Arc<RenderPass>,
+        window_size: [u32; 2],
         state: &GameState,
         global_ubo: GlobalUbo,
-        command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-    ) {
-        if self.pipeline.is_none() {
-            panic!("Tried to render game objects but the pipeline is not initialized")
-        }
+    ) -> Arc<SecondaryAutoCommandBuffer>
+    {
+        let pipeline = match self.pipeline.as_ref() {
+            Some(pipeline) => pipeline,
+            None => panic!("Tried to render game objects but the pipeline is not initialized")
+        };
 
-        let pipeline = self.pipeline.as_ref().unwrap();
+        let mut secondary_builder = AutoCommandBufferBuilder::secondary(
+            vulkan.command_buffer_allocator.clone(),
+            vulkan.queue.queue_family_index(),
+            CommandBufferUsage::MultipleSubmit,
+            CommandBufferInheritanceInfo {
+                render_pass: Some(Subpass::from(render_pass.clone(), 0).unwrap().into()),
+                ..Default::default()
+            }
+        )
+        .unwrap();
 
-        command_buffer
+        secondary_builder
             .bind_pipeline_graphics(pipeline.clone())
+            .unwrap()
+            .set_viewport(
+                0,
+                [Viewport {
+                    offset: [0.0, 0.0],
+                    extent: [window_size[0] as f32, window_size[1] as f32],
+                    depth_range: 0.0..=1.0,
+                }]
+                .into_iter()
+                .collect(),
+            )
             .unwrap();
 
         let uniform_buffer = {
@@ -70,7 +84,7 @@ impl EntityRenderSystem {
         )
         .unwrap();
 
-        command_buffer
+        secondary_builder
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 pipeline.layout().clone(),
@@ -87,7 +101,7 @@ impl EntityRenderSystem {
                 tex_index: object.texture.unwrap_or(-1),
             };
 
-            command_buffer
+            secondary_builder
                 .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap()
                 .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
@@ -96,11 +110,13 @@ impl EntityRenderSystem {
                 .unwrap();
 
             unsafe {
-                command_buffer
+                secondary_builder
                     .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
                     .unwrap();
             }
         }
+
+        secondary_builder.build().unwrap()
     }
 
     pub fn create_pipeline(&mut self, vulkan: &Vulkan, render_pass: Arc<RenderPass>) {

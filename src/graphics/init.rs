@@ -1,27 +1,14 @@
 use crate::graphics::{
-    EntityRenderSystem, Graphics, /*PointLightRenderSystem,*/ Renderer, TimeInfo, Vulkan,
+    Graphics, /*PointLightRenderSystem,*/ Renderer, TimeInfo, Vulkan,
     renderer::RenderContext,
 };
 use std::{error::Error, sync::Arc, time::Instant};
 use vulkano::{
-    VulkanLibrary,
     buffer::{
-        BufferUsage,
-        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
-    },
-    command_buffer::allocator::StandardCommandBufferAllocator,
-    descriptor_set::allocator::StandardDescriptorSetAllocator,
-    device::{
-        Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, QueueCreateInfo, QueueFlags,
-        physical::PhysicalDeviceType,
-    },
-    format::Format,
-    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
-    instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-    render_pass::{Framebuffer, FramebufferCreateInfo},
-    swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
-    sync::{self, GpuFuture},
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo}, BufferUsage
+    }, command_buffer::allocator::{StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo}, descriptor_set::allocator::StandardDescriptorSetAllocator, device::{
+        physical::PhysicalDeviceType, Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, QueueCreateInfo, QueueFlags
+    }, format::Format, image::{view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage}, instance::{Instance, InstanceCreateFlags, InstanceCreateInfo}, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator}, render_pass::{Framebuffer, FramebufferCreateInfo}, swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo}, sync::{self, GpuFuture}, VulkanLibrary
 };
 use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
@@ -35,8 +22,6 @@ impl Graphics {
         Ok(Graphics {
             vulkan,
             renderer: Renderer::new(),
-            game_object_system: EntityRenderSystem::default(),
-            // point_light_system: PointLightRenderSystem::default(),
         })
     }
 }
@@ -126,7 +111,10 @@ impl Vulkan {
 
         let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
             device.clone(),
-            Default::default(),
+            StandardCommandBufferAllocatorCreateInfo {
+                secondary_buffer_count: 32,
+                ..Default::default()
+            }
         ));
 
         let uniform_buffer_allocator = SubbufferAllocator::new(
@@ -208,7 +196,7 @@ impl RenderContext {
             .unwrap()
         };
 
-        let render_pass = vulkano::single_pass_renderpass!(
+        let render_pass = vulkano::ordered_passes_renderpass!(
             vulkan.device.clone(),
             attachments: {
                 color: {
@@ -224,12 +212,35 @@ impl RenderContext {
                     store_op: DontCare,
                 },
             },
-            pass: {
-                color: [color],
-                depth_stencil: {depth_stencil},
-            },
+            passes: [
+                { color: [color], depth_stencil: {depth_stencil}, input: [] }, // Draw what you want on this pass
+                { color: [color], depth_stencil: {depth_stencil}, input: [] } // Gui render pass
+            ]
         )
         .unwrap();
+
+        // let render_pass = vulkano::ordered_passes_renderpass!(
+        //     vulkan.device.clone(),
+        //     attachments: {
+        //         color: {
+        //             format: swapchain.image_format(),
+        //             samples: 1,
+        //             load_op: Clear,
+        //             store_op: Store,
+        //         },
+        //         depth_stencil: {
+        //             format: Format::D32_SFLOAT,
+        //             samples: 1,
+        //             load_op: Clear,
+        //             store_op: DontCare,
+        //         },
+        //     },
+        //     passes: [
+        //         { color: [color], depth_stencil: {depth_stencil} },
+        //         { color: [color], depth_stencil: {} }
+        //     ]
+        // )
+        // .unwrap();
 
         let framebuffers = {
             let depth_buffer = ImageView::new_default(
