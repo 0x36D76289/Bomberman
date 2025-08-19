@@ -22,5 +22,7 @@ rust-project.json
 # End of https://www.toptal.com/developers/gitignore/api/rust,rust-analyzer
 
 # Custom rules (everything added below won't be overriden by 'Generate .gitignore File' if you use 'Update' option)
-
+# MacOS
 .DS_Store
+# Bomberman settings file
+settings.bomb
