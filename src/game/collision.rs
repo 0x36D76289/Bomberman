@@ -2,7 +2,7 @@ use glam::Vec2;
 
 use crate::game::{
     direction::Direction,
-    map::{Map, MapElement},
+    map::{map::Map, map_element::MapElement},
 };
 
 const PUSHBACK: f32 = 0.01;

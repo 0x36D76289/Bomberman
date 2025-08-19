@@ -4,6 +4,10 @@ use rand::random_range;
 use crate::{
     game::{
         direction::Direction,
+        map::{
+            map_element::MapElement,
+            map_settings::{MapSettings, MapType},
+        },
         resources::{ResourceName, Resources},
     },
     graphics::{
@@ -12,90 +16,11 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug)]
-pub enum MapElement {
-    Empty,
-    SpawnPoint(Direction),
-    Breakable(Object),
-    Unbreakable(Object),
-}
-
-impl MapElement {
-    #[cfg(debug_assertions)]
-    #[allow(unused)]
-    fn value(&self) -> char {
-        match *self {
-            MapElement::Empty => ' ',
-            MapElement::SpawnPoint(_) => '*',
-            MapElement::Breakable(_) => '#',
-            MapElement::Unbreakable(_) => 'X',
-        }
-    }
-
-    fn random_spawn_point() -> Self {
-        Self::SpawnPoint(match random_range(0..=3) {
-            0 => Direction::Up,
-            1 => Direction::Down,
-            2 => Direction::Left,
-            _ => Direction::Right,
-        })
-    }
-}
-
 pub struct Map {
     pub width: usize,
     pub height: usize,
     content: Vec<MapElement>,
     pub floor: Object,
-}
-
-pub enum MapType {
-    Corners,
-    Random,
-}
-
-pub struct MapSettings {
-    pub width: u8,
-    pub height: u8,
-    pub cheesiness: u8,
-    pub spawns: u8,
-    pub spawn_size: u8,
-    pub safe_range: u8,
-    pub map_type: MapType,
-    pub walls: bool,
-    pub attempts: u8,
-}
-
-impl Default for MapSettings {
-    fn default() -> Self {
-        MapSettings {
-            width: 14,
-            height: 14,
-            cheesiness: 0,
-            spawns: 4,
-            spawn_size: 1,
-            safe_range: 3,
-            map_type: MapType::Corners,
-            walls: true,
-            attempts: 100,
-        }
-    }
-}
-
-impl MapSettings {
-    pub fn default_cheese() -> Self {
-        MapSettings {
-            width: 15,
-            height: 15,
-            cheesiness: 5,
-            spawns: 4,
-            spawn_size: 1,
-            safe_range: 3,
-            map_type: MapType::Random,
-            walls: true,
-            attempts: 100,
-        }
-    }
 }
 
 impl Map {

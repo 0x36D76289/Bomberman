@@ -6,7 +6,7 @@ use super::collision::Collision;
 use crate::{
     game::{
         direction::Direction,
-        map::{Map, MapElement},
+        map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         resources::{ResourceName, Resources},
     },
