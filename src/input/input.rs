@@ -7,6 +7,8 @@ use winit::{
 
 use crate::input::{input_name::InputName, input_state::InputState};
 
+pub type Binds = [KeyCode; 5];
+
 #[derive(Debug, Clone, Copy)]
 pub struct Input {
     states: [InputState; 5],
@@ -76,11 +78,7 @@ impl Input {
     }
 
     /// Updates all of a player's input by using their keybinds
-    pub fn update_input_player(
-        &mut self,
-        map: &HashMap<PhysicalKey, ElementState>,
-        codes: [KeyCode; 5],
-    ) {
+    pub fn update_input_player(&mut self, map: &HashMap<PhysicalKey, ElementState>, codes: Binds) {
         for input in InputName::iterator() {
             self.update_input_keycode(map, codes[input.clone() as usize], input.clone());
         }

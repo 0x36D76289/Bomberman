@@ -2,7 +2,7 @@ use crate::{
     game::{
         bomb::Bomb,
         collision::Collision,
-        map::Map,
+        map::map::Map,
         resources::{ResourceName, Resources},
     },
     graphics::{

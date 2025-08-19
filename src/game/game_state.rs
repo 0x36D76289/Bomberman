@@ -1,9 +1,10 @@
-use super::map::Map;
-use super::player::Player;
 use crate::app_state::{AppState, CommandBuffer, KeyMap};
 use crate::game::Camera;
 use crate::game::bomb::Bomb;
-use crate::game::map::{MapElement, MapSettings};
+use crate::game::map::map::Map;
+use crate::game::map::map_element::MapElement;
+use crate::game::map::map_settings::MapSettings;
+use crate::game::player::Player;
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;

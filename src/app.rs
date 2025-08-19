@@ -2,11 +2,11 @@ use crate::app_state::{AppState, CommandBuffer, KeyMap};
 use crate::game::game_state::GameState;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
-use crate::input::input_name::InputName;
+use crate::settings::settings::Settings;
 use glam::usize;
 use std::error::Error;
 use winit::event::ElementState;
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::PhysicalKey;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -19,14 +19,15 @@ pub struct App {
     keys: KeyMap,
     inputs: Vec<Input>,
     graphics: Graphics,
+    settings: Settings,
 }
 
 impl App {
-    pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
+    pub fn init(settings: Settings, event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
 
         let keys = KeyMap::new();
-        let inputs = vec![Input::default()];
+        let inputs = vec![Input::default(); settings.binds.len()];
 
         let default_state = AppState::Game(GameState::default_state(&graphics)?);
         let state_stack = vec![default_state];
@@ -36,6 +37,7 @@ impl App {
             keys,
             inputs,
             graphics,
+            settings,
         })
     }
 
@@ -44,16 +46,9 @@ impl App {
     }
 
     fn update_inputs(&mut self) {
-        //HACK: manually mapping inputs of P1 for testing
-        //using F35 as a default
-        let mut p1_binds = [KeyCode::F35; 5];
-        p1_binds[InputName::Up as usize] = KeyCode::KeyW;
-        p1_binds[InputName::Down as usize] = KeyCode::KeyS;
-        p1_binds[InputName::Left as usize] = KeyCode::KeyA;
-        p1_binds[InputName::Right as usize] = KeyCode::KeyD;
-        p1_binds[InputName::Bomb as usize] = KeyCode::Enter;
-
-        self.inputs[0].update_input_player(&self.keys, p1_binds);
+        for i in 0..self.settings.binds.len() {
+            self.inputs[i].update_input_player(&self.keys, self.settings.binds[i]);
+        }
     }
 
     fn update_state(&mut self) {
