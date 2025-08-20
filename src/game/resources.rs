@@ -19,9 +19,13 @@ pub enum ResourceName {
     Floor,
     Player,
     Bomb,
+    PowerSpeed,
+    PowerPower,
+    PowerBomb,
+    PowerSlide,
 }
 
-const RESOURCE_NAME_SIZE: usize = ResourceName::Bomb as usize + 1;
+const RESOURCE_NAME_SIZE: usize = ResourceName::PowerSlide as usize + 1;
 
 #[derive(Debug, Clone)]
 pub struct Resources {
@@ -76,6 +80,26 @@ impl Resources {
             &mut command_buffer,
             memory_allocator.clone(),
         ));
+        textures[ResourceName::PowerSpeed as usize] = Some(load_texture(
+            include_bytes!("../assets/simple.png"),
+            &mut command_buffer,
+            memory_allocator.clone(),
+        ));
+        textures[ResourceName::PowerPower as usize] = Some(load_texture(
+            include_bytes!("../assets/WhiteBomberMan.png"),
+            &mut command_buffer,
+            memory_allocator.clone(),
+        ));
+        textures[ResourceName::PowerBomb as usize] = Some(load_texture(
+            include_bytes!("../assets/textureStone.png"),
+            &mut command_buffer,
+            memory_allocator.clone(),
+        ));
+        textures[ResourceName::PowerSlide as usize] = Some(load_texture(
+            include_bytes!("../assets/denji.png"),
+            &mut command_buffer,
+            memory_allocator.clone(),
+        ));
         let _ = command_buffer
             .build()
             .unwrap()
@@ -125,6 +149,16 @@ impl Resources {
             )
             .unwrap(),
         );
+
+        let power_model = Model::load(
+            include_bytes!("../assets/quad.obj"),
+            memory_allocator.clone(),
+        )
+        .unwrap();
+        models[ResourceName::PowerSpeed as usize] = Some(power_model.clone());
+        models[ResourceName::PowerPower as usize] = Some(power_model.clone());
+        models[ResourceName::PowerBomb as usize] = Some(power_model.clone());
+        models[ResourceName::PowerSlide as usize] = Some(power_model.clone());
 
         // println!("{:?}", textures);
 

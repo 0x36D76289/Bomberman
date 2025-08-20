@@ -8,6 +8,7 @@ pub mod enemy;
 pub mod game_state;
 pub mod map;
 pub mod player;
+pub mod powerup;
 pub mod resources;
 
 pub use camera::Camera;

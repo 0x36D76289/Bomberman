@@ -1,6 +1,7 @@
 use core::f32;
 
 use glam::{Vec2, Vec3, usize};
+use rand::random_range;
 
 use super::collision::Collision;
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
         direction::Direction,
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
+        powerup::PowerUp,
         resources::{ResourceName, Resources},
     },
     graphics::{
@@ -50,6 +52,8 @@ const BOMB_POWER_DEFAULT: u8 = 2;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
 const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
 const BOMB_RADIUS: f32 = 0.5;
+
+const PERCENTAGE_POWERUP_SPAWN: u64 = 5;
 
 impl Bomb {
     pub fn new(owner: u32, x: usize, y: usize, resources: &Resources) -> Self {
@@ -96,8 +100,14 @@ impl Bomb {
         self.position.y = self.position.y as usize as f32 + 0.5;
     }
 
-    fn find_wall(&self, map: &mut Map, dirvec: Vec2) -> u8 {
-        for i in 1..self.power + 1 {
+    fn find_wall(
+        &self,
+        map: &mut Map,
+        dirvec: Vec2,
+        power_ups: &mut Vec<PowerUp>,
+        resources: &Resources,
+    ) -> u8 {
+        for i in 1..=self.power {
             let pos = self.position + dirvec * i as f32;
             let elem = map.get_elem_pos(pos);
             match elem {
@@ -105,6 +115,9 @@ impl Bomb {
                 MapElement::SpawnPoint(_) => continue,
                 MapElement::Breakable(_) => {
                     let _ = map.set_elem_pos(pos, MapElement::Empty);
+                    if random_range(1..=100) <= PERCENTAGE_POWERUP_SPAWN {
+                        power_ups.push(PowerUp::new(pos.y as usize, pos.x as usize, resources));
+                    }
                 }
                 MapElement::Unbreakable(_) => (),
             }
@@ -131,21 +144,27 @@ impl Bomb {
         }
     }
 
-    fn explode(&mut self, map: &mut Map, resources: &Resources) {
+    fn explode(&mut self, map: &mut Map, power_ups: &mut Vec<PowerUp>, resources: &Resources) {
         self.state = BombState::Exploding;
         self.center();
-        self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 });
-        self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 });
-        self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 });
-        self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 });
+        self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
+        self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 }, power_ups, resources);
+        self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 }, power_ups, resources);
+        self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 }, power_ups, resources);
         self.set_explosion_objects(resources);
     }
 
     /// tick for bombs that are Planted or Sliding
-    fn live_bomb(&mut self, delta: f32, map: &mut Map, resources: &Resources) {
+    fn live_bomb(
+        &mut self,
+        delta: f32,
+        map: &mut Map,
+        power_ups: &mut Vec<PowerUp>,
+        resources: &Resources,
+    ) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode(map, resources);
+            self.explode(map, power_ups, resources);
             return;
         }
         self.timer -= delta;
@@ -239,13 +258,14 @@ impl Bomb {
         delta: f32,
         players: &mut Vec<Player>,
         map: &mut Map,
+        power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
     ) {
         match self.state {
-            BombState::Planted => self.live_bomb(delta, map, resources),
+            BombState::Planted => self.live_bomb(delta, map, power_ups, resources),
             BombState::Sliding(_) => {
                 // self.slide(direction);
-                self.live_bomb(delta, map, resources);
+                self.live_bomb(delta, map, power_ups, resources);
             }
             BombState::Exploding => self.exploding_bomb(delta, players),
         }

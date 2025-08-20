@@ -71,7 +71,7 @@ impl Map {
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
         Object {
             model: ressources.models[ResourceName::Floor as usize].clone(),
-            texture: Some(ResourceName::Floor as i32),
+            texture: Some(ResourceName::Floor as TextureIndex),
             transform: Transform {
                 translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
                 scale: Vec3::new(width as f32, 1.0, height as f32),
@@ -237,21 +237,15 @@ impl Map {
     }
 
     pub fn new(settings: MapSettings, ressources: &Resources) -> Option<Self> {
-        let ret = Self::empty(settings.width, settings.height, ressources)
+        let mut ret = Self::empty(settings.width, settings.height, ressources)
             .grid(ressources)
             .fill_break(ressources)
             .cheese(settings.cheesiness);
 
-        let ret = match settings.map_type {
+        ret = match settings.map_type {
             MapType::Corners => Some(ret.corners()),
             MapType::Random => ret.random(&settings),
-        };
-
-        if ret.is_none() {
-            return None;
-        }
-
-        let mut ret = ret.unwrap();
+        }?;
 
         if settings.walls {
             ret = ret.walls(ressources);
