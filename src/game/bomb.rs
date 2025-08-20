@@ -16,14 +16,15 @@ use crate::{
     },
 };
 
-#[allow(unused)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BombState {
     Planted,
+    #[allow(unused)]
     Sliding(Direction),
     Exploding,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Explosion {
     up: u8,
     down: u8,
@@ -31,6 +32,7 @@ pub struct Explosion {
     right: u8,
 }
 
+#[derive(Debug, Clone)]
 pub struct Bomb {
     pub position: Vec2,
     pub timer: f32,
@@ -139,6 +141,7 @@ impl Bomb {
         self.set_explosion_objects(resources);
     }
 
+    /// tick for bombs that are Planted or Sliding
     fn live_bomb(&mut self, delta: f32, map: &mut Map, resources: &Resources) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
@@ -146,6 +149,50 @@ impl Bomb {
             return;
         }
         self.timer -= delta;
+    }
+
+    /// returns y, x as usize
+    fn pos_as_usize(&self) -> (usize, usize) {
+        return (self.position.y as usize, self.position.x as usize);
+    }
+
+    fn in_range(&self, bomb: &Self) -> bool {
+        let (sy, sx) = self.pos_as_usize();
+        let (oy, ox) = bomb.pos_as_usize();
+
+        if sy == oy {
+            if (ox >= (sx - self.explosion.left as usize))
+                && (ox <= (sx + self.explosion.right as usize))
+            {
+                return true;
+            }
+        }
+        if sx == ox {
+            if (oy >= (sy - self.explosion.up as usize))
+                && (oy <= (sy + self.explosion.down as usize))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// finds every live bomb near it and explodes it
+    pub fn chain_react(&self, bombs: &mut Vec<Self>) {
+        for bomb in bombs {
+            if self.in_range(bomb) {
+                match bomb.state {
+                    BombState::Planted => {
+                        bomb.timer = 0.0;
+                    }
+                    BombState::Sliding(_) => {
+                        bomb.state = BombState::Planted;
+                        bomb.timer = 0.0;
+                    }
+                    BombState::Exploding => (),
+                }
+            }
+        }
     }
 
     fn exploding_bomb(&mut self, delta: f32, players: &mut Vec<Player>) {
