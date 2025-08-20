@@ -1,6 +1,7 @@
 use crate::graphics::{Model, transform::Transform};
 use glam::Vec3;
 use std::sync::Arc;
+use vulkano::image::sampler::Sampler;
 
 pub type TextureIndex = i32;
 

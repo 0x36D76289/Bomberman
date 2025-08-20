@@ -50,7 +50,9 @@ impl App {
     }
 
     fn render(&mut self) {
-        self.graphics.renderer.render(&self.graphics.vulkan, &self.state_stack);
+        self.graphics
+            .renderer
+            .render(&self.graphics.vulkan, &self.state_stack);
         self.graphics.renderer.update_time();
         self.graphics.renderer.update_title(&format!(
             "Bomberman!! fps: {:.0}",
@@ -66,8 +68,8 @@ impl ApplicationHandler for App {
         let vulkan = &self.graphics.vulkan;
 
         renderer.init_render_context(event_loop, vulkan);
-        renderer.init_game_render_system(vulkan);
-        renderer.init_ui_render_system(vulkan);
+        renderer.create_gui(event_loop, vulkan);
+        renderer.create_world_pipeline(vulkan);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -78,10 +80,12 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.record_key(event.physical_key, event.state)
-            }
-            _ => (),
+            _ => match (self.graphics.renderer.update_gui_event(&event), event) {
+                (false, WindowEvent::KeyboardInput { event, .. }) => {
+                    self.record_key(event.physical_key, event.state)
+                }
+                _ => (),
+            },
         }
     }
 

@@ -1,7 +1,7 @@
 use egui_winit_vulkano::Gui;
 
 pub struct UiState {
-    gui: Gui
+    gui: Gui,
 }
 
 impl UiState {

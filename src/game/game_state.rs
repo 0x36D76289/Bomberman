@@ -4,10 +4,18 @@ use crate::game::map::{MapElement, MapSettings};
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
-use crate::graphics::{GlobalUbo, Graphics, LightInfo, Renderer, Vulkan};
+use crate::graphics::{GlobalUbo, Graphics, LightInfo, Push, Renderer, Vulkan};
 
 use glam::{Vec2, Vec3, Vec4};
-use vulkano::command_buffer::SecondaryAutoCommandBuffer;
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferInheritanceInfo, CommandBufferInheritanceRenderPassType,
+    CommandBufferInheritanceRenderingInfo, CommandBufferUsage, SecondaryAutoCommandBuffer,
+};
+use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
+use vulkano::format::Format;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::render_pass::Subpass;
 use winit::keyboard::KeyCode;
 
 use crate::game::bomb::Bomb;
@@ -195,7 +203,14 @@ impl GameState {
         (None, 0)
     }
 
-    pub fn render(&self, renderer: &Renderer, vulkan: &Vulkan) -> Arc<SecondaryAutoCommandBuffer> {
+    pub fn render(&self, vulkan: &Vulkan, renderer: &Renderer) -> Arc<SecondaryAutoCommandBuffer> {
+        let pipeline = match renderer.world_pipeline.as_ref() {
+            Some(pipeline) => pipeline.clone(),
+            None => panic!(
+                "Called render on a GameState object but the world_pipeline is not initialized in the renderer"
+            ),
+        };
+
         let global_ubo = GlobalUbo {
             projection: self.camera.projection_matrix.to_cols_array_2d(),
             view: self.camera.view_matrix.to_cols_array_2d(),
@@ -204,12 +219,96 @@ impl GameState {
             direction_to_light: self.light.direction_to_light.to_array().into(),
             directional_light_color: self.light.directional_light_color.into(),
         };
-        renderer.game_render_system().render_game_objects(
-            vulkan,
-            renderer.rcx().render_pass.clone(),
-            renderer.window_size(),
-            self,
-            global_ubo,
+
+        let format = renderer.rcx().swapchain.image_format();
+
+        let inheritance_rendering_info = CommandBufferInheritanceRenderingInfo {
+            color_attachment_formats: vec![Some(format)],
+            depth_attachment_format: Some(Format::D32_SFLOAT),
+            ..Default::default()
+        };
+
+        let mut secondary_builder = AutoCommandBufferBuilder::secondary(
+            vulkan.command_buffer_allocator.clone(),
+            vulkan.queue.queue_family_index(),
+            CommandBufferUsage::SimultaneousUse,
+            CommandBufferInheritanceInfo {
+                render_pass: Some(CommandBufferInheritanceRenderPassType::BeginRendering(
+                    inheritance_rendering_info,
+                )),
+                ..Default::default()
+            },
         )
+        .unwrap();
+
+        secondary_builder
+            .bind_pipeline_graphics(pipeline.clone())
+            .unwrap()
+            .set_viewport(
+                0,
+                [Viewport {
+                    offset: [0.0, 0.0],
+                    extent: renderer.rcx().window.inner_size().into(),
+                    depth_range: 0.0..=1.0,
+                }]
+                .into_iter()
+                .collect(),
+            )
+            .unwrap();
+
+        let uniform_buffer = {
+            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+            *buffer.write().unwrap() = global_ubo;
+
+            buffer
+        };
+
+        let layout = &pipeline.layout().set_layouts()[0];
+        let descriptor_set = DescriptorSet::new_variable(
+            vulkan.descriptor_set_allocator.clone(),
+            layout.clone(),
+            self.resources.textures.len() as u32,
+            [
+                WriteDescriptorSet::buffer(0, uniform_buffer),
+                WriteDescriptorSet::sampler(1, renderer.sampler.clone()),
+                WriteDescriptorSet::image_view_array(2, 0, self.resources.textures.clone()),
+            ],
+            [],
+        )
+        .unwrap();
+
+        secondary_builder
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
+            .unwrap();
+
+        for object in self.objects_to_render() {
+            let push_constant = Push {
+                model_matrix: object.transform.mat4().to_cols_array_2d(),
+                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+                color: object.color.to_array(),
+                tex_index: object.texture.unwrap_or(-1),
+            };
+
+            secondary_builder
+                .push_constants(pipeline.layout().clone(), 0, push_constant)
+                .unwrap()
+                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+                .unwrap()
+                .bind_index_buffer(object.model.index_buffer.clone())
+                .unwrap();
+
+            unsafe {
+                secondary_builder
+                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
+                    .unwrap();
+            }
+        }
+
+        secondary_builder.build().unwrap()
     }
 }
