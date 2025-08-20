@@ -1,5 +1,6 @@
 use glam::{Vec2, Vec3, usize};
 use rand::random_range;
+use vulkano::image::sampler::Sampler;
 
 use crate::{
     game::{
