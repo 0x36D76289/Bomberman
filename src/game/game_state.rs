@@ -5,6 +5,7 @@ use crate::game::map::map::Map;
 use crate::game::map::map_element::MapElement;
 use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
+use crate::game::powerup::PowerUp;
 use crate::game::resources::Resources;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
@@ -30,6 +31,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 pub struct GameState {
     players: Vec<Player>,
     bombs: Vec<Bomb>,
+    power_ups: Vec<PowerUp>,
     pub resources: Resources,
     map: Map,
     camera: Camera,
@@ -92,6 +94,7 @@ impl GameState {
         Ok(Self {
             players,
             bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
             map,
             resources,
             camera,
@@ -105,6 +108,7 @@ impl GameState {
         Self {
             players,
             bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
             map,
             resources: self.resources.clone(),
             camera: self.camera,
@@ -126,8 +130,12 @@ impl GameState {
 
         let players_objects = self.players.iter().map(|p| &p.object).flatten();
         let bomb_objects = self.bombs.iter().map(|b| &b.objects).flatten();
+        let power_up_objects = self.power_ups.iter().map(|p| &p.object);
 
-        map_objects.chain(players_objects).chain(bomb_objects)
+        map_objects
+            .chain(players_objects)
+            .chain(bomb_objects)
+            .chain(power_up_objects)
     }
 
     #[cfg(debug_assertions)]
@@ -155,7 +163,13 @@ impl GameState {
     fn mp_game_tick(&mut self, delta: f32, inputs: &Vec<Input>) {
         // tick bombs
         for bomb in &mut self.bombs {
-            bomb.tick(delta, &mut self.players, &mut self.map, &self.resources);
+            bomb.tick(
+                delta,
+                &mut self.players,
+                &mut self.map,
+                &mut self.power_ups,
+                &self.resources,
+            );
         }
         for i in 0..self.bombs.len() {
             if self.bombs[i].state != BombState::Exploding {
