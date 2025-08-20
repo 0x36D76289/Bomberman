@@ -72,8 +72,8 @@ pub trait Collision {
     }
 
     fn collide_map(&mut self, map: &Map, direction: Direction) {
-        for y in -1..2 {
-            for x in -1..2 {
+        for y in -1..=1 {
+            for x in -1..=1 {
                 if Self::does_map_collide(
                     map,
                     self.get_pos().x + x as f32,

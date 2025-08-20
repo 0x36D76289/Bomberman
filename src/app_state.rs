@@ -1,12 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use vulkano::command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer};
+use vulkano::command_buffer::SecondaryAutoCommandBuffer;
 use winit::{event::ElementState, keyboard::PhysicalKey};
 
-use crate::{game::game_state::GameState, graphics::Graphics, input::input::Input, ui::UiState};
+use crate::{
+    game::game_state::GameState,
+    graphics::{Renderer, Vulkan},
+    input::input::Input,
+    ui::UiState,
+};
 
 pub type KeyMap = HashMap<PhysicalKey, ElementState>;
-pub type CommandBuffer = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
 
 pub enum AppState {
     Game(GameState),
@@ -14,10 +18,10 @@ pub enum AppState {
 }
 
 impl AppState {
-    pub fn render(&self, graphics: &Graphics, command_buffer: &mut CommandBuffer) {
+    pub fn render(&self, renderer: &Renderer, vulkan: &Vulkan) -> Arc<SecondaryAutoCommandBuffer> {
         match self {
-            AppState::Game(game_state) => game_state.render(graphics, command_buffer),
-            AppState::Ui(_) => (),
+            AppState::Game(game_state) => game_state.render(vulkan, renderer),
+            AppState::Ui(_) => !todo!("implement ui render system"),
         }
     }
 

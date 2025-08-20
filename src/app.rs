@@ -1,9 +1,8 @@
-use crate::app_state::{AppState, CommandBuffer, KeyMap};
+use crate::app_state::{AppState, KeyMap};
 use crate::game::game_state::GameState;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
-use glam::usize;
 use std::error::Error;
 use winit::event::ElementState;
 use winit::keyboard::PhysicalKey;
@@ -61,7 +60,7 @@ impl App {
             renderer.get_delta_time(),
             &self.inputs,
             &self.keys,
-            renderer.get_rcx().swapchain.image_extent().into(),
+            renderer.rcx().swapchain.image_extent().into(),
         );
         for _ in 0..res.1 {
             self.state_stack.pop();
@@ -71,55 +70,43 @@ impl App {
         }
     }
 
-    fn render_state(&self, command_buffer: &mut CommandBuffer, pos: usize) {
-        if self.state_stack[pos].is_transparent() && pos != 0 {
-            self.render_state(command_buffer, pos - 1);
-        }
-        self.state_stack[pos].render(&self.graphics, command_buffer);
-    }
-
-    fn draw_frame(&mut self) {
-        if let Some(mut command_buffer) = self.graphics.renderer.begin_frame(&self.graphics.vulkan)
-        {
-            self.render_state(&mut command_buffer, self.state_stack.len() - 1);
-            self.graphics
-                .renderer
-                .end_frame(&self.graphics.vulkan, command_buffer);
-            self.graphics.renderer.update_time();
-            self.graphics.renderer.update_title(&format!(
-                "Bomberman!! fps: {:.0}",
-                self.graphics.renderer.get_rcx().time_info.avg_fps
-            ));
-        }
+    fn render(&mut self) {
+        self.graphics
+            .renderer
+            .render(&self.graphics.vulkan, &self.state_stack);
+        self.graphics.renderer.update_time();
+        self.graphics.renderer.update_title(&format!(
+            "Bomberman!! fps: {:.0}",
+            self.graphics.renderer.rcx().time_info.avg_fps
+        ));
     }
 }
 
 impl ApplicationHandler for App {
     // This is called when the window is created
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let graphics = &mut self.graphics;
+        let renderer = &mut self.graphics.renderer;
+        let vulkan = &self.graphics.vulkan;
 
-        graphics
-            .renderer
-            .init_render_context(event_loop, &graphics.vulkan);
-        graphics.game_object_system.create_pipeline(
-            &graphics.vulkan,
-            graphics.renderer.get_rcx().render_pass.clone(),
-        );
+        renderer.init_render_context(event_loop, vulkan);
+        renderer.create_gui(event_loop, vulkan);
+        renderer.create_world_pipeline(vulkan);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
                 self.update_state();
-                self.draw_frame();
+                self.render()
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::KeyboardInput { event, .. } => {
-                self.record_key(event.physical_key, event.state)
-            }
-            _ => (),
+            _ => match (self.graphics.renderer.update_gui_event(&event), event) {
+                (false, WindowEvent::KeyboardInput { event, .. }) => {
+                    self.record_key(event.physical_key, event.state)
+                }
+                _ => (),
+            },
         }
     }
 
