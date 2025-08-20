@@ -93,7 +93,6 @@ impl Vulkan {
                         runtime_descriptor_array: true,
                         descriptor_binding_variable_descriptor_count: true,
                         dynamic_rendering: true,
-                        image_view_format_swizzle: true,
                         ..DeviceFeatures::empty()
                     },
                     queue_create_infos: vec![QueueCreateInfo {

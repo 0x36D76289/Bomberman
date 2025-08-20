@@ -1,6 +1,6 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::game::Camera;
-use crate::game::bomb::Bomb;
+use crate::game::bomb::{Bomb, BombState};
 use crate::game::map::map::Map;
 use crate::game::map::map_element::MapElement;
 use crate::game::map::map_settings::MapSettings;
@@ -157,6 +157,12 @@ impl GameState {
         for bomb in &mut self.bombs {
             bomb.tick(delta, &mut self.players, &mut self.map, &self.resources);
         }
+        for i in 0..self.bombs.len() {
+            if self.bombs[i].state != BombState::Exploding {
+                continue;
+            }
+            self.bombs[i].clone().chain_react(&mut self.bombs);
+        }
         self.bombs.retain(|bomb| bomb.despawn == false);
         // for player in players: summon bomb if Pressed
         for (i, player) in self.players.iter_mut().enumerate() {
@@ -233,7 +239,6 @@ impl GameState {
             .unwrap_or(&winit::event::ElementState::Released)
             .is_pressed()
         {
-            println!("coucoulesamis");
             return (Some(AppState::Game(self.recreate())), 1);
         }
 
