@@ -1,4 +1,5 @@
-pub mod entity_render_system;
+// pub mod entity_render_system;
+// pub mod ui_render_system;
 pub mod init;
 pub mod light;
 pub mod model;
@@ -8,10 +9,11 @@ pub mod texture;
 pub mod transform;
 
 pub use {
-    entity_render_system::{EntityRenderSystem, vs::GlobalUbo},
+    // entity_render_system::{GameRenderSystem, vs::GlobalUbo},
+    // ui_render_system::UiRenderSystem,
     light::LightInfo,
     model::Model,
-    renderer::Renderer,
+    renderer::{Renderer, vs::GlobalUbo, vs::Push},
     texture::load_texture,
 };
 
@@ -29,8 +31,6 @@ use vulkano::{
 pub struct Graphics {
     pub vulkan: Vulkan,
     pub renderer: Renderer,
-    pub game_object_system: EntityRenderSystem,
-    // pub point_light_system: PointLightRenderSystem,
 }
 
 pub struct Vulkan {

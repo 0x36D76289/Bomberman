@@ -1,43 +1,32 @@
-use crate::graphics::{
-    EntityRenderSystem, Graphics, /*PointLightRenderSystem,*/ Renderer, TimeInfo, Vulkan,
-    renderer::RenderContext,
-};
-use std::{error::Error, sync::Arc, time::Instant};
+use crate::graphics::{Graphics, /*PointLightRenderSystem,*/ Renderer, Vulkan};
+use std::{error::Error, sync::Arc};
 use vulkano::{
     VulkanLibrary,
     buffer::{
         BufferUsage,
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
     },
-    command_buffer::allocator::StandardCommandBufferAllocator,
+    command_buffer::allocator::{
+        StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
+    },
     descriptor_set::allocator::StandardDescriptorSetAllocator,
     device::{
         Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, QueueCreateInfo, QueueFlags,
         physical::PhysicalDeviceType,
     },
-    format::Format,
-    image::{Image, ImageCreateInfo, ImageType, ImageUsage, view::ImageView},
     instance::{Instance, InstanceCreateFlags, InstanceCreateInfo},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-    render_pass::{Framebuffer, FramebufferCreateInfo},
-    swapchain::{ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
-    sync::{self, GpuFuture},
+    memory::allocator::{MemoryTypeFilter, StandardMemoryAllocator},
+    swapchain::Surface,
 };
-use winit::{
-    event_loop::{ActiveEventLoop, EventLoop},
-    window::Window,
-};
+use winit::event_loop::EventLoop;
 
 impl Graphics {
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let vulkan = Vulkan::init(event_loop)?;
 
-        Ok(Graphics {
-            vulkan,
-            renderer: Renderer::new(),
-            game_object_system: EntityRenderSystem::default(),
-            // point_light_system: PointLightRenderSystem::default(),
-        })
+        let renderer = Renderer::new(&vulkan);
+
+        Ok(Graphics { vulkan, renderer })
     }
 }
 
@@ -103,6 +92,8 @@ impl Vulkan {
                         shader_sampled_image_array_non_uniform_indexing: true,
                         runtime_descriptor_array: true,
                         descriptor_binding_variable_descriptor_count: true,
+                        dynamic_rendering: true,
+                        image_view_format_swizzle: true,
                         ..DeviceFeatures::empty()
                     },
                     queue_create_infos: vec![QueueCreateInfo {
@@ -126,7 +117,10 @@ impl Vulkan {
 
         let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
             device.clone(),
-            Default::default(),
+            StandardCommandBufferAllocatorCreateInfo {
+                secondary_buffer_count: 32,
+                ..Default::default()
+            },
         ));
 
         let uniform_buffer_allocator = SubbufferAllocator::new(
@@ -147,144 +141,6 @@ impl Vulkan {
             descriptor_set_allocator,
             command_buffer_allocator,
             uniform_buffer_allocator,
-        })
-    }
-}
-
-impl RenderContext {
-    pub fn init(event_loop: &ActiveEventLoop, vulkan: &Vulkan) -> Result<Self, Box<dyn Error>> {
-        let window = Arc::new(
-            event_loop
-                .create_window(Window::default_attributes().with_title("Bomberman!"))
-                .unwrap(),
-        );
-
-        let surface = Surface::from_window(vulkan.instance.clone(), window.clone())
-            .expect("Could not create surface");
-
-        let window_size = window.inner_size();
-
-        // Create the swapchain which holds a queue of images that are waiting to be presented on the screen
-        let (swapchain, images) = {
-            let surface_capabilities = vulkan
-                .device
-                .physical_device()
-                .surface_capabilities(&surface, Default::default())
-                .unwrap();
-
-            let image_formats = vulkan
-                .device
-                .physical_device()
-                .surface_formats(&surface, Default::default())
-                .unwrap();
-
-            let (image_format, _) =
-                if image_formats.contains(&(Format::B8G8R8A8_UNORM, ColorSpace::SrgbNonLinear)) {
-                    (Format::B8G8R8A8_UNORM, ColorSpace::SrgbNonLinear)
-                } else {
-                    println!(
-                        "Warning: the device doesnt support B8G8R8A8_UNORM, the colors might be off"
-                    );
-                    image_formats[0]
-                };
-
-            Swapchain::new(
-                vulkan.device.clone(),
-                surface,
-                SwapchainCreateInfo {
-                    min_image_count: surface_capabilities.min_image_count.max(2),
-                    image_format,
-                    image_extent: window_size.into(),
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
-                    composite_alpha: surface_capabilities
-                        .supported_composite_alpha
-                        .into_iter()
-                        .next()
-                        .unwrap(),
-                    present_mode: PresentMode::Fifo,
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        };
-
-        let render_pass = vulkano::single_pass_renderpass!(
-            vulkan.device.clone(),
-            attachments: {
-                color: {
-                    format: swapchain.image_format(),
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                depth_stencil: {
-                    format: Format::D32_SFLOAT,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: DontCare,
-                },
-            },
-            pass: {
-                color: [color],
-                depth_stencil: {depth_stencil},
-            },
-        )
-        .unwrap();
-
-        let framebuffers = {
-            let depth_buffer = ImageView::new_default(
-                Image::new(
-                    vulkan.memory_allocator.clone(),
-                    ImageCreateInfo {
-                        image_type: ImageType::Dim2d,
-                        format: Format::D32_SFLOAT,
-                        extent: images[0].extent(),
-                        usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                            | ImageUsage::TRANSIENT_ATTACHMENT,
-                        ..Default::default()
-                    },
-                    AllocationCreateInfo::default(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-
-            images
-                .iter()
-                .map(|image| {
-                    let view = ImageView::new_default(image.clone()).unwrap();
-
-                    Framebuffer::new(
-                        render_pass.clone(),
-                        FramebufferCreateInfo {
-                            attachments: vec![view, depth_buffer.clone()],
-                            ..Default::default()
-                        },
-                    )
-                    .unwrap()
-                })
-                .collect::<Vec<_>>()
-        };
-
-        let recreate_swapchain = false;
-        let previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
-
-        let time_info = TimeInfo {
-            time: Instant::now(),
-            dt: 0.0,
-            frame_count: 0.0,
-            avg_fps: 0.0,
-            dt_sum: 0.0,
-        };
-
-        Ok(RenderContext {
-            window,
-            swapchain,
-            render_pass,
-            framebuffers,
-            recreate_swapchain,
-            previous_frame_end,
-            time_info,
         })
     }
 }
