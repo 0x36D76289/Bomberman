@@ -33,7 +33,13 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
+    pub fn new(
+        id: u32,
+        position: Vec2,
+        direction: Direction,
+        resources: &Resources,
+        is_human: bool,
+    ) -> Self {
         let dir_vec = direction.to_vec2();
         Player {
             id,
