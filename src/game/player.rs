@@ -37,8 +37,7 @@ impl Player {
         id: u32,
         position: Vec2,
         direction: Direction,
-        resources: &Resources,
-        is_human: bool,
+        resources: &Resources
     ) -> Self {
         let dir_vec = direction.to_vec2();
         Player {
