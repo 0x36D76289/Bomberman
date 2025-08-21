@@ -30,6 +30,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 pub struct GameState {
     players: Vec<Player>,
+    game_inputs: Vec<Input>,
+
     bombs: Vec<Bomb>,
     power_ups: Vec<PowerUp>,
     pub resources: Resources,
@@ -53,7 +55,7 @@ impl GameState {
                             y: y as f32 + 0.5,
                         },
                         *dir,
-                        resources,
+                        resources
                     ));
 
                     id += 1;
@@ -70,10 +72,10 @@ impl GameState {
             graphics.vulkan.command_buffer_allocator.clone(),
             graphics.vulkan.queue.clone(),
         );
-
         //HACK: this is not safe, map can fail creation
         let map = Map::new(MapSettings::default(), &resources).unwrap();
         let players = Self::create_players(&map, &resources);
+        let game_inputs = vec![Input::default(); players.len()];
 
         let mut camera = Camera::new();
         camera.transform = Transform {
@@ -90,6 +92,7 @@ impl GameState {
 
         Ok(Self {
             players,
+            game_inputs,
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -104,6 +107,7 @@ impl GameState {
         let players = Self::create_players(&map, &self.resources);
         Self {
             players,
+            game_inputs: self.game_inputs.clone(),
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -157,7 +161,7 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn mp_game_tick(&mut self, delta: f32, inputs: &Vec<Input>) {
+    fn mp_game_tick(&mut self, delta: f32) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(
@@ -182,19 +186,26 @@ impl GameState {
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
         for (i, player) in self.players.iter_mut().enumerate() {
-            if player.alive
-                && inputs.get_or_default(i).bomb() == InputState::Pressed
-                && let Some(bomb) = player.create_bomb(&self.resources)
-            {
-                self.bombs.push(bomb);
+            if !player.alive {
+                continue;
+            }
+            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed {
+                match player.create_bomb(&self.resources) {
+                    Some(bomb) => self.bombs.push(bomb),
+                    None => (),
+                }
             }
         }
-        // player movement
         for (i, player) in self.players.iter_mut().enumerate() {
-            player.player_move(inputs.get_or_default(i), delta, &self.map, &self.bombs);
+            player.player_move(
+                self.game_inputs.get_or_default(i),
+                delta,
+                &self.map,
+                &self.bombs,
+            );
         }
         // uncomment this and comment the previous line to control the camera
-        // self.camera.keyboard_move(&self.inputs[0], delta);
+        // self.camera.keyboard_move(&self.game_inputs[0], delta);
     }
 
     fn update_camera(&mut self, aspect_ratio: f32) {
@@ -244,7 +255,8 @@ impl GameState {
         // let state_func = match self.mode {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
-        self.mp_game_tick(delta_time, inputs);
+        self.inputs_to_game_inputs(inputs);
+        self.mp_game_tick(delta_time);
         self.update_camera(window_size.0 as f32 / window_size.1 as f32);
 
         #[cfg(debug_assertions)]
@@ -260,6 +272,13 @@ impl GameState {
         (None, 0)
     }
 
+    // Put the inputs read into game inputs
+    fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
+        for (i, input) in inputs.iter().enumerate() {
+            self.game_inputs[i] = *input;
+        }
+    }
+    
     pub fn render(&self, vulkan: &Vulkan, renderer: &Renderer) -> Arc<SecondaryAutoCommandBuffer> {
         let pipeline = match renderer.world_pipeline.as_ref() {
             Some(pipeline) => pipeline.clone(),
@@ -267,7 +286,6 @@ impl GameState {
                 "Called render on a GameState object but the world_pipeline is not initialized in the renderer"
             ),
         };
-
         let global_ubo = GlobalUbo {
             projection: self.camera.projection_matrix.to_cols_array_2d(),
             view: self.camera.view_matrix.to_cols_array_2d(),
