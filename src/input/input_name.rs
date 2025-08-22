@@ -1,3 +1,5 @@
+use crate::game::direction::Direction;
+
 #[derive(Clone, Copy)]
 pub enum InputName {
     Up,
@@ -17,5 +19,14 @@ impl InputName {
             InputName::Bomb,
         ];
         DIRECTIONS.iter()
+    }
+    
+    pub fn direction_to_input(direction: Direction) -> InputName {
+        match direction {
+            Direction::Down => InputName::Down,
+            Direction::Up => InputName::Up,
+            Direction::Right => InputName::Right,
+            Direction::Left => InputName::Left,    
+        }
     }
 }
