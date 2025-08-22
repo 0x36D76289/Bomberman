@@ -48,7 +48,6 @@ pub struct Bomb {
 }
 
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
-const BOMB_POWER_DEFAULT: u8 = 2;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
 const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
 const BOMB_RADIUS: f32 = 0.5;
@@ -56,14 +55,14 @@ const BOMB_RADIUS: f32 = 0.5;
 const PERCENTAGE_POWERUP_SPAWN: u64 = 5;
 
 impl Bomb {
-    pub fn new(owner: u32, x: usize, y: usize, resources: &Resources) -> Self {
+    pub fn new(owner: u32, x: usize, y: usize, power: u8, resources: &Resources) -> Self {
         Self {
             position: Vec2 {
                 x: x as f32 + 0.5,
                 y: y as f32 + 0.5,
             },
             timer: BOMB_TIMER_DEFAULT,
-            power: BOMB_POWER_DEFAULT,
+            power,
             owner_id: owner,
             state: BombState::Planted,
             collision_enabled: false,
@@ -86,7 +85,7 @@ impl Bomb {
         }
     }
 
-    fn enable_collision(&mut self, players: &Vec<Player>) {
+    fn enable_collision(&mut self, players: &[Player]) {
         if self.collision_enabled {
             return;
         }
@@ -172,28 +171,28 @@ impl Bomb {
 
     /// returns y, x as usize
     fn pos_as_usize(&self) -> (usize, usize) {
-        return (self.position.y as usize, self.position.x as usize);
+        (self.position.y as usize, self.position.x as usize)
     }
 
     fn in_range(&self, bomb: &Self) -> bool {
         let (sy, sx) = self.pos_as_usize();
         let (oy, ox) = bomb.pos_as_usize();
 
-        if sy == oy {
-            if (ox >= (sx - self.explosion.left as usize))
-                && (ox <= (sx + self.explosion.right as usize))
-            {
-                return true;
-            }
+        if (sy == oy)
+            && (ox >= (sx - self.explosion.left as usize))
+            && (ox <= (sx + self.explosion.right as usize))
+        {
+            return true;
         }
-        if sx == ox {
-            if (oy >= (sy - self.explosion.up as usize))
-                && (oy <= (sy + self.explosion.down as usize))
-            {
-                return true;
-            }
+
+        if (sx == ox)
+            && (oy >= (sy - self.explosion.up as usize))
+            && (oy <= (sy + self.explosion.down as usize))
+        {
+            return true;
         }
-        return false;
+
+        false
     }
 
     /// finds every live bomb near it and explodes it
@@ -228,23 +227,22 @@ impl Bomb {
             let (px, py) = player.position.into();
             let (bx, by) = self.position.into();
 
-            if (px - bx).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()) {
-                if ((py + player.get_size())
+            if ((px - bx).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()))
+                && ((py + player.get_size())
                     > (by - self.explosion.up as f32 - BOMB_EXPLOSION_RADIUS))
-                    && ((py - player.get_size())
-                        < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
-                {
-                    kill = true;
-                }
+                && ((py - player.get_size())
+                    < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
+            {
+                kill = true;
             }
-            if (py - by).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()) {
-                if ((px + player.get_size())
+
+            if ((py - by).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()))
+                && ((px + player.get_size())
                     > (bx - self.explosion.left as f32 - BOMB_EXPLOSION_RADIUS))
-                    && ((px - player.get_size())
-                        < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
-                {
-                    kill = true;
-                }
+                && ((px - player.get_size())
+                    < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
+            {
+                kill = true;
             }
 
             if kill {

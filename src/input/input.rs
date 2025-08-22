@@ -24,10 +24,10 @@ impl Default for Input {
 
 impl Input {
     fn axis_to_float(negative: InputState, positive: InputState) -> f32 {
-        negative.is_down() as u8 as f32 * -1.0 + positive.is_down() as u8 as f32 * 1.0
+        -(negative.is_down() as u8 as f32) + positive.is_down() as u8 as f32
     }
 
-    pub fn to_vec2(&self) -> Vec2 {
+    pub fn as_vec2(&self) -> Vec2 {
         Vec2 {
             x: Self::axis_to_float(self.left(), self.right()),
             y: Self::axis_to_float(self.down(), self.up()),
@@ -69,18 +69,15 @@ impl Input {
         key: KeyCode,
         input: InputName,
     ) {
-        match map.get(&PhysicalKey::Code(key)) {
-            Some(state) => {
-                self.update_input_component(state.is_pressed(), input);
-            }
-            None => (),
+        if let Some(state) = map.get(&PhysicalKey::Code(key)) {
+            self.update_input_component(state.is_pressed(), input);
         }
     }
 
     /// Updates all of a player's input by using their keybinds
     pub fn update_input_player(&mut self, map: &HashMap<PhysicalKey, ElementState>, codes: Binds) {
         for input in InputName::iterator() {
-            self.update_input_keycode(map, codes[input.clone() as usize], input.clone());
+            self.update_input_keycode(map, codes[*input as usize], *input);
         }
     }
 }

@@ -1,4 +1,4 @@
-use glam::{usize, USizeVec2, Vec2, Vec3};
+use glam::{USizeVec2, Vec2, Vec3, usize};
 use rand::random_range;
 
 use crate::{
@@ -22,13 +22,13 @@ pub enum PowerUpType {
 }
 
 impl PowerUpType {
-    fn apply(&self) -> impl Fn(&mut Player) -> () {
-        return match self {
+    fn apply(&self) -> impl Fn(&mut Player) {
+        match self {
             PowerUpType::Speed => |p: &mut Player| p.speed_level += 1,
             PowerUpType::Power => |p: &mut Player| p.power_level += 1,
             PowerUpType::Bomb => |p: &mut Player| p.bombs_remaining += 1,
             PowerUpType::Slide => |p: &mut Player| p.can_kick_bomb = true,
-        };
+        }
     }
 }
 
