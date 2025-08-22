@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec3, Vec4};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Transform {
     pub translation: Vec3,
     pub scale: Vec3,

@@ -2,7 +2,7 @@ use rand::random_range;
 
 use crate::{game::direction::Direction, graphics::object::Object};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MapElement {
     Empty,
     SpawnPoint(Direction),
