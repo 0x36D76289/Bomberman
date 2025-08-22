@@ -20,13 +20,13 @@ impl InputName {
         ];
         DIRECTIONS.iter()
     }
-    
+
     pub fn direction_to_input(direction: Direction) -> InputName {
         match direction {
             Direction::Down => InputName::Down,
             Direction::Up => InputName::Up,
             Direction::Right => InputName::Right,
-            Direction::Left => InputName::Left,    
+            Direction::Left => InputName::Left,
         }
     }
 }
