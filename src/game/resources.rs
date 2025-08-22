@@ -1,16 +1,11 @@
 use std::sync::Arc;
 
 use vulkano::{
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract,
-        allocator::StandardCommandBufferAllocator,
-    },
-    device::Queue,
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract},
     image::view::ImageView,
-    memory::allocator::StandardMemoryAllocator,
 };
 
-use crate::graphics::{Model, load_texture};
+use crate::graphics::{Model, Vulkan, load_texture};
 
 pub enum ResourceName {
     Breakable,
@@ -34,18 +29,16 @@ pub struct Resources {
 }
 
 impl Resources {
-    pub fn load_resources(
-        memory_allocator: Arc<StandardMemoryAllocator>,
-        command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-        queue: Arc<Queue>,
-    ) -> Self {
+    pub fn load_resources(vulkan: &Vulkan) -> Self {
+        let memory_allocator = vulkan.memory_allocator.clone();
+
         let mut textures = vec![None; RESOURCE_NAME_SIZE];
         let mut models = vec![None; RESOURCE_NAME_SIZE];
 
         // load the textures
         let mut command_buffer = AutoCommandBufferBuilder::primary(
-            command_buffer_allocator.clone(),
-            queue.queue_family_index(),
+            vulkan.command_buffer_allocator.clone(),
+            vulkan.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
@@ -103,7 +96,7 @@ impl Resources {
         let _ = command_buffer
             .build()
             .unwrap()
-            .execute(queue.clone())
+            .execute(vulkan.queue.clone())
             .unwrap();
 
         // load the models

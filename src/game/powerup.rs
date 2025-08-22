@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PowerUpType {
     Speed,
     Power,
@@ -32,7 +32,7 @@ impl PowerUpType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PowerUp {
     pub power_up_type: PowerUpType,
     pub object: Object,

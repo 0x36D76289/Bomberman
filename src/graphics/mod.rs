@@ -5,15 +5,14 @@ pub mod light;
 pub mod model;
 pub mod object;
 pub mod renderer;
+pub mod text;
 pub mod texture;
 pub mod transform;
 
 pub use {
-    // entity_render_system::{GameRenderSystem, vs::GlobalUbo},
-    // ui_render_system::UiRenderSystem,
     light::LightInfo,
     model::Model,
-    renderer::{Renderer, vs::GlobalUbo, vs::Push},
+    renderer::{Renderer, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
     texture::load_texture,
 };
 
@@ -53,7 +52,7 @@ pub struct TimeInfo {
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
 #[repr(C)]
-pub struct MyVertex {
+pub struct GameVertex {
     #[format(R32G32B32_SFLOAT)]
     #[name("in_position")]
     pub position: [f32; 3],
@@ -67,7 +66,19 @@ pub struct MyVertex {
     pub uv: [f32; 2],
 }
 
-impl PartialEq for MyVertex {
+#[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct GuiVertex {
+    #[format(R32G32_SFLOAT)]
+    #[name("in_position")]
+    pub position: [f32; 2],
+
+    #[format(R32G32_SFLOAT)]
+    #[name("in_uv")]
+    pub uv: [f32; 2],
+}
+
+impl PartialEq for GameVertex {
     fn eq(&self, other: &Self) -> bool {
         let iter_self = self
             .position
@@ -88,9 +99,9 @@ impl PartialEq for MyVertex {
     }
 }
 
-impl Eq for MyVertex {}
+impl Eq for GameVertex {}
 
-impl Hash for MyVertex {
+impl Hash for GameVertex {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         for v in self
             .position

@@ -1,8 +1,10 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::game::game_state::GameState;
+use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
+use crate::ui::UiState;
 use std::error::Error;
 use winit::event::ElementState;
 use winit::keyboard::PhysicalKey;
@@ -17,6 +19,7 @@ pub struct App {
     state_stack: Vec<AppState>,
     keys: KeyMap,
     inputs: Vec<Input>,
+    resources: Resources,
     graphics: Graphics,
     settings: Settings,
 }
@@ -25,16 +28,21 @@ impl App {
     pub fn init(settings: Settings, event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
 
+        let resources = Resources::load_resources(&graphics.vulkan);
+
         let keys = KeyMap::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        let default_state = AppState::Game(GameState::default_state(&graphics)?);
-        let state_stack = vec![default_state];
+        let default_game_state = AppState::Game(GameState::default_state(&resources)?);
+        let gui_state1 = AppState::Ui(UiState::default_state());
+
+        let state_stack = vec![default_game_state, gui_state1];
 
         Ok(Self {
             state_stack,
             keys,
             inputs,
+            resources,
             graphics,
             settings,
         })
@@ -53,14 +61,14 @@ impl App {
     fn update_state(&mut self) {
         self.update_inputs();
 
-        let app_state = self.state_stack.last_mut().unwrap();
+        let app_state = self.state_stack.first_mut().unwrap();
         let renderer = &self.graphics.renderer;
 
         let res = app_state.tick(
             renderer.get_delta_time(),
             &self.inputs,
             &self.keys,
-            renderer.rcx().swapchain.image_extent().into(),
+            &self.resources,
         );
         for _ in 0..res.1 {
             self.state_stack.pop();
@@ -73,7 +81,7 @@ impl App {
     fn render(&mut self) {
         self.graphics
             .renderer
-            .render(&self.graphics.vulkan, &self.state_stack);
+            .render(&self.graphics.vulkan, &self.state_stack, &self.resources);
         self.graphics.renderer.update_time();
         self.graphics.renderer.update_title(&format!(
             "Bomberman!! fps: {:.0}",
@@ -89,8 +97,8 @@ impl ApplicationHandler for App {
         let vulkan = &self.graphics.vulkan;
 
         renderer.init_render_context(event_loop, vulkan);
-        renderer.create_gui(event_loop, vulkan);
-        renderer.create_world_pipeline(vulkan);
+        renderer.create_gui_pipeline(vulkan);
+        renderer.create_game_pipeline(vulkan);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -101,13 +109,10 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
-            _ => {
-                if let (false, WindowEvent::KeyboardInput { event, .. }) =
-                    (self.graphics.renderer.update_gui_event(&event), event)
-                {
-                    self.record_key(event.physical_key, event.state)
-                }
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.record_key(event.physical_key, event.state)
             }
+            _ => (),
         }
     }
 

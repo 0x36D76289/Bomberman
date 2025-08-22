@@ -1,4 +1,4 @@
-use crate::graphics::MyVertex;
+use crate::graphics::GameVertex;
 use std::{collections::HashMap, error::Error, io::Cursor, sync::Arc};
 use tobj::LoadError;
 use vulkano::{
@@ -8,7 +8,7 @@ use vulkano::{
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    pub vertex_buffer: Subbuffer<[MyVertex]>,
+    pub vertex_buffer: Subbuffer<[GameVertex]>,
     pub index_buffer: Subbuffer<[u32]>,
 }
 
@@ -23,13 +23,13 @@ impl Model {
             Err(LoadError::OpenFileFailed)
         })?;
 
-        let mut unique_vertices: HashMap<MyVertex, u32> = HashMap::new();
-        let mut vertices = vec![MyVertex::default()];
+        let mut unique_vertices: HashMap<GameVertex, u32> = HashMap::new();
+        let mut vertices = vec![GameVertex::default()];
         let mut indices = Vec::new();
 
         for model in models {
             for i in model.mesh.indices {
-                let mut vertex = MyVertex::default();
+                let mut vertex = GameVertex::default();
                 let i = i as usize;
 
                 vertex.position = [

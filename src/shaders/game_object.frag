@@ -19,7 +19,7 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
 layout(set = 0, binding = 1) uniform sampler s;
 layout(set = 0, binding = 2) uniform texture2D tex[];
 
-layout(push_constant) uniform Push {
+layout(push_constant) uniform GamePush {
     mat4 model_matrix;
     mat4 normal_matrix;
     vec3 color;
