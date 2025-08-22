@@ -18,7 +18,7 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     vec4 directional_light_color;
 } ubo;
 
-layout(push_constant) uniform Push {
+layout(push_constant) uniform GamePush {
     mat4 model_matrix;
     mat4 normal_matrix;
     vec3 color;

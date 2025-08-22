@@ -18,6 +18,7 @@ use glam::{Vec2, Vec3};
 const PLAYER_RADIUS: f32 = 0.4;
 
 #[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct Player {
     pub id: u32,
     pub position: Vec2,
