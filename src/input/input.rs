@@ -63,6 +63,20 @@ impl Input {
         }
     }
 
+    pub fn release_all(&mut self) {
+        for state in self.states.iter_mut() {
+            *state = InputState::Released;
+        }
+    }
+
+    pub fn release_all_but(&mut self, input: InputName) {
+        for (i, state) in self.states.iter_mut().enumerate() {
+            if i != input as usize {
+                *state = InputState::Released;
+            }
+        }
+    }
+
     fn update_input_keycode(
         &mut self,
         map: &HashMap<PhysicalKey, ElementState>,
