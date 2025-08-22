@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 pub type TextureIndex = i32;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Object {
     pub model: Arc<Model>,
     pub texture: Option<TextureIndex>,
