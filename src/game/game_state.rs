@@ -1,4 +1,5 @@
 use crate::app_state::{AppState, KeyMap};
+use crate::game::Camera;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::map::map::Map;
 use crate::game::map::map_element::MapElement;
@@ -6,13 +7,12 @@ use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::resources::Resources;
-use crate::game::Camera;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, Graphics, LightInfo, Push, Renderer, Vulkan};
 use crate::input::input::{GetOrDefault, Input};
 use crate::input::input_state::InputState;
-use glam::{bool, Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
 use std::error::Error;
 use std::sync::Arc;
@@ -45,21 +45,18 @@ impl GameState {
 
         for y in 0..map.height {
             for x in 0..map.width {
-                match map.get_elem(x, y) {
-                    MapElement::SpawnPoint(dir) => {
-                        players.push(Player::new(
-                            id,
-                            Vec2 {
-                                x: x as f32 + 0.5,
-                                y: y as f32 + 0.5,
-                            },
-                            dir.clone(),
-                            &resources,
-                        ));
+                if let MapElement::SpawnPoint(dir) = map.get_elem(x, y) {
+                    players.push(Player::new(
+                        id,
+                        Vec2 {
+                            x: x as f32 + 0.5,
+                            y: y as f32 + 0.5,
+                        },
+                        *dir,
+                        resources,
+                    ));
 
-                        id += 1;
-                    }
-                    _ => (),
+                    id += 1;
                 }
             }
         }
@@ -128,8 +125,8 @@ impl GameState {
             })
             .chain(std::iter::once(&self.map.floor));
 
-        let players_objects = self.players.iter().map(|p| &p.object).flatten();
-        let bomb_objects = self.bombs.iter().map(|b| &b.objects).flatten();
+        let players_objects = self.players.iter().flat_map(|p| &p.object);
+        let bomb_objects = self.bombs.iter().flat_map(|b| &b.objects);
         let power_up_objects = self.power_ups.iter().map(|p| &p.object);
 
         map_objects
@@ -177,22 +174,19 @@ impl GameState {
             }
             self.bombs[i].clone().chain_react(&mut self.bombs);
         }
-        self.bombs.retain(|bomb| bomb.despawn == false);
+        self.bombs.retain(|bomb| !bomb.despawn);
         //tick powerups
         for powerup in &mut self.power_ups {
             powerup.tick(&mut self.players);
         }
-        self.power_ups.retain(|powerup| powerup.despawn == false);
+        self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
         for (i, player) in self.players.iter_mut().enumerate() {
-            if !player.alive {
-                continue;
-            }
-            if inputs.get_or_default(i).bomb() == InputState::Pressed {
-                match player.create_bomb(&self.resources) {
-                    Some(bomb) => self.bombs.push(bomb),
-                    None => (),
-                }
+            if player.alive
+                && inputs.get_or_default(i).bomb() == InputState::Pressed
+                && let Some(bomb) = player.create_bomb(&self.resources)
+            {
+                self.bombs.push(bomb);
             }
         }
         // player movement

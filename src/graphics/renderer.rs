@@ -288,7 +288,7 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
-    pub fn render(&mut self, vulkan: &Vulkan, states: &Vec<AppState>) {
+    pub fn render(&mut self, vulkan: &Vulkan, states: &[AppState]) {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
@@ -376,7 +376,7 @@ impl Renderer {
 
         //TODO: all states from last backwards until no transparency
         let state = states.last().unwrap();
-        let secondary_cb = state.render(&self, vulkan);
+        let secondary_cb = state.render(self, vulkan);
 
         let rcx = self.rcx.as_mut().unwrap();
 

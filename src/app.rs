@@ -101,12 +101,13 @@ impl ApplicationHandler for App {
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
-            _ => match (self.graphics.renderer.update_gui_event(&event), event) {
-                (false, WindowEvent::KeyboardInput { event, .. }) => {
+            _ => {
+                if let (false, WindowEvent::KeyboardInput { event, .. }) =
+                    (self.graphics.renderer.update_gui_event(&event), event)
+                {
                     self.record_key(event.physical_key, event.state)
                 }
-                _ => (),
-            },
+            }
         }
     }
 

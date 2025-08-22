@@ -45,7 +45,7 @@ impl Map {
     fn fix_objects(mut self) -> Self {
         for y in 0..self.height {
             for x in 0..self.width {
-                match &mut self.content[y as usize * self.width as usize + x as usize] {
+                match &mut self.content[y * self.width + x] {
                     MapElement::Empty => (),
                     MapElement::SpawnPoint(_) => (),
                     MapElement::Breakable(obj) => {
@@ -95,7 +95,7 @@ impl Map {
 
         for y in (1..self.height).step_by(2) {
             for x in (1..self.width).step_by(2) {
-                self.content[y as usize * self.width as usize + x as usize] =
+                self.content[y * self.width + x] =
                     MapElement::Unbreakable(unbreakable_object.clone());
             }
         }
@@ -107,11 +107,8 @@ impl Map {
 
         let mut content_clone = self.content.clone();
         for (i, elem) in content_clone.iter_mut().enumerate() {
-            match elem {
-                MapElement::Empty => {
-                    self.content[i] = MapElement::Breakable(breakable_object.clone())
-                }
-                _ => (),
+            if let MapElement::Empty = elem {
+                self.content[i] = MapElement::Breakable(breakable_object.clone())
             }
         }
         self
@@ -132,48 +129,40 @@ impl Map {
         Self {
             width: self.width + 2,
             height: self.height + 2,
-            content: content,
+            content,
             floor: Self::create_floor(self.width as u8 + 2, self.height as u8 + 2, ressources),
         }
     }
 
     fn corners(mut self) -> Self {
         // Top left corner
-        self.content[(0 * self.width) as usize + 0 as usize] =
-            MapElement::SpawnPoint(Direction::Right);
-        self.content[(0 * self.width) as usize + 1 as usize] = MapElement::Empty;
-        self.content[(1 * self.width) as usize + 0 as usize] = MapElement::Empty;
+        self.content[0] = MapElement::SpawnPoint(Direction::Right);
+        self.content[1] = MapElement::Empty;
+        self.content[self.width] = MapElement::Empty;
         // Top right corner
-        self.content[(0 * self.width) as usize + (self.width - 1) as usize] =
-            MapElement::SpawnPoint(Direction::Left);
-        self.content[(0 * self.width) as usize + (self.width - 2) as usize] = MapElement::Empty;
-        self.content[(1 * self.width) as usize + (self.width - 1) as usize] = MapElement::Empty;
+        self.content[self.width - 1] = MapElement::SpawnPoint(Direction::Left);
+        self.content[self.width - 2] = MapElement::Empty;
+        self.content[2 * self.width - 1] = MapElement::Empty;
         // Bottom left corner
-        self.content[((self.height - 1) * self.width) as usize + 0 as usize] =
-            MapElement::SpawnPoint(Direction::Right);
-        self.content[((self.height - 1) * self.width) as usize + 1 as usize] = MapElement::Empty;
-        self.content[((self.height - 2) * self.width) as usize + 0 as usize] = MapElement::Empty;
+        self.content[(self.height - 1) * self.width] = MapElement::SpawnPoint(Direction::Right);
+        self.content[((self.height - 1) * self.width) + 1] = MapElement::Empty;
+        self.content[(self.height - 2) * self.width] = MapElement::Empty;
         // Bottom right corner
-        self.content[((self.height - 1) * self.width) as usize + (self.width - 1) as usize] =
+        self.content[((self.height - 1) * self.width) + (self.width - 1)] =
             MapElement::SpawnPoint(Direction::Left);
-        self.content[((self.height - 1) * self.width) as usize + (self.width - 2) as usize] =
-            MapElement::Empty;
-        self.content[((self.height - 2) * self.width) as usize + (self.width - 1) as usize] =
-            MapElement::Empty;
+        self.content[((self.height - 1) * self.width) + (self.width - 2)] = MapElement::Empty;
+        self.content[((self.height - 2) * self.width) + (self.width - 1)] = MapElement::Empty;
 
         self
     }
 
     fn cheese(mut self, cheesiness: u8) -> Self {
         for i in 0..self.content.len() {
-            match self.content[i] {
-                MapElement::Breakable(_) => {
-                    if random_range(0..=100) > (100 - cheesiness.clamp(0, 100)) {
-                        self.content[i] = MapElement::Empty;
-                    }
-                }
-                _ => (),
-            };
+            if let MapElement::Breakable(_) = self.content[i]
+                && random_range(0..=100) > (100 - cheesiness.clamp(0, 100))
+            {
+                self.content[i] = MapElement::Empty;
+            }
         }
         self
     }
@@ -194,26 +183,23 @@ impl Map {
             for x in
                 (x - safe_range as i16).max(0)..=(x + safe_range as i16).min(self.width as i16 - 1)
             {
-                match self.content[y as usize * self.width as usize + x as usize] {
-                    MapElement::SpawnPoint(_) => return false,
-                    _ => (),
+                if let MapElement::SpawnPoint(_) =
+                    self.content[y as usize * self.width + x as usize]
+                {
+                    return false;
                 }
             }
         }
-        self.content[y as usize * self.width as usize + x as usize] =
-            MapElement::random_spawn_point();
+        self.content[y as usize * self.width + x as usize] = MapElement::random_spawn_point();
         for y in
             (y - spawn_size as i16).max(0)..=(y + spawn_size as i16).min(self.height as i16 - 1)
         {
             for x in
                 (x - spawn_size as i16).max(0)..=(x + spawn_size as i16).min(self.width as i16 - 1)
             {
-                match self.content[y as usize * self.width as usize + x as usize] {
-                    MapElement::Breakable(_) => {
-                        self.content[y as usize * self.width as usize + x as usize] =
-                            MapElement::Empty
-                    }
-                    _ => (),
+                if let MapElement::Breakable(_) = self.content[y as usize * self.width + x as usize]
+                {
+                    self.content[y as usize * self.width + x as usize] = MapElement::Empty
                 }
             }
         }
@@ -286,7 +272,7 @@ impl Map {
         }
         self.content[y * self.width + x] = elem;
         // TODO: update object
-        return Ok(());
+        Ok(())
     }
 
     pub fn set_elem_pos(&mut self, pos: Vec2, elem: MapElement) -> Result<(), ()> {

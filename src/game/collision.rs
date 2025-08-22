@@ -24,8 +24,8 @@ pub trait Collision {
     }
 
     fn is_colliding_with(&self, pos: Vec2, radius: f32) -> bool {
-        return ((self.get_pos().x - pos.x).abs() < (self.get_size() + radius))
-            && ((self.get_pos().y - pos.y).abs() < (self.get_size() + radius));
+        ((self.get_pos().x - pos.x).abs() < (self.get_size() + radius))
+            && ((self.get_pos().y - pos.y).abs() < (self.get_size() + radius))
     }
 
     fn resolve_collision_with(&mut self, pos: Vec2, mut radius: f32, direction: Direction) {
@@ -63,12 +63,12 @@ pub trait Collision {
         if (x as usize >= map.width) || (y as usize >= map.height) {
             return true;
         }
-        return match map.get_elem(x as usize, y as usize) {
+        match map.get_elem(x as usize, y as usize) {
             MapElement::Empty => false,
             MapElement::SpawnPoint(_) => false,
             MapElement::Breakable(_) => true,
             MapElement::Unbreakable(_) => true,
-        };
+        }
     }
 
     fn collide_map(&mut self, map: &Map, direction: Direction) {

@@ -23,7 +23,7 @@ pub struct Player {
     pub position: Vec2,
     pub direction: Direction,
     pub alive: bool,
-    pub power_level: u32,
+    pub power_level: u8,
     pub speed_level: u8,
     pub speed: f32,
     pub bombs_remaining: u32,
@@ -36,11 +36,11 @@ impl Player {
     pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
         let dir_vec = direction.to_vec2();
         Player {
-            id: id,
-            position: position,
-            direction: direction,
+            id,
+            position,
+            direction,
             alive: true,
-            power_level: 1,
+            power_level: 2,
             speed_level: 1,
             speed: 1.5,
             bombs_remaining: 1,
@@ -82,16 +82,17 @@ impl Player {
         // check position doesn't have another player
         // check position isn't already bomb
         self.bombs_remaining -= 1;
-        return Some(Bomb::new(
+        Some(Bomb::new(
             self.id,
             self.position.x as usize,
             self.position.y as usize,
+            self.power_level,
             resources,
-        ));
+        ))
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &Vec<Bomb>) {
-        let mut motion = input.to_vec2() * delta * self.speed * self.speed_level as f32;
+        let mut motion = input.as_vec2() * delta * self.speed * self.speed_level as f32;
         // TODO: add logic for speed
 
         let mut dist: f32;
@@ -134,7 +135,7 @@ impl Player {
             None => (),
             Some(obj) => {
                 obj.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
-                let (x, y) = input.to_vec2().into();
+                let (x, y) = input.as_vec2().into();
                 if x != 0.0 || y != 0.0 {
                     obj.transform.rotation.y = x.atan2(y);
                 }

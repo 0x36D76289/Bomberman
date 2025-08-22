@@ -148,7 +148,7 @@ impl Camera {
             }
 
             self.transform.rotation.x = self.transform.rotation.x.clamp(-1.5, 1.5);
-            self.transform.rotation.y = self.transform.rotation.y % (2.0 * std::f32::consts::PI);
+            self.transform.rotation.y %= 2.0 * std::f32::consts::PI;
         } else {
             // if bomb is not pressed, move the camera position
             let yaw = self.transform.rotation.y;

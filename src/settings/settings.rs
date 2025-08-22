@@ -49,8 +49,8 @@ impl Settings {
         let settings_file = OpenOptions::new()
             .read(true)
             .write(true)
-            .truncate(false)
             .create(true)
+            .truncate(true)
             .open(SETTINGS_PATH);
         if settings_file.is_err() {
             println!("save: failed to open {}", SETTINGS_PATH);
@@ -65,16 +65,11 @@ impl Settings {
     }
 
     pub fn load_settings() -> Self {
-        let settings_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .create(true)
-            .open(SETTINGS_PATH);
+        let settings_file = OpenOptions::new().read(true).open(SETTINGS_PATH);
 
         if settings_file.is_err() {
             println!(
-                "couldn't read or create file \"{}\", loading default settings",
+                "couldn't read file \"{}\", loading default settings",
                 SETTINGS_PATH
             );
             return Self::default();
