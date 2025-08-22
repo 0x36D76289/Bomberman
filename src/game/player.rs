@@ -24,6 +24,7 @@ pub struct Player {
     pub direction: Direction,
     pub alive: bool,
     pub power_level: u32,
+    pub speed_level: u8,
     pub speed: f32,
     pub bombs_remaining: u32,
     pub is_human: bool,
@@ -40,6 +41,7 @@ impl Player {
             direction: direction,
             alive: true,
             power_level: 1,
+            speed_level: 1,
             speed: 1.5,
             bombs_remaining: 1,
             is_human: true,
@@ -89,7 +91,8 @@ impl Player {
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &Vec<Bomb>) {
-        let mut motion = input.to_vec2() * delta * self.speed;
+        let mut motion = input.to_vec2() * delta * self.speed * self.speed_level as f32;
+        // TODO: add logic for speed
 
         let mut dist: f32;
         while motion.x != 0.0 || motion.y != 0.0 {

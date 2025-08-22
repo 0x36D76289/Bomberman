@@ -49,6 +49,7 @@ impl Settings {
         let settings_file = OpenOptions::new()
             .read(true)
             .write(true)
+            .truncate(false)
             .create(true)
             .open(SETTINGS_PATH);
         if settings_file.is_err() {
@@ -67,6 +68,7 @@ impl Settings {
         let settings_file = OpenOptions::new()
             .read(true)
             .write(true)
+            .truncate(false)
             .create(true)
             .open(SETTINGS_PATH);
 
@@ -85,6 +87,6 @@ impl Settings {
             default.save();
             return default;
         }
-        return load.unwrap();
+        load.unwrap()
     }
 }
