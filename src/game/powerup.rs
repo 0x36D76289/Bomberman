@@ -1,8 +1,12 @@
-use glam::{USizeVec2, Vec3, usize};
+use glam::{usize, USizeVec2, Vec2, Vec3};
 use rand::random_range;
 
 use crate::{
-    game::resources::{ResourceName, Resources},
+    game::{
+        collision::Collision,
+        player::Player,
+        resources::{ResourceName, Resources},
+    },
     graphics::{
         object::{Object, TextureIndex},
         transform::Transform,
@@ -17,11 +21,44 @@ pub enum PowerUpType {
     Slide,
 }
 
+impl PowerUpType {
+    fn apply(&self) -> impl Fn(&mut Player) -> () {
+        return match self {
+            PowerUpType::Speed => |p: &mut Player| p.speed_level += 1,
+            PowerUpType::Power => |p: &mut Player| p.power_level += 1,
+            PowerUpType::Bomb => |p: &mut Player| p.bombs_remaining += 1,
+            PowerUpType::Slide => |p: &mut Player| p.can_kick_bomb = true,
+        };
+    }
+}
+
 #[derive(Debug)]
 pub struct PowerUp {
     pub power_up_type: PowerUpType,
     pub object: Object,
     pub pos: USizeVec2,
+    pub despawn: bool,
+}
+
+impl PowerUp {
+    pub fn get_size(&self) -> f32 {
+        0.4
+    }
+
+    pub fn tick(&mut self, players: &mut Vec<Player>) {
+        for player in players {
+            if player.is_colliding_with(
+                Vec2 {
+                    x: self.pos.x as f32 + 0.5,
+                    y: self.pos.y as f32 + 0.5,
+                },
+                self.get_size(),
+            ) {
+                self.power_up_type.apply()(player);
+                self.despawn = true;
+            }
+        }
+    }
 }
 
 impl PowerUp {
@@ -66,6 +103,7 @@ impl PowerUp {
                 color: Vec3::ONE,
             },
             pos: USizeVec2 { x, y },
+            despawn: false,
         }
     }
 }

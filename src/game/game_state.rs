@@ -1,5 +1,4 @@
 use crate::app_state::{AppState, KeyMap};
-use crate::game::Camera;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::map::map::Map;
 use crate::game::map::map_element::MapElement;
@@ -7,12 +6,13 @@ use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::resources::Resources;
+use crate::game::Camera;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, Graphics, LightInfo, Push, Renderer, Vulkan};
 use crate::input::input::{GetOrDefault, Input};
 use crate::input::input_state::InputState;
-use glam::{Vec2, Vec3, Vec4, bool};
+use glam::{bool, Vec2, Vec3, Vec4};
 use rand::random_range;
 use std::error::Error;
 use std::sync::Arc;
@@ -178,6 +178,11 @@ impl GameState {
             self.bombs[i].clone().chain_react(&mut self.bombs);
         }
         self.bombs.retain(|bomb| bomb.despawn == false);
+        //tick powerups
+        for powerup in &mut self.power_ups {
+            powerup.tick(&mut self.players);
+        }
+        self.power_ups.retain(|powerup| powerup.despawn == false);
         // for player in players: summon bomb if Pressed
         for (i, player) in self.players.iter_mut().enumerate() {
             if !player.alive {
@@ -190,6 +195,7 @@ impl GameState {
                 }
             }
         }
+        // player movement
         for (i, player) in self.players.iter_mut().enumerate() {
             player.player_move(inputs.get_or_default(i), delta, &self.map, &self.bombs);
         }

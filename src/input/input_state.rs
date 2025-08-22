@@ -7,9 +7,6 @@ pub enum InputState {
 
 impl InputState {
     pub fn is_down(&self) -> bool {
-        return match self {
-            InputState::Released => false,
-            _ => true,
-        };
+        !matches!(self, InputState::Released)
     }
 }
