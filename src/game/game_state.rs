@@ -55,7 +55,7 @@ impl GameState {
                             y: y as f32 + 0.5,
                         },
                         *dir,
-                        resources
+                        resources,
                     ));
 
                     id += 1;
@@ -275,10 +275,10 @@ impl GameState {
     // Put the inputs read into game inputs
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
-            self.game_inputs[i] = *input;
+            self.game_inputs[i] = input.clone();
         }
     }
-    
+
     pub fn render(&self, vulkan: &Vulkan, renderer: &Renderer) -> Arc<SecondaryAutoCommandBuffer> {
         let pipeline = match renderer.world_pipeline.as_ref() {
             Some(pipeline) => pipeline.clone(),
@@ -385,5 +385,13 @@ impl GameState {
         }
 
         secondary_builder.build().unwrap()
+    }
+
+    pub fn get_player(&self, id: u32) -> Option<&Player> {
+        self.players.get(id as usize)
+    }
+
+    pub fn get_map(&self) -> &Map {
+        &self.map
     }
 }
