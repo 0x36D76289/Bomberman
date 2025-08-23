@@ -13,6 +13,7 @@ pub use {
     light::LightInfo,
     model::Model,
     renderer::{Renderer, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
+    text::TextRenderer,
     texture::load_texture,
 };
 

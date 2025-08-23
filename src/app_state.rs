@@ -40,7 +40,7 @@ impl AppState {
     ) -> (Option<AppState>, u8) {
         match self {
             AppState::Game(game_state) => game_state.tick(delta, inputs, keys, resources),
-            AppState::Ui(_) => (None, 0),
+            AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources),
         }
     }
 

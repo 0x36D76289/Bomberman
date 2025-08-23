@@ -5,10 +5,7 @@ use crate::{
         map::map::Map,
         resources::{ResourceName, Resources},
     },
-    graphics::{
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    graphics::{object::Object, transform::Transform},
     input::input::Input,
 };
 
@@ -48,8 +45,8 @@ impl Player {
             is_human: true,
             can_kick_bomb: false,
             object: Some(Object {
-                model: resources.models[ResourceName::Player as usize].clone(),
-                texture: Some(ResourceName::Player as TextureIndex),
+                model: resources.models[&ResourceName::Player].clone(),
+                texture: Some(resources.textures_index[&ResourceName::Player]),
                 color: Vec3::ONE,
                 transform: Transform {
                     translation: Vec3::new(position.x, 0.0, position.y),

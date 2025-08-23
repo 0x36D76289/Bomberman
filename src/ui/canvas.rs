@@ -15,8 +15,10 @@ pub struct Canvas {
     pub width: f32,
     pub height: f32,
     pub color: Vec4,
-    pub text: Option<String>,
     pub texture: Option<TextureIndex>,
+    pub text: Option<String>,
+    pub text_color: Option<Vec4>,
+    pub text_size: Option<f32>,
 }
 
 impl Canvas {
@@ -70,9 +72,15 @@ impl Canvas {
     }
 
     pub fn push_constant(&self) -> GuiPush {
-        GuiPush {
-            color: self.color.into(),
-            tex_index: self.texture.unwrap_or(-1),
+        match self.texture {
+            Some(index) => GuiPush {
+                color: Vec4::ONE.into(),
+                tex_index: index,
+            },
+            None => GuiPush {
+                color: self.color.into(),
+                tex_index: -1,
+            },
         }
     }
 }
