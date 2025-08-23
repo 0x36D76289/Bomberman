@@ -61,7 +61,7 @@ impl App {
     fn update_state(&mut self) {
         self.update_inputs();
 
-        let app_state = self.state_stack.first_mut().unwrap();
+        let app_state = self.state_stack.last_mut().unwrap();
         let renderer = &self.graphics.renderer;
 
         let res = app_state.tick(

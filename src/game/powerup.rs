@@ -7,10 +7,7 @@ use crate::{
         player::Player,
         resources::{ResourceName, Resources},
     },
-    graphics::{
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    graphics::{object::Object, transform::Transform},
 };
 
 #[derive(Debug, Clone)]
@@ -66,23 +63,23 @@ impl PowerUp {
         let (power_up_type, model, texture) = match random_range(0..=3) {
             0 => (
                 PowerUpType::Speed,
-                resources.models[ResourceName::PowerSpeed as usize].clone(),
-                ResourceName::PowerSpeed as TextureIndex,
+                resources.models[&ResourceName::PowerSpeed].clone(),
+                resources.textures_index[&ResourceName::PowerSpeed],
             ),
             1 => (
                 PowerUpType::Power,
-                resources.models[ResourceName::PowerPower as usize].clone(),
-                ResourceName::PowerPower as TextureIndex,
+                resources.models[&ResourceName::PowerPower].clone(),
+                resources.textures_index[&ResourceName::PowerPower],
             ),
             2 => (
                 PowerUpType::Bomb,
-                resources.models[ResourceName::PowerBomb as usize].clone(),
-                ResourceName::PowerBomb as TextureIndex,
+                resources.models[&ResourceName::PowerBomb].clone(),
+                resources.textures_index[&ResourceName::PowerBomb],
             ),
             _ => (
                 PowerUpType::Slide,
-                resources.models[ResourceName::PowerSlide as usize].clone(),
-                ResourceName::PowerSlide as TextureIndex,
+                resources.models[&ResourceName::PowerSlide].clone(),
+                resources.textures_index[&ResourceName::PowerSlide],
             ),
         };
 

@@ -1,12 +1,14 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBufferAbstract},
     image::view::ImageView,
+    memory::allocator::StandardMemoryAllocator,
 };
 
-use crate::graphics::{Model, Vulkan, load_texture};
+use crate::graphics::{Model, Vulkan, load_texture, object::TextureIndex};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceName {
     Breakable,
     Unbreakable,
@@ -18,24 +20,114 @@ pub enum ResourceName {
     PowerPower,
     PowerBomb,
     PowerSlide,
+    FontAtlas,
 }
-
-const RESOURCE_NAME_SIZE: usize = ResourceName::PowerSlide as usize + 1;
 
 #[derive(Debug, Clone)]
 pub struct Resources {
-    pub textures: [Arc<ImageView>; RESOURCE_NAME_SIZE],
-    pub models: [Arc<Model>; RESOURCE_NAME_SIZE],
+    pub textures: Vec<Arc<ImageView>>,
+    pub textures_index: HashMap<ResourceName, TextureIndex>,
+    pub models: HashMap<ResourceName, Arc<Model>>,
 }
 
 impl Resources {
     pub fn load_resources(vulkan: &Vulkan) -> Self {
-        let memory_allocator = vulkan.memory_allocator.clone();
-
-        let mut textures = vec![None; RESOURCE_NAME_SIZE];
-        let mut models = vec![None; RESOURCE_NAME_SIZE];
+        let mut textures: HashMap<ResourceName, &[u8]> = HashMap::new();
+        let mut models: HashMap<ResourceName, &[u8]> = HashMap::new();
 
         // load the textures
+        textures.insert(
+            ResourceName::Player,
+            include_bytes!("../assets/WhiteBomberMan.png"),
+        );
+        textures.insert(
+            ResourceName::Breakable,
+            include_bytes!("../assets/025-noteblock.png"),
+        );
+        textures.insert(
+            ResourceName::Unbreakable,
+            include_bytes!("../assets/001-durable_wall.png"),
+        );
+        textures.insert(
+            ResourceName::Wall,
+            include_bytes!("../assets/001-durable_wall.png"),
+        );
+        textures.insert(
+            ResourceName::Floor,
+            include_bytes!("../assets/000-floor.png"),
+        );
+        textures.insert(ResourceName::Bomb, include_bytes!("../assets/miku.png"));
+        textures.insert(
+            ResourceName::PowerSpeed,
+            include_bytes!("../assets/simple.png"),
+        );
+        textures.insert(
+            ResourceName::PowerPower,
+            include_bytes!("../assets/WhiteBomberMan.png"),
+        );
+        textures.insert(
+            ResourceName::PowerBomb,
+            include_bytes!("../assets/textureStone.png"),
+        );
+        textures.insert(
+            ResourceName::PowerSlide,
+            include_bytes!("../assets/denji.png"),
+        );
+        textures.insert(
+            ResourceName::FontAtlas,
+            include_bytes!("../assets/font_atlas.png"),
+        );
+
+        // load the models
+        models.insert(
+            ResourceName::Player,
+            include_bytes!("../assets/bomberman.obj"),
+        );
+        models.insert(
+            ResourceName::Breakable,
+            include_bytes!("../assets/cube.obj"),
+        );
+        models.insert(
+            ResourceName::Unbreakable,
+            include_bytes!("../assets/cube.obj"),
+        );
+        models.insert(ResourceName::Wall, include_bytes!("../assets/cube.obj"));
+        models.insert(ResourceName::Floor, include_bytes!("../assets/quad.obj"));
+        models.insert(ResourceName::Bomb, include_bytes!("../assets/bomb.obj"));
+        models.insert(
+            ResourceName::PowerSpeed,
+            include_bytes!("../assets/quad.obj"),
+        );
+        models.insert(
+            ResourceName::PowerPower,
+            include_bytes!("../assets/quad.obj"),
+        );
+        models.insert(
+            ResourceName::PowerBomb,
+            include_bytes!("../assets/quad.obj"),
+        );
+        models.insert(
+            ResourceName::PowerSlide,
+            include_bytes!("../assets/quad.obj"),
+        );
+
+        let (textures, textures_index) = Resources::load_textures(textures, vulkan);
+        let models = Resources::load_models(models, vulkan.memory_allocator.clone());
+
+        Self {
+            textures,
+            textures_index,
+            models,
+        }
+    }
+
+    fn load_textures(
+        textures: HashMap<ResourceName, &[u8]>,
+        vulkan: &Vulkan,
+    ) -> (Vec<Arc<ImageView>>, HashMap<ResourceName, TextureIndex>) {
+        let mut texture_array: Vec<Arc<ImageView>> = Vec::new();
+        let mut texture_indexes: HashMap<ResourceName, TextureIndex> = HashMap::new();
+
         let mut command_buffer = AutoCommandBufferBuilder::primary(
             vulkan.command_buffer_allocator.clone(),
             vulkan.queue.queue_family_index(),
@@ -43,124 +135,37 @@ impl Resources {
         )
         .unwrap();
 
-        textures[ResourceName::Player as usize] = Some(load_texture(
-            include_bytes!("../assets/WhiteBomberMan.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::Breakable as usize] = Some(load_texture(
-            include_bytes!("../assets/025-noteblock.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::Unbreakable as usize] = Some(load_texture(
-            include_bytes!("../assets/001-durable_wall.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::Wall as usize] = Some(load_texture(
-            include_bytes!("../assets/001-durable_wall.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::Floor as usize] = Some(load_texture(
-            include_bytes!("../assets/000-floor.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::Bomb as usize] = Some(load_texture(
-            include_bytes!("../assets/miku.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::PowerSpeed as usize] = Some(load_texture(
-            include_bytes!("../assets/simple.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::PowerPower as usize] = Some(load_texture(
-            include_bytes!("../assets/WhiteBomberMan.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::PowerBomb as usize] = Some(load_texture(
-            include_bytes!("../assets/textureStone.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
-        textures[ResourceName::PowerSlide as usize] = Some(load_texture(
-            include_bytes!("../assets/denji.png"),
-            &mut command_buffer,
-            memory_allocator.clone(),
-        ));
+        for texture in textures {
+            texture_array.push(load_texture(
+                texture.1,
+                &mut command_buffer,
+                vulkan.memory_allocator.clone(),
+            ));
+            texture_indexes.insert(texture.0, (texture_array.len() - 1) as TextureIndex);
+        }
+
         let _ = command_buffer
             .build()
             .unwrap()
             .execute(vulkan.queue.clone())
             .unwrap();
 
-        // load the models
-        models[ResourceName::Player as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/bomberman.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
-        models[ResourceName::Breakable as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/cube.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
-        models[ResourceName::Unbreakable as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/cube.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
-        models[ResourceName::Wall as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/cube.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
-        models[ResourceName::Floor as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/quad.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
-        models[ResourceName::Bomb as usize] = Some(
-            Model::load(
-                include_bytes!("../assets/bomb.obj"),
-                memory_allocator.clone(),
-            )
-            .unwrap(),
-        );
+        (texture_array, texture_indexes)
+    }
 
-        let power_model = Model::load(
-            include_bytes!("../assets/quad.obj"),
-            memory_allocator.clone(),
-        )
-        .unwrap();
-        models[ResourceName::PowerSpeed as usize] = Some(power_model.clone());
-        models[ResourceName::PowerPower as usize] = Some(power_model.clone());
-        models[ResourceName::PowerBomb as usize] = Some(power_model.clone());
-        models[ResourceName::PowerSlide as usize] = Some(power_model.clone());
+    fn load_models(
+        models: HashMap<ResourceName, &[u8]>,
+        memory_allocator: Arc<StandardMemoryAllocator>,
+    ) -> HashMap<ResourceName, Arc<Model>> {
+        let mut model_map: HashMap<ResourceName, Arc<Model>> = HashMap::new();
 
-        // println!("{:?}", textures);
-
-        let models: Vec<Arc<Model>> = models.into_iter().flatten().collect();
-        let textures: Vec<Arc<ImageView>> = textures.into_iter().flatten().collect();
-
-        Self {
-            models: models.try_into().unwrap(),
-            textures: textures.try_into().unwrap(),
+        for model in models {
+            model_map.insert(
+                model.0,
+                Model::load(model.1, memory_allocator.clone()).unwrap(),
+            );
         }
+
+        model_map
     }
 }

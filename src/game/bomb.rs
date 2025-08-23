@@ -12,10 +12,7 @@ use crate::{
         powerup::PowerUp,
         resources::{ResourceName, Resources},
     },
-    graphics::{
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    graphics::{object::Object, transform::Transform},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -74,8 +71,8 @@ impl Bomb {
 
     fn create_object(x: usize, y: usize, resources: &Resources) -> Object {
         Object {
-            model: resources.models[ResourceName::Bomb as usize].clone(),
-            texture: Some(ResourceName::Bomb as TextureIndex),
+            model: resources.models[&ResourceName::Bomb].clone(),
+            texture: Some(resources.textures_index[&ResourceName::Bomb]),
             color: Vec3::ONE,
             transform: Transform {
                 translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),

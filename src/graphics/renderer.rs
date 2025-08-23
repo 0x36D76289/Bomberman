@@ -1,7 +1,7 @@
 use crate::{
     app_state::AppState,
     game::resources::Resources,
-    graphics::{GameVertex, GuiVertex, TimeInfo, Vulkan},
+    graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
 };
 use std::{sync::Arc, time::Instant};
 use vulkano::{
@@ -45,6 +45,7 @@ pub struct Renderer {
     rcx: Option<RenderContext>,
     pub game_pipeline: Option<Arc<GraphicsPipeline>>,
     pub gui_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub text_renderer: TextRenderer,
     pub sampler: Arc<Sampler>,
 }
 
@@ -60,6 +61,8 @@ pub struct RenderContext {
 
 impl Renderer {
     pub fn new(vulkan: &Vulkan) -> Self {
+        let text_renderer = TextRenderer::new();
+
         let sampler = Sampler::new(
             vulkan.device.clone(),
             SamplerCreateInfo {
@@ -76,6 +79,7 @@ impl Renderer {
             rcx: None,
             game_pipeline: None,
             gui_pipeline: None,
+            text_renderer,
             sampler,
         }
     }

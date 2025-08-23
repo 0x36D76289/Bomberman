@@ -14,7 +14,7 @@ layout(set = 0, binding = 1) uniform texture2D tex[];
 
 void main() {
     if (push.tex_index >= 0) {
-        f_color = texture(nonuniformEXT(sampler2D(tex[push.tex_index], s)), in_uv);
+        f_color = texture(nonuniformEXT(sampler2D(tex[push.tex_index], s)), in_uv) * push.color;
     } else {
         f_color = push.color;
     }
