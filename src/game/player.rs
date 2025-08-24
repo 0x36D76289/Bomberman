@@ -42,7 +42,7 @@ impl Player {
             speed_level: 1,
             speed: 1.5,
             bombs_remaining: 1,
-            is_human: true,
+            is_human: id > 1,
             can_kick_bomb: false,
             object: Some(Object {
                 model: resources.models[&ResourceName::Player].clone(),
