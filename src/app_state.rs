@@ -4,7 +4,7 @@ use vulkano::command_buffer::SecondaryAutoCommandBuffer;
 use winit::{event::ElementState, keyboard::PhysicalKey};
 
 use crate::{
-    game::game_state::GameState,
+    game::{game_state::GameState, resources::Resources},
     graphics::{Renderer, Vulkan},
     input::input::Input,
     ui::UiState,
@@ -12,16 +12,22 @@ use crate::{
 
 pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 
+#[derive(Debug, Clone)]
 pub enum AppState {
     Game(GameState),
     Ui(UiState),
 }
 
 impl AppState {
-    pub fn render(&self, renderer: &Renderer, vulkan: &Vulkan) -> Arc<SecondaryAutoCommandBuffer> {
+    pub fn render(
+        &self,
+        renderer: &Renderer,
+        vulkan: &Vulkan,
+        resources: &Resources,
+    ) -> Arc<SecondaryAutoCommandBuffer> {
         match self {
-            AppState::Game(game_state) => game_state.render(vulkan, renderer),
-            AppState::Ui(_) => !todo!("implement ui render system"),
+            AppState::Game(game_state) => game_state.render(vulkan, renderer, resources),
+            AppState::Ui(ui_state) => ui_state.render(vulkan, renderer, resources),
         }
     }
 
@@ -30,11 +36,11 @@ impl AppState {
         delta: f32,
         inputs: &Vec<Input>,
         keys: &KeyMap,
-        window_size: (u32, u32),
+        resources: &Resources,
     ) -> (Option<AppState>, u8) {
         match self {
-            AppState::Game(game_state) => game_state.tick(delta, inputs, keys, window_size),
-            AppState::Ui(_) => (None, 0),
+            AppState::Game(game_state) => game_state.tick(delta, inputs, keys, resources),
+            AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources),
         }
     }
 

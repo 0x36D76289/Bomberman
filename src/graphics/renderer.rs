@@ -1,14 +1,14 @@
 use crate::{
     app_state::AppState,
-    graphics::{MyVertex, TimeInfo, Vulkan},
+    game::resources::Resources,
+    graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
 };
-use egui_winit_vulkano::{Gui, GuiConfig};
 use std::{sync::Arc, time::Instant};
 use vulkano::{
     Validated, VulkanError,
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, RenderingAttachmentInfo, RenderingInfo,
-        SubpassContents,
+        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
+        RenderingAttachmentInfo, RenderingInfo, SubpassContents,
     },
     descriptor_set::layout::DescriptorBindingFlags,
     format::{ClearValue, Format},
@@ -22,7 +22,7 @@ use vulkano::{
         DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
             GraphicsPipelineCreateInfo,
-            color_blend::{ColorBlendAttachmentState, ColorBlendState},
+            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState},
             depth_stencil::{DepthState, DepthStencilState},
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
@@ -39,18 +39,18 @@ use vulkano::{
     },
     sync::{self, GpuFuture},
 };
-use winit::{event::WindowEvent, event_loop::ActiveEventLoop, window::Window};
+use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub struct Renderer {
     rcx: Option<RenderContext>,
-    pub world_pipeline: Option<Arc<GraphicsPipeline>>,
-    pub gui: Option<Gui>,
+    pub game_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub gui_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub text_renderer: TextRenderer,
     pub sampler: Arc<Sampler>,
 }
 
 pub struct RenderContext {
     pub window: Arc<Window>,
-    pub surface: Arc<Surface>,
     pub swapchain: Arc<Swapchain>,
     pub images: Vec<Arc<ImageView>>,
     pub depth_image: Arc<ImageView>,
@@ -61,6 +61,8 @@ pub struct RenderContext {
 
 impl Renderer {
     pub fn new(vulkan: &Vulkan) -> Self {
+        let text_renderer = TextRenderer::new();
+
         let sampler = Sampler::new(
             vulkan.device.clone(),
             SamplerCreateInfo {
@@ -75,8 +77,9 @@ impl Renderer {
 
         Self {
             rcx: None,
-            world_pipeline: None,
-            gui: None,
+            game_pipeline: None,
+            gui_pipeline: None,
+            text_renderer,
             sampler,
         }
     }
@@ -170,7 +173,6 @@ impl Renderer {
 
         self.rcx = Some(RenderContext {
             window,
-            surface,
             swapchain,
             images,
             depth_image,
@@ -180,17 +182,17 @@ impl Renderer {
         })
     }
 
-    pub fn create_world_pipeline(&mut self, vulkan: &Vulkan) {
-        let vertex_shader = vs::load(vulkan.device.clone())
+    pub fn create_game_pipeline(&mut self, vulkan: &Vulkan) {
+        let vertex_shader = game_vs::load(vulkan.device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
-        let fragment_shader = fs::load(vulkan.device.clone())
+        let fragment_shader = game_fs::load(vulkan.device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
 
-        let vertex_input_state = MyVertex::per_vertex().definition(&vertex_shader).unwrap();
+        let vertex_input_state = GameVertex::per_vertex().definition(&vertex_shader).unwrap();
         let stages = [
             PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
             PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
@@ -223,7 +225,7 @@ impl Renderer {
             ..Default::default()
         };
 
-        self.world_pipeline = Some(
+        self.game_pipeline = Some(
             GraphicsPipeline::new(
                 vulkan.device.clone(),
                 None,
@@ -251,20 +253,73 @@ impl Renderer {
         );
     }
 
-    pub fn create_gui(&mut self, event_loop: &ActiveEventLoop, vulkan: &Vulkan) {
-        let rcx = self.rcx();
+    pub fn create_gui_pipeline(&mut self, vulkan: &Vulkan) {
+        let vertex_shader = gui_vs::load(vulkan.device.clone())
+            .unwrap()
+            .entry_point("main")
+            .unwrap();
+        let fragment_shader = gui_fs::load(vulkan.device.clone())
+            .unwrap()
+            .entry_point("main")
+            .unwrap();
 
-        self.gui = Some(Gui::new(
-            event_loop,
-            rcx.surface.clone(),
-            vulkan.queue.clone(),
-            rcx.swapchain.image_format(),
-            GuiConfig::default(),
-        ))
-    }
+        let vertex_input_state = GuiVertex::per_vertex().definition(&vertex_shader).unwrap();
+        let stages = [
+            PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
+            PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
+        ];
+        let layout = {
+            let mut layout_create_info =
+                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
 
-    pub fn update_gui_event(&mut self, event: &WindowEvent) -> bool {
-        self.gui.as_mut().unwrap().update(event)
+            let binding = layout_create_info.set_layouts[0]
+                .bindings
+                .get_mut(&1)
+                .unwrap();
+            binding.binding_flags |= DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT;
+            binding.descriptor_count = 100;
+
+            PipelineLayout::new(
+                vulkan.device.clone(),
+                layout_create_info
+                    .into_pipeline_layout_create_info(vulkan.device.clone())
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+
+        let format = self.rcx().swapchain.image_format();
+
+        let pipeline_rendering_info = PipelineRenderingCreateInfo {
+            color_attachment_formats: vec![Some(format)],
+            ..Default::default()
+        };
+
+        self.gui_pipeline = Some(
+            GraphicsPipeline::new(
+                vulkan.device.clone(),
+                None,
+                GraphicsPipelineCreateInfo {
+                    stages: stages.into_iter().collect(),
+                    vertex_input_state: Some(vertex_input_state),
+                    viewport_state: Some(Default::default()),
+                    color_blend_state: Some(ColorBlendState::with_attachment_states(
+                        1,
+                        ColorBlendAttachmentState {
+                            blend: Some(AttachmentBlend::alpha()),
+                            ..Default::default()
+                        },
+                    )),
+                    input_assembly_state: Some(InputAssemblyState::default()),
+                    rasterization_state: Some(RasterizationState::default()),
+                    multisample_state: Some(MultisampleState::default()),
+                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
+                    subpass: Some(PipelineSubpassType::BeginRendering(pipeline_rendering_info)),
+                    ..GraphicsPipelineCreateInfo::layout(layout)
+                },
+            )
+            .unwrap(),
+        );
     }
 
     pub fn rcx(&self) -> &RenderContext {
@@ -288,7 +343,55 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
-    pub fn render(&mut self, vulkan: &Vulkan, states: &[AppState]) {
+    pub fn render_state(
+        &self,
+        vulkan: &Vulkan,
+        primary_cb: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+        state: &AppState,
+        image_index: u32,
+        resources: &Resources,
+        is_first: bool,
+    ) {
+        let rcx = self.rcx.as_ref().unwrap();
+
+        let mut color_attachment =
+            RenderingAttachmentInfo::image_view(rcx.images[image_index as usize].clone());
+        color_attachment.store_op = AttachmentStoreOp::Store;
+        color_attachment.load_op = AttachmentLoadOp::Load;
+        if is_first {
+            color_attachment.load_op = AttachmentLoadOp::Clear;
+            color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
+        }
+
+        let depth_attachment = match state {
+            AppState::Game(_) => {
+                let mut depth_attachment =
+                    RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
+                depth_attachment.load_op = AttachmentLoadOp::Clear;
+                depth_attachment.clear_value = Some(ClearValue::DepthStencil((1.0, 0)));
+                Some(depth_attachment)
+            }
+            AppState::Ui(_) => None,
+        };
+
+        let pass_info = RenderingInfo {
+            color_attachments: vec![Some(color_attachment)],
+            depth_attachment,
+            layer_count: 1,
+            contents: SubpassContents::SecondaryCommandBuffers,
+            ..Default::default()
+        };
+
+        primary_cb.begin_rendering(pass_info).unwrap();
+
+        let secondary_cb = state.render(self, vulkan, resources);
+
+        primary_cb.execute_commands(secondary_cb).unwrap();
+
+        primary_cb.end_rendering().unwrap();
+    }
+
+    pub fn render(&mut self, vulkan: &Vulkan, states: &[AppState], resources: &Resources) {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
@@ -349,40 +452,33 @@ impl Renderer {
         let mut primary_cb = AutoCommandBufferBuilder::primary(
             vulkan.command_buffer_allocator.clone(),
             vulkan.queue.queue_family_index(),
-            CommandBufferUsage::SimultaneousUse,
+            CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
 
-        let mut color_attachment =
-            RenderingAttachmentInfo::image_view(rcx.images[image_index as usize].clone());
-        color_attachment.load_op = AttachmentLoadOp::Clear;
-        color_attachment.store_op = AttachmentStoreOp::Store;
-        color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-
-        let mut depth_attachment = RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
-        depth_attachment.load_op = AttachmentLoadOp::Clear;
-        depth_attachment.clear_value = Some(ClearValue::DepthStencil((1.0, 0)));
-
-        let world_pass_info = RenderingInfo {
-            color_attachments: vec![Some(color_attachment)],
-            depth_attachment: Some(depth_attachment),
-            layer_count: 1,
-            contents: SubpassContents::SecondaryCommandBuffers,
-            ..Default::default()
-        };
-
-        primary_cb.begin_rendering(world_pass_info).unwrap();
-        // primary_cb.bind_pipeline_graphics(self.world_pipeline.clone()).unwrap();
-
-        //TODO: all states from last backwards until no transparency
-        let state = states.last().unwrap();
-        let secondary_cb = state.render(self, vulkan);
+        let states_to_skip = states.len()
+            - 1
+            - states
+                .iter()
+                .rev()
+                .take_while(|s| s.is_transparent())
+                .count();
+        let mut is_first = true;
+        for state in states.iter().skip(states_to_skip) {
+            self.render_state(
+                vulkan,
+                &mut primary_cb,
+                state,
+                image_index,
+                resources,
+                is_first,
+            );
+            if is_first {
+                is_first = false
+            }
+        }
 
         let rcx = self.rcx.as_mut().unwrap();
-
-        primary_cb.execute_commands(secondary_cb).unwrap();
-
-        primary_cb.end_rendering().unwrap();
 
         let command_buffer = primary_cb.build().unwrap();
         let future = rcx
@@ -436,16 +532,30 @@ impl Renderer {
     }
 }
 
-pub mod vs {
+pub mod game_vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         path: "src/shaders/game_object.vert"
     }
 }
 
-pub mod fs {
+pub mod game_fs {
     vulkano_shaders::shader! {
         ty: "fragment",
         path: "src/shaders/game_object.frag"
+    }
+}
+
+pub mod gui_vs {
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        path: "src/shaders/gui.vert"
+    }
+}
+
+pub mod gui_fs {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        path: "src/shaders/gui.frag"
     }
 }

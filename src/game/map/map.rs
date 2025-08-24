@@ -10,12 +10,10 @@ use crate::{
         },
         resources::{ResourceName, Resources},
     },
-    graphics::{
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    graphics::{object::Object, transform::Transform},
 };
 
+#[derive(Debug, Clone)]
 pub struct Map {
     pub width: usize,
     pub height: usize,
@@ -26,8 +24,8 @@ pub struct Map {
 impl Map {
     fn create_breakable(ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[ResourceName::Breakable as usize].clone(),
-            texture: Some(ResourceName::Breakable as TextureIndex),
+            model: ressources.models[&ResourceName::Breakable].clone(),
+            texture: Some(ressources.textures_index[&ResourceName::Breakable]),
             transform: Default::default(),
             color: Default::default(),
         }
@@ -35,8 +33,8 @@ impl Map {
 
     fn create_unbreakable(ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[ResourceName::Unbreakable as usize].clone(),
-            texture: Some(ResourceName::Unbreakable as TextureIndex),
+            model: ressources.models[&ResourceName::Unbreakable].clone(),
+            texture: Some(ressources.textures_index[&ResourceName::Unbreakable]),
             transform: Default::default(),
             color: Default::default(),
         }
@@ -70,8 +68,8 @@ impl Map {
 
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[ResourceName::Floor as usize].clone(),
-            texture: Some(ResourceName::Floor as TextureIndex),
+            model: ressources.models[&ResourceName::Floor].clone(),
+            texture: Some(ressources.textures_index[&ResourceName::Floor]),
             transform: Transform {
                 translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
                 scale: Vec3::new(width as f32, 1.0, height as f32),

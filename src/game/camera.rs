@@ -6,7 +6,6 @@ use glam::{Mat4, Vec3, Vec4};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Camera {
-    pub transform: Transform,
     pub projection_matrix: Mat4,
     pub view_matrix: Mat4,
     pub inverse_view_matrix: Mat4,
@@ -15,7 +14,6 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Self {
         Self {
-            transform: Default::default(),
             projection_matrix: Mat4::IDENTITY,
             view_matrix: Mat4::IDENTITY,
             inverse_view_matrix: Mat4::IDENTITY,
@@ -123,7 +121,7 @@ impl Camera {
     }
 
     #[allow(unused)]
-    pub fn keyboard_move(&mut self, input_state: &Input, delta: f32) {
+    pub fn keyboard_move(&mut self, input_state: &Input, camera: &mut Transform, delta: f32) {
         const MOVE_SPEED: f32 = 3.0;
         const LOOK_SPEED: f32 = 1.5;
 
@@ -144,14 +142,14 @@ impl Camera {
             }
 
             if rotate.dot(rotate) > f32::EPSILON {
-                self.transform.rotation += LOOK_SPEED * delta * rotate.normalize()
+                camera.rotation += LOOK_SPEED * delta * rotate.normalize()
             }
 
-            self.transform.rotation.x = self.transform.rotation.x.clamp(-1.5, 1.5);
-            self.transform.rotation.y %= 2.0 * std::f32::consts::PI;
+            camera.rotation.x = camera.rotation.x.clamp(-1.5, 1.5);
+            camera.rotation.y %= 2.0 * std::f32::consts::PI;
         } else {
             // if bomb is not pressed, move the camera position
-            let yaw = self.transform.rotation.y;
+            let yaw = camera.rotation.y;
             let up_dir = Vec3::new(0.0, -1.0, 0.0);
             let forward_dir = Vec3::new(yaw.sin(), 0.0, yaw.cos());
             let right_dir = Vec3::new(forward_dir.z, 0.0, -forward_dir.x);
@@ -182,7 +180,7 @@ impl Camera {
             }
 
             if move_dir.dot(move_dir) > f32::EPSILON {
-                self.transform.translation += MOVE_SPEED * delta * move_dir.normalize()
+                camera.translation += MOVE_SPEED * delta * move_dir.normalize()
             }
         }
     }
