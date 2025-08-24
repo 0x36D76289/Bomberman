@@ -5,10 +5,7 @@ use crate::{
         map::map::Map,
         resources::{ResourceName, Resources},
     },
-    graphics::{
-        object::{Object, TextureIndex},
-        transform::Transform,
-    },
+    graphics::{object::Object, transform::Transform},
     input::input::Input,
 };
 
@@ -18,6 +15,7 @@ use glam::{Vec2, Vec3};
 const PLAYER_RADIUS: f32 = 0.4;
 
 #[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct Player {
     pub id: u32,
     pub position: Vec2,
@@ -47,8 +45,8 @@ impl Player {
             is_human: id > 1,
             can_kick_bomb: false,
             object: Some(Object {
-                model: resources.models[ResourceName::Player as usize].clone(),
-                texture: Some(ResourceName::Player as TextureIndex),
+                model: resources.models[&ResourceName::Player].clone(),
+                texture: Some(resources.textures_index[&ResourceName::Player]),
                 color: Vec3::ONE,
                 transform: Transform {
                     translation: Vec3::new(position.x, 0.0, position.y),
