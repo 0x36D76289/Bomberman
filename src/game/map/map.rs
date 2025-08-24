@@ -220,6 +220,14 @@ impl Map {
         Some(self)
     }
 
+    /// Return neighbouring empty cells
+    pub fn get_neighbours(self, position: Vec2) -> Vec<Vec2> {
+        Direction::iterator()
+            .map(|dir| position + dir.to_vec2())
+            .filter(|neighbour_pos| self.get_elem_pos(*neighbour_pos) == &MapElement::Empty)
+            .collect()
+    }
+
     pub fn new(settings: MapSettings, ressources: &Resources) -> Option<Self> {
         let mut ret = Self::empty(settings.width, settings.height, ressources)
             .grid(ressources)

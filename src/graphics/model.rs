@@ -6,7 +6,7 @@ use vulkano::{
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Model {
     pub vertex_buffer: Subbuffer<[GameVertex]>,
     pub index_buffer: Subbuffer<[u32]>,

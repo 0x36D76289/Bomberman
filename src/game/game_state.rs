@@ -31,6 +31,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 #[derive(Debug, Clone)]
 pub struct GameState {
     players: Vec<Player>,
+    game_inputs: Vec<Input>,
     bombs: Vec<Bomb>,
     power_ups: Vec<PowerUp>,
     map: Map,
@@ -68,6 +69,7 @@ impl GameState {
         //HACK: this is not safe, map can fail creation
         let map = Map::new(MapSettings::default(), resources).unwrap();
         let players = Self::create_players(&map, resources);
+        let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
             translation: Vec3::new(map.width as f32 / 2.0, -27.5, -1.25),
@@ -83,6 +85,7 @@ impl GameState {
 
         Ok(Self {
             players,
+            game_inputs,
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -96,6 +99,7 @@ impl GameState {
         let players = Self::create_players(&map, resources);
         Self {
             players,
+            game_inputs: self.game_inputs.clone(),
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -148,7 +152,7 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn mp_game_tick(&mut self, delta: f32, inputs: &Vec<Input>, resources: &Resources) {
+    fn mp_game_tick(&mut self, delta: f32, resources: &Resources) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(
@@ -173,19 +177,26 @@ impl GameState {
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
         for (i, player) in self.players.iter_mut().enumerate() {
-            if player.alive
-                && inputs.get_or_default(i).bomb() == InputState::Pressed
-                && let Some(bomb) = player.create_bomb(resources)
-            {
-                self.bombs.push(bomb);
+            if !player.alive {
+                continue;
+            }
+            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed {
+                match player.create_bomb(&resources) {
+                    Some(bomb) => self.bombs.push(bomb),
+                    None => (),
+                }
             }
         }
-        // player movement
         for (i, player) in self.players.iter_mut().enumerate() {
-            player.player_move(inputs.get_or_default(i), delta, &self.map, &self.bombs);
+            player.player_move(
+                self.game_inputs.get_or_default(i),
+                delta,
+                &self.map,
+                &self.bombs,
+            );
         }
         // uncomment this and comment the previous line to control the camera
-        // self.camera.keyboard_move(&self.inputs[0], delta);
+        // self.camera.keyboard_move(&self.game_inputs[0], delta);
     }
 
     fn restart_inside(&mut self, keys: &KeyMap, resources: &Resources) {
@@ -226,7 +237,8 @@ impl GameState {
         // let state_func = match self.mode {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
-        self.mp_game_tick(delta_time, inputs, resources);
+        self.inputs_to_game_inputs(inputs);
+        self.mp_game_tick(delta_time, resources);
 
         #[cfg(debug_assertions)]
         if keys
@@ -239,6 +251,13 @@ impl GameState {
 
         //TODO: return new AppState if needed and number of elements to pop from appstate_stack
         (None, 0)
+    }
+
+    // Put the inputs read into game inputs
+    fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
+        for (i, input) in inputs.iter().enumerate() {
+            self.game_inputs[i] = input.clone();
+        }
     }
 
     pub fn render(
@@ -364,5 +383,13 @@ impl GameState {
         }
 
         secondary_builder.build().unwrap()
+    }
+
+    pub fn get_player(&self, id: u32) -> Option<&Player> {
+        self.players.get(id as usize)
+    }
+
+    pub fn get_map(&self) -> &Map {
+        &self.map
     }
 }
