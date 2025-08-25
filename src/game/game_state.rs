@@ -180,11 +180,10 @@ impl GameState {
             if !player.alive {
                 continue;
             }
-            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed {
-                match player.create_bomb(&resources) {
-                    Some(bomb) => self.bombs.push(bomb),
-                    None => (),
-                }
+            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
+                && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
+            {
+                self.bombs.push(bomb)
             }
         }
         for (i, player) in self.players.iter_mut().enumerate() {
@@ -192,7 +191,7 @@ impl GameState {
                 self.game_inputs.get_or_default(i),
                 delta,
                 &self.map,
-                &self.bombs,
+                &mut self.bombs,
             );
         }
         // uncomment this and comment the previous line to control the camera

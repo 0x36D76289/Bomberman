@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{Vec2, bool};
 
 use crate::game::{
     direction::Direction,
@@ -28,9 +28,9 @@ pub trait Collision {
             && ((self.get_pos().y - pos.y).abs() < (self.get_size() + radius))
     }
 
-    fn resolve_collision_with(&mut self, pos: Vec2, mut radius: f32, direction: Direction) {
+    fn resolve_collision_with(&mut self, pos: Vec2, mut radius: f32, direction: Direction) -> bool {
         if !self.is_colliding_with(pos, radius) {
-            return;
+            return false;
         }
         radius += PUSHBACK;
         match direction {
@@ -53,7 +53,8 @@ pub trait Collision {
                 x: pos.x - radius - self.get_size(),
                 y: self.get_pos().y,
             }),
-        }
+        };
+        true
     }
 
     fn does_map_collide(map: &Map, x: f32, y: f32) -> bool {
@@ -71,7 +72,9 @@ pub trait Collision {
         }
     }
 
-    fn collide_map(&mut self, map: &Map, direction: Direction) {
+    /// returns True if collision was found
+    fn collide_map(&mut self, map: &Map, direction: Direction) -> bool {
+        let mut ret = false;
         for y in -1..=1 {
             for x in -1..=1 {
                 if Self::does_map_collide(
@@ -79,16 +82,19 @@ pub trait Collision {
                     self.get_pos().x + x as f32,
                     self.get_pos().y + y as f32,
                 ) {
-                    self.resolve_collision_with(
+                    if self.resolve_collision_with(
                         Vec2 {
                             x: (self.get_pos().x + x as f32) as usize as f32 + 0.5,
                             y: (self.get_pos().y + y as f32) as usize as f32 + 0.5,
                         },
                         0.5,
                         direction,
-                    );
+                    ) {
+                        ret = true;
+                    }
                 }
             }
         }
+        ret
     }
 }
