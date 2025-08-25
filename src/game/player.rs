@@ -31,7 +31,13 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(id: u32, position: Vec2, direction: Direction, resources: &Resources) -> Self {
+    pub fn new(
+        id: u32,
+        position: Vec2,
+        direction: Direction,
+        resources: &Resources,
+        is_human: bool,
+    ) -> Self {
         let dir_vec = direction.to_vec2();
         Player {
             id,
@@ -42,7 +48,7 @@ impl Player {
             speed_level: 1,
             speed: 1.5,
             bombs_remaining: 1,
-            is_human: id > 1,
+            is_human,
             can_kick_bomb: false,
             object: Some(Object {
                 model: resources.models[&ResourceName::Player].clone(),
