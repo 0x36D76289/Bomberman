@@ -16,6 +16,7 @@ use crate::{
     },
 };
 
+#[derive(Clone)]
 pub struct Map {
     pub width: usize,
     pub height: usize,

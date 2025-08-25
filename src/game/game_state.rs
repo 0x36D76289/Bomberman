@@ -1,6 +1,7 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::game::Camera;
 use crate::game::bomb::{Bomb, BombState};
+use crate::game::game_settings::GameSettings;
 use crate::game::map::map::Map;
 use crate::game::map::map_element::MapElement;
 use crate::game::map::map_settings::MapSettings;
@@ -31,7 +32,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 pub struct GameState {
     players: Vec<Player>,
     game_inputs: Vec<Input>,
-
+    nb_humans: u32,
     bombs: Vec<Bomb>,
     power_ups: Vec<PowerUp>,
     pub resources: Resources,
@@ -41,7 +42,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    fn create_players(map: &Map, resources: &Resources) -> Vec<Player> {
+    fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
 
@@ -56,6 +57,7 @@ impl GameState {
                         },
                         *dir,
                         resources,
+                        id < *nb_humans,
                     ));
 
                     id += 1;
@@ -66,15 +68,20 @@ impl GameState {
     }
 
     //TODO: add get_input_player -> returns Released if p doesn't exist
-    pub fn default_state(graphics: &Graphics) -> Result<Self, Box<dyn Error>> {
+    pub fn default_state(
+        graphics: &Graphics,
+        settings: GameSettings,
+    ) -> Result<Self, Box<dyn Error>> {
         let resources = Resources::load_resources(
             graphics.vulkan.memory_allocator.clone(),
             graphics.vulkan.command_buffer_allocator.clone(),
             graphics.vulkan.queue.clone(),
         );
         //HACK: this is not safe, map can fail creation
-        let map = Map::new(MapSettings::default(), &resources).unwrap();
-        let players = Self::create_players(&map, &resources);
+        //LOIC: true
+        let map = Map::new(settings.map_settings, &resources).unwrap();
+        let nb_humans = settings.nb_humans;
+        let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
 
         let mut camera = Camera::new();
@@ -93,6 +100,7 @@ impl GameState {
         Ok(Self {
             players,
             game_inputs,
+            nb_humans,
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -104,10 +112,11 @@ impl GameState {
 
     fn recreate(&self) -> Self {
         let map = Map::new(MapSettings::default(), &self.resources).unwrap();
-        let players = Self::create_players(&map, &self.resources);
+        let players = Self::create_players(&map, &self.resources, &self.nb_humans);
         Self {
             players,
             game_inputs: self.game_inputs.clone(),
+            nb_humans: self.nb_humans,
             bombs: Vec::<Bomb>::new(),
             power_ups: Vec::<PowerUp>::new(),
             map,
@@ -236,7 +245,7 @@ impl GameState {
                 &self.resources,
             )
             .unwrap();
-            self.players = Self::create_players(&self.map, &self.resources);
+            self.players = Self::create_players(&self.map, &self.resources, &self.nb_humans);
             self.bombs = Vec::new();
         }
         *was_pressed = is_pressed;

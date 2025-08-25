@@ -1,5 +1,7 @@
 use crate::app_state::{AppState, KeyMap};
+use crate::game::game_settings::GameSettings;
 use crate::game::game_state::GameState;
+use crate::game::map::map_settings::MapSettings;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
@@ -26,9 +28,10 @@ impl App {
         let graphics = Graphics::new(event_loop)?;
 
         let keys = KeyMap::new();
-        let inputs = vec![Input::default(); settings.binds.len()];
-
-        let default_state = AppState::Game(GameState::default_state(&graphics)?);
+        let nb_human = settings.binds.len();
+        let inputs = vec![Input::default(); nb_human];
+        let game_settings = GameSettings::new(&settings, MapSettings::default())?;
+        let default_state = AppState::Game(GameState::default_state(&graphics, game_settings)?);
         let state_stack = vec![default_state];
 
         Ok(Self {
