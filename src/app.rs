@@ -1,7 +1,4 @@
 use crate::app_state::{AppState, KeyMap};
-use crate::game::game_settings::GameSettings;
-use crate::game::game_state::GameState;
-use crate::game::map::map_settings::MapSettings;
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
@@ -35,13 +32,9 @@ impl App {
         let keys = KeyMap::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        let default_game_state = AppState::Game(GameState::default_state(
-            &resources,
-            GameSettings::default()?,
-        )?);
-        let gui_state1 = AppState::Ui(UiState::default_state());
+        let gui_state1 = AppState::Ui(UiState::main_menu());
 
-        let state_stack = vec![default_game_state, gui_state1];
+        let state_stack = vec![gui_state1];
 
         Ok(Self {
             state_stack,
@@ -77,6 +70,7 @@ impl App {
         );
         for _ in 0..res.1 {
             self.state_stack.pop();
+            //TODO: if last state popped then handle application stop
         }
         if res.0.is_some() {
             self.state_stack.push(res.0.unwrap());

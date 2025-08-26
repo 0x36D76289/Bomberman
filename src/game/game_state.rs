@@ -7,13 +7,15 @@ use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::resources::Resources;
-use crate::game::{Camera, resources};
+use crate::game::Camera;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
-use crate::graphics::{GamePush, GlobalUbo, Graphics, LightInfo, Renderer, Vulkan};
-use crate::input::input::{GetOrDefault, Input};
+use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
+use crate::input::input::Input;
 use crate::input::input_state::InputState;
-use glam::{Vec2, Vec3, Vec4, bool};
+use crate::input::input_vec::GetOrDefault;
+use crate::ui::UiState;
+use glam::{bool, Vec2, Vec3, Vec4};
 use rand::random_range;
 use std::error::Error;
 use std::sync::Arc;
@@ -241,6 +243,15 @@ impl GameState {
         keys: &KeyMap,
         resources: &Resources,
     ) -> (Option<AppState>, u8) {
+        //Pause
+        if keys
+            .get(&PhysicalKey::Code(KeyCode::Escape))
+            .unwrap_or(&winit::event::ElementState::Released)
+            .is_pressed()
+        {
+            return (Some(AppState::Ui(UiState::pause())), 0);
+        }
+
         #[cfg(debug_assertions)]
         self.restart_inside(keys, resources);
 
