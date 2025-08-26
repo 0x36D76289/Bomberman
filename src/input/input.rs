@@ -34,20 +34,24 @@ impl Input {
         }
     }
 
+    pub fn get_state(&self, name: InputName) -> InputState {
+        self.states[name as usize]
+    }
+
     pub fn up(&self) -> InputState {
-        self.states[InputName::Up as usize]
+        self.get_state(InputName::Up)
     }
     pub fn down(&self) -> InputState {
-        self.states[InputName::Down as usize]
+        self.get_state(InputName::Down)
     }
     pub fn left(&self) -> InputState {
-        self.states[InputName::Left as usize]
+        self.get_state(InputName::Left)
     }
     pub fn right(&self) -> InputState {
-        self.states[InputName::Right as usize]
+        self.get_state(InputName::Right)
     }
     pub fn bomb(&self) -> InputState {
-        self.states[InputName::Bomb as usize]
+        self.get_state(InputName::Bomb)
     }
 
     /// Updates an individual input component
@@ -93,14 +97,5 @@ impl Input {
         for input in InputName::iterator() {
             self.update_input_keycode(map, codes[*input as usize], *input);
         }
-    }
-}
-pub trait GetOrDefault<T> {
-    fn get_or_default(&self, i: usize) -> T;
-}
-
-impl<T: Default + Clone> GetOrDefault<T> for Vec<T> {
-    fn get_or_default(&self, i: usize) -> T {
-        self.get(i).cloned().unwrap_or_default()
     }
 }
