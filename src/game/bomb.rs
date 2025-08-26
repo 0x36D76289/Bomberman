@@ -6,7 +6,7 @@ use rand::random_range;
 use super::collision::Collision;
 use crate::{
     game::{
-        direction::Direction,
+        direction::{self, Direction},
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         powerup::PowerUp,
@@ -48,8 +48,10 @@ const BOMB_TIMER_DEFAULT: f32 = 3.0;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
 const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
 const BOMB_RADIUS: f32 = 0.5;
+const BOMB_SLIDE_RADIUS: f32 = 0.45;
+const BOMB_SLIDE_SPEED: f32 = 4.0;
 
-const PERCENTAGE_POWERUP_SPAWN: u64 = 5;
+const PERCENTAGE_POWERUP_SPAWN: u64 = 15;
 
 impl Bomb {
     pub fn new(owner: u32, x: usize, y: usize, power: u8, resources: &Resources) -> Self {
@@ -80,6 +82,11 @@ impl Bomb {
                 rotation: Vec3::ZERO,
             },
         }
+    }
+
+    fn update_model_pos(&mut self) {
+        self.objects[0].transform.translation.x = self.position.x;
+        self.objects[0].transform.translation.z = self.position.y;
     }
 
     fn enable_collision(&mut self, players: &[Player]) {
@@ -248,6 +255,37 @@ impl Bomb {
         }
     }
 
+    fn stop_slide(&mut self) {
+        self.center();
+        self.update_model_pos();
+        self.state = BombState::Planted;
+    }
+
+    fn slide(&mut self, direction: Direction, delta: f32, map: &Map, players: &[Player]) {
+        let mut motion = direction.to_vec2() * delta * BOMB_SLIDE_SPEED;
+
+        let mut dist: Vec2;
+        while motion.x != 0.0 || motion.y != 0.0 {
+            dist = motion;
+            if motion.x.abs() > 1.0 || motion.y.abs() > 1.0 {
+                dist = motion.normalize()
+            }
+            self.position += dist;
+            self.bound(map);
+            if self.collide_map(map, direction) {
+                return self.stop_slide();
+            }
+            for player in players {
+                if self.resolve_collision_with(player.position, player.get_size(), direction) {
+                    return self.stop_slide();
+                }
+            }
+
+            motion -= dist;
+        }
+        self.update_model_pos();
+    }
+
     pub fn tick(
         &mut self,
         delta: f32,
@@ -258,8 +296,8 @@ impl Bomb {
     ) {
         match self.state {
             BombState::Planted => self.live_bomb(delta, map, power_ups, resources),
-            BombState::Sliding(_) => {
-                // self.slide(direction);
+            BombState::Sliding(direction) => {
+                self.slide(direction, delta, map, players);
                 self.live_bomb(delta, map, power_ups, resources);
             }
             BombState::Exploding => self.exploding_bomb(delta, players),
@@ -278,7 +316,8 @@ impl Collision for Bomb {
     fn get_size(&self) -> f32 {
         match self.state {
             BombState::Exploding => 0.0,
-            _ => BOMB_RADIUS,
+            BombState::Planted => BOMB_RADIUS,
+            BombState::Sliding(_) => BOMB_SLIDE_RADIUS,
         }
     }
 }
