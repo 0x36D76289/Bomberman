@@ -1,4 +1,6 @@
 use crate::app_state::AppState;
+use crate::game::ai::AI;
+
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::camera::Camera;
 use crate::game::collision::Collision;
@@ -62,6 +64,7 @@ pub struct GameState {
     enemies: Vec<Enemy>,
     exit_pos: Vec2,
     exit_revealed: bool,
+    cpus: Vec<AI>,
     game_inputs: Vec<Input>,
     nb_humans: u32,
     bombs: Vec<Bomb>,
@@ -192,6 +195,60 @@ impl GameState {
         }
 
         players
+    }
+
+    //TODO: add get_input_player -> returns Released if p doesn't exist
+    pub fn default_state(
+        resources: &Resources,
+        settings: GameSettings,
+    ) -> Result<Self, Box<dyn Error>> {
+        //HACK: this is not safe, map can fail creation
+        //LOIC: true
+        let map = Map::new(settings.map_settings, &resources).unwrap();
+        let nb_humans = settings.nb_humans;
+        let players = Self::create_players(&map, &resources, &nb_humans);
+        let cpus = (nb_humans..players.len() as u32).map(AI::new).collect();
+        let game_inputs = vec![Input::default(); players.len()];
+
+        let camera = Transform {
+            translation: Vec3::new(map.width as f32 / 2.0, -27.5, -1.25),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
+
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.8),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.6),
+        };
+
+        Ok(Self {
+            players,
+            cpus,
+            game_inputs,
+            nb_humans,
+            bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
+            map,
+            camera,
+            light,
+        })
+    }
+
+    fn recreate(&self, resources: &Resources) -> Self {
+        let map = Map::new(MapSettings::default(), resources).unwrap();
+        let players = Self::create_players(&map, &resources, &self.nb_humans);
+        Self {
+            players,
+            cpus: self.cpus.clone(),
+            game_inputs: self.game_inputs.clone(),
+            nb_humans: self.nb_humans,
+            bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
+            map,
+            camera: self.camera,
+            light: self.light,
+        }
     }
 
     pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
@@ -364,16 +421,18 @@ impl GameState {
             return (Some(AppState::Ui(UiState::pause())), 0);
         }
 
-        self.inputs_to_game_inputs(inputs);
-
+        
+        
+        
         let result = match self.mode {
             GameMode::Multiplayer => {
+                self.inputs_to_game_inputs(inputs);
                 self.mp_game_tick(delta_time, resources, audio_manager);
                 GameTickResult::None
             }
             GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
         };
-
+        
         match result {
             GameTickResult::LevelComplete => {
                 if let Some(progress) = &self.campaign_progress {
@@ -393,6 +452,8 @@ impl GameState {
         }
     }
 
+    fn get_cpu_inputs(&self) {}
+    // Put the inputs read into game inputs
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
             if i < self.game_inputs.len() {
@@ -542,4 +603,5 @@ impl GameState {
     pub fn get_map(&self) -> &Map {
         &self.map
     }
+
 }
