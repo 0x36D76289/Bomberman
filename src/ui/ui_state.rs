@@ -2,10 +2,10 @@ use crate::{
     app_state::{AppState, KeyMap},
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
-    input::input::Input,
-    ui::canvas::Canvas,
+    input::{input::Input, input_state::InputState, input_vec::MenuInput},
+    ui::{button::Button, canvas::Canvas},
 };
-use glam::{Vec2, Vec4};
+use glam::Vec4;
 use std::sync::Arc;
 use vulkano::{
     command_buffer::{
@@ -14,54 +14,70 @@ use vulkano::{
         CommandBufferUsage, SecondaryAutoCommandBuffer,
     },
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
+    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
 };
-use winit::keyboard::{KeyCode, PhysicalKey};
+
+/// What UI is in use
+#[derive(Debug, Copy, Clone)]
+pub enum UIPage {
+    MainMenu,
+    Pause,
+}
 
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub canvases: Vec<Canvas>,
+    pub buttons: Vec<Button>,
     pub is_transparent: bool,
+    pub selected: usize,
+    pub page: UIPage,
 }
 
 impl UiState {
-    pub fn default_state() -> Self {
-        let title = Canvas {
-            center: Vec2::new(0.0, -0.3),
-            text: Some("BOMBERMAN".to_string()),
-            text_color: Some(Vec4::ONE),
-            text_size: Some(2.0),
-            ..Default::default()
-        };
-
-        let text1 = Canvas {
-            center: Vec2::new(0.0, 0.2),
-            text: Some("Press enter to play!".to_string()),
-            text_color: Some(Vec4::ONE),
-            text_size: Some(0.8),
-            ..Default::default()
-        };
-
-        Self {
-            canvases: vec![title, text1],
-            is_transparent: false,
-        }
-    }
-
     pub fn is_transparent(&self) -> bool {
         self.is_transparent
+    }
+
+    fn select_button(&mut self, target: usize) {
+        let mut target = target;
+        if target >= self.buttons.len() {
+            target = 0;
+        }
+
+        self.buttons[self.selected].toggle();
+        self.buttons[target].toggle();
+        self.selected = target;
+    }
+
+    /// Returns true if confirm button is used
+    pub fn button_inputs(&mut self, inputs: &Vec<Input>) -> bool {
+        if self.buttons.len() != 0 {
+            if inputs.menu_up() == InputState::Pressed {
+                self.select_button(self.buttons[self.selected].neighbors.up);
+            }
+            if inputs.menu_down() == InputState::Pressed {
+                self.select_button(self.buttons[self.selected].neighbors.down);
+            }
+            if inputs.menu_left() == InputState::Pressed {
+                self.select_button(self.buttons[self.selected].neighbors.left);
+            }
+            if inputs.menu_right() == InputState::Pressed {
+                self.select_button(self.buttons[self.selected].neighbors.right);
+            }
+        }
+        inputs.menu_confirm() == InputState::Pressed
     }
 
     pub fn tick(
         &mut self,
         _delta_time: f32,
-        _inputs: &Vec<Input>,
+        inputs: &Vec<Input>,
         keys: &KeyMap,
-        _resources: &Resources,
+        resources: &Resources,
     ) -> (Option<AppState>, u8) {
-        match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
-            Some(state) if state.is_pressed() => (None, 1),
-            _ => (None, 0),
+        match self.page {
+            UIPage::MainMenu => self.main_menu_tick(keys, resources),
+            UIPage::Pause => self.pause_tick(inputs, resources),
         }
     }
 
@@ -135,7 +151,10 @@ impl UiState {
             )
             .unwrap();
 
-        for canvas in self.canvases.iter() {
+        let canvases = self.canvases.iter();
+        let button_canvaces = self.buttons.iter().map(|b| &b.canvas);
+
+        for canvas in canvases.chain(button_canvaces) {
             // draw the canvas
             let vertex_buffer = canvas.into_vertex_buffer(vulkan.memory_allocator.clone());
             let vertex_buffer_len = vertex_buffer.len() as u32;
