@@ -1,3 +1,6 @@
+// game/mod.rs
+
+pub mod ai;
 pub mod bomb;
 pub mod camera;
 pub mod collision;
