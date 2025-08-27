@@ -115,7 +115,6 @@ impl Bomb {
             let elem = map.get_elem_pos(pos);
             match elem {
                 MapElement::Empty => continue,
-                MapElement::SpawnPoint(_) => continue,
                 MapElement::Breakable(_) => {
                     let _ = map.set_elem_pos(pos, MapElement::Empty);
                     if random_range(1..=100) <= PERCENTAGE_POWERUP_SPAWN {
