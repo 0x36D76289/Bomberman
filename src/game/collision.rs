@@ -66,7 +66,6 @@ pub trait Collision {
         }
         match map.get_elem(x as usize, y as usize) {
             MapElement::Empty => false,
-            MapElement::SpawnPoint(_) => false,
             MapElement::Breakable(_) => true,
             MapElement::Unbreakable(_) => true,
         }

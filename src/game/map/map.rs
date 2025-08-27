@@ -1,11 +1,11 @@
-use glam::{Vec2, Vec3, usize};
+use glam::{Vec2, Vec3, i16, usize};
 use rand::random_range;
 
 use crate::{
     game::{
         direction::Direction,
         map::{
-            map_element::MapElement,
+            map_element::{MapElement, SpawnPoint},
             map_settings::{MapSettings, MapType},
         },
         resources::{ResourceName, Resources},
@@ -18,6 +18,7 @@ pub struct Map {
     pub width: usize,
     pub height: usize,
     content: Vec<MapElement>,
+    pub spawns: Vec<SpawnPoint>,
     pub floor: Object,
 }
 
@@ -45,7 +46,6 @@ impl Map {
             for x in 0..self.width {
                 match &mut self.content[y * self.width + x] {
                     MapElement::Empty => (),
-                    MapElement::SpawnPoint(_) => (),
                     MapElement::Breakable(obj) => {
                         obj.transform = Transform {
                             translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
@@ -83,6 +83,7 @@ impl Map {
         Map {
             width: width as usize,
             height: height as usize,
+            spawns: vec![],
             content: vec![MapElement::Empty; width as usize * height as usize],
             floor: Self::create_floor(width, height, ressources),
         }
@@ -127,27 +128,33 @@ impl Map {
         Self {
             width: self.width + 2,
             height: self.height + 2,
+            spawns: self.spawns,
             content,
             floor: Self::create_floor(self.width as u8 + 2, self.height as u8 + 2, ressources),
         }
     }
 
     fn corners(mut self) -> Self {
+        // Set spawns
+        self.spawns.push(SpawnPoint::init(1, 1));
+        self.spawns.push(SpawnPoint::init((self.width) as i32, 1));
+        self.spawns
+            .push(SpawnPoint::init(self.width as i32, self.height as i32));
+        self.spawns.push(SpawnPoint::init(1, self.height as i32));
         // Top left corner
-        self.content[0] = MapElement::SpawnPoint(Direction::Right);
+        self.content[0] = MapElement::Empty;
         self.content[1] = MapElement::Empty;
         self.content[self.width] = MapElement::Empty;
         // Top right corner
-        self.content[self.width - 1] = MapElement::SpawnPoint(Direction::Left);
+        self.content[self.width - 1] = MapElement::Empty;
         self.content[self.width - 2] = MapElement::Empty;
         self.content[2 * self.width - 1] = MapElement::Empty;
         // Bottom left corner
-        self.content[(self.height - 1) * self.width] = MapElement::SpawnPoint(Direction::Right);
+        self.content[(self.height - 1) * self.width] = MapElement::Empty;
         self.content[((self.height - 1) * self.width) + 1] = MapElement::Empty;
         self.content[(self.height - 2) * self.width] = MapElement::Empty;
         // Bottom right corner
-        self.content[((self.height - 1) * self.width) + (self.width - 1)] =
-            MapElement::SpawnPoint(Direction::Left);
+        self.content[((self.height - 1) * self.width) + (self.width - 1)] = MapElement::Empty;
         self.content[((self.height - 1) * self.width) + (self.width - 2)] = MapElement::Empty;
         self.content[((self.height - 2) * self.width) + (self.width - 1)] = MapElement::Empty;
 
@@ -175,20 +182,16 @@ impl Map {
             x = random_range(0..self.width) as i16;
             y = random_range(0..self.height) as i16;
         }
-        for y in
-            (y - safe_range as i16).max(0)..=(y + safe_range as i16).min(self.height as i16 - 1)
-        {
-            for x in
-                (x - safe_range as i16).max(0)..=(x + safe_range as i16).min(self.width as i16 - 1)
-            {
-                if let MapElement::SpawnPoint(_) =
-                    self.content[y as usize * self.width + x as usize]
-                {
-                    return false;
-                }
+
+        for spawn in self.spawns.clone() {
+            let spawn_range_x: u8 = (spawn.x as i16 - x).abs() as u8;
+            let spawn_range_y: u8 = (spawn.y as i16 - y).abs() as u8;
+
+            if spawn_range_x <= safe_range && spawn_range_y <= safe_range {
+                return false;
             }
         }
-        self.content[y as usize * self.width + x as usize] = MapElement::random_spawn_point();
+        self.spawns.push(SpawnPoint::init(x as i32, y as i32));
         for y in
             (y - spawn_size as i16).max(0)..=(y + spawn_size as i16).min(self.height as i16 - 1)
         {

@@ -47,25 +47,21 @@ impl GameState {
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
+        for spawn in map.spawns.clone() {
+            players.push(Player::new(
+                id,
+                Vec2 {
+                    x: spawn.x as f32 + 0.5,
+                    y: spawn.y as f32 + 0.5,
+                },
+                spawn.direction,
+                resources,
+                id < *nb_humans,
+            ));
 
-        for y in 0..map.height {
-            for x in 0..map.width {
-                if let MapElement::SpawnPoint(dir) = map.get_elem(x, y) {
-                    players.push(Player::new(
-                        id,
-                        Vec2 {
-                            x: x as f32 + 0.5,
-                            y: y as f32 + 0.5,
-                        },
-                        *dir,
-                        resources,
-                        id < *nb_humans,
-                    ));
-
-                    id += 1;
-                }
-            }
+            id += 1;
         }
+
         players
     }
 
@@ -126,7 +122,6 @@ impl GameState {
             .iter()
             .filter_map(|el| match el {
                 MapElement::Empty => None,
-                MapElement::SpawnPoint(_) => None,
                 MapElement::Breakable(obj) => Some(obj),
                 MapElement::Unbreakable(obj) => Some(obj),
             })
