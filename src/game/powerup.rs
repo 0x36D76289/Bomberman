@@ -52,7 +52,6 @@ impl PowerUp {
                 },
                 self.get_size(),
             ) {
-                // Jouer le son de collecte de bonus
                 audio_manager.play_sound_effect(SoundEffect::BonusPickup);
                 self.power_up_type.apply()(player);
                 self.despawn = true;
