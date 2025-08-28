@@ -192,7 +192,6 @@ impl GameState {
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
             {
-                // Jouer le son de placement de bombe
                 audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)
             }

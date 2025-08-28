@@ -151,7 +151,6 @@ impl Bomb {
         self.state = BombState::Exploding;
         self.center();
 
-        // Jouer le son d'explosion
         audio_manager.play_sound_effect(SoundEffect::BombExplosion);
 
         self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
@@ -255,7 +254,6 @@ impl Bomb {
             }
 
             if kill {
-                // Jouer le son de mort du joueur
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
                 player.kill();
             }
