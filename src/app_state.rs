@@ -4,6 +4,7 @@ use vulkano::command_buffer::SecondaryAutoCommandBuffer;
 use winit::{event::ElementState, keyboard::PhysicalKey};
 
 use crate::{
+    audio::AudioManager,
     game::{game_state::GameState, resources::Resources},
     graphics::{Renderer, Vulkan},
     input::input::Input,
@@ -37,10 +38,13 @@ impl AppState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self {
-            AppState::Game(game_state) => game_state.tick(delta, inputs, keys, resources),
-            AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources),
+            AppState::Game(game_state) => {
+                game_state.tick(delta, inputs, keys, resources, audio_manager)
+            }
+            AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources, audio_manager),
         }
     }
 
