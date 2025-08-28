@@ -1,4 +1,5 @@
 use crate::app_state::{AppState, KeyMap};
+use crate::audio::{AudioManager, BackgroundMusic};
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
@@ -21,6 +22,7 @@ pub struct App {
     resources: Resources,
     graphics: Graphics,
     settings: Settings,
+    audio_manager: AudioManager,
 }
 
 impl App {
@@ -36,6 +38,10 @@ impl App {
 
         let state_stack = vec![gui_state1];
 
+        let mut audio_manager = AudioManager::new()?;
+
+        audio_manager.play_background_music(BackgroundMusic::Menu);
+
         Ok(Self {
             state_stack,
             keys,
@@ -43,6 +49,7 @@ impl App {
             resources,
             graphics,
             settings,
+            audio_manager,
         })
     }
 
@@ -67,6 +74,7 @@ impl App {
             &self.inputs,
             &self.keys,
             &self.resources,
+            &mut self.audio_manager,
         );
         for _ in 0..res.1 {
             self.state_stack.pop();

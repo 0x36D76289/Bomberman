@@ -2,6 +2,7 @@ use glam::{USizeVec2, Vec2, Vec3, usize};
 use rand::random_range;
 
 use crate::{
+    audio::{AudioManager, SoundEffect},
     game::{
         collision::Collision,
         player::Player,
@@ -42,7 +43,7 @@ impl PowerUp {
         0.4
     }
 
-    pub fn tick(&mut self, players: &mut Vec<Player>) {
+    pub fn tick(&mut self, players: &mut Vec<Player>, audio_manager: &mut AudioManager) {
         for player in players {
             if player.is_colliding_with(
                 Vec2 {
@@ -51,6 +52,8 @@ impl PowerUp {
                 },
                 self.get_size(),
             ) {
+                // Jouer le son de collecte de bonus
+                audio_manager.play_sound_effect(SoundEffect::BonusPickup);
                 self.power_up_type.apply()(player);
                 self.despawn = true;
             }

@@ -1,4 +1,5 @@
 use crate::app_state::{AppState, KeyMap};
+use crate::audio::AudioManager;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::game_settings::GameSettings;
 use crate::game::map::map::Map;
@@ -159,7 +160,7 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn mp_game_tick(&mut self, delta: f32, resources: &Resources) {
+    fn mp_game_tick(&mut self, delta: f32, resources: &Resources, audio_manager: &mut AudioManager) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(
@@ -168,6 +169,7 @@ impl GameState {
                 &mut self.map,
                 &mut self.power_ups,
                 resources,
+                audio_manager,
             );
         }
         for i in 0..self.bombs.len() {
@@ -179,7 +181,7 @@ impl GameState {
         self.bombs.retain(|bomb| !bomb.despawn);
         //tick powerups
         for powerup in &mut self.power_ups {
-            powerup.tick(&mut self.players);
+            powerup.tick(&mut self.players, audio_manager);
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
@@ -190,6 +192,8 @@ impl GameState {
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
             {
+                // Jouer le son de placement de bombe
+                audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)
             }
         }
@@ -236,6 +240,7 @@ impl GameState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         //Pause
         if keys
@@ -253,7 +258,7 @@ impl GameState {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
         self.inputs_to_game_inputs(inputs);
-        self.mp_game_tick(delta_time, resources);
+        self.mp_game_tick(delta_time, resources, audio_manager);
 
         #[cfg(debug_assertions)]
         if keys

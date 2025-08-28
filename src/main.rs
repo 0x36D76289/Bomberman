@@ -1,5 +1,6 @@
 mod app;
 mod app_state;
+mod audio;
 mod game;
 mod graphics;
 mod input;

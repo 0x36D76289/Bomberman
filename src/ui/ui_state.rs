@@ -1,5 +1,6 @@
 use crate::{
     app_state::{AppState, KeyMap},
+    audio::AudioManager,
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
@@ -14,7 +15,7 @@ use vulkano::{
         CommandBufferUsage, SecondaryAutoCommandBuffer,
     },
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
+    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
 
 /// What UI is in use
@@ -74,10 +75,11 @@ impl UiState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self.page {
-            UIPage::MainMenu => self.main_menu_tick(keys, resources),
-            UIPage::Pause => self.pause_tick(inputs, resources),
+            UIPage::MainMenu => self.main_menu_tick(keys, resources, audio_manager),
+            UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
         }
     }
 
