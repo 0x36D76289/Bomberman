@@ -3,8 +3,12 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::{
     app_state::{AppState, KeyMap},
+<<<<<<< HEAD
     audio::{AudioManager, BackgroundMusic},
     game::{arena_state::ArenaState, game_settings::GameSettings, resources::Resources},
+=======
+    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
+>>>>>>> 081d3f4 (started ui for game settings selection)
     ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
@@ -34,6 +38,7 @@ impl UiState {
             page: UIPage::MainMenu,
         }
     }
+<<<<<<< HEAD
 
     pub fn main_menu_tick(
         &self,
@@ -52,6 +57,15 @@ impl UiState {
                     0,
                 )
             }
+=======
+    pub fn main_menu_tick(&self, keys: &KeyMap) -> (Option<AppState>, u8) {
+        match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
+            Some(state) if state.is_pressed() => (
+                // TODO: replace player count with value gotten from settings/previous ui
+                Some(AppState::Ui(UiState::game_settings(2))),
+                0,
+            ),
+>>>>>>> 081d3f4 (started ui for game settings selection)
             _ => (None, 0),
         }
     }
