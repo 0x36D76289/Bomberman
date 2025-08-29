@@ -4,7 +4,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::{
     app_state::{AppState, KeyMap},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-    ui::{canvas::Canvas, ui_state::UIPage, UiState},
+    ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
 impl UiState {
@@ -33,13 +33,11 @@ impl UiState {
             page: UIPage::MainMenu,
         }
     }
-    pub fn main_menu_tick(&self, keys: &KeyMap, resources: &Resources) -> (Option<AppState>, u8) {
+    pub fn main_menu_tick(&self, keys: &KeyMap) -> (Option<AppState>, u8) {
         match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
             Some(state) if state.is_pressed() => (
-                //TODO: replace with safe variant
-                Some(AppState::Game(
-                    GameState::default_state(resources, GameSettings::default().unwrap()).unwrap(),
-                )),
+                // TODO: replace player count with value gotten from settings/previous ui
+                Some(AppState::Ui(UiState::game_settings(2))),
                 0,
             ),
             _ => (None, 0),
