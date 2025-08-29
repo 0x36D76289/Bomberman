@@ -4,7 +4,8 @@ use crate::{
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    ui::{button::Button, canvas::Canvas},
+    settings,
+    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings},
 };
 use glam::Vec4;
 use std::sync::Arc;
@@ -23,6 +24,7 @@ use vulkano::{
 pub enum UIPage {
     MainMenu,
     Pause,
+    GameSettings(UIGameSettings),
 }
 
 #[derive(Debug, Clone)]
@@ -78,8 +80,14 @@ impl UiState {
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self.page {
+<<<<<<< HEAD
             UIPage::MainMenu => self.main_menu_tick(keys, resources, audio_manager),
             UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
+=======
+            UIPage::MainMenu => self.main_menu_tick(keys),
+            UIPage::Pause => self.pause_tick(inputs, resources),
+            UIPage::GameSettings(_) => self.game_settings_tick(inputs, resources),
+>>>>>>> 081d3f4 (started ui for game settings selection)
         }
     }
 
