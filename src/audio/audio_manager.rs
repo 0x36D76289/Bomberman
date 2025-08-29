@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::Path;
 use anyhow::Result;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 
@@ -59,49 +58,45 @@ impl AudioManager {
     }
 
     fn load_assets(&mut self) -> Result<()> {
-        self.load_sound_effect(
+        self.sound_effects.insert(
             SoundEffect::BombExplosion,
-            "src/assets/sounds/bomb_explosion.ogg",
-        )?;
-        self.load_sound_effect(SoundEffect::PutBomb, "src/assets/sounds/put_bomb.ogg")?;
-        self.load_sound_effect(
+            include_bytes!("../assets/sounds/bomb_explosion.ogg").to_vec(),
+        );
+        self.sound_effects.insert(
+            SoundEffect::PutBomb,
+            include_bytes!("../assets/sounds/put_bomb.ogg").to_vec(),
+        );
+        self.sound_effects.insert(
             SoundEffect::PlayerDeath,
-            "src/assets/sounds/player_death.wav",
-        )?;
-        self.load_sound_effect(SoundEffect::PlayerHurt, "src/assets/sounds/player_hurt.wav")?;
-        self.load_sound_effect(SoundEffect::EnemyHit, "src/assets/sounds/enemy_hit_1.ogg")?;
-        self.load_sound_effect(SoundEffect::BonusPickup, "src/assets/sounds/bonus.wav")?;
+            include_bytes!("../assets/sounds/player_death.wav").to_vec(),
+        );
+        self.sound_effects.insert(
+            SoundEffect::PlayerHurt,
+            include_bytes!("../assets/sounds/player_hurt.wav").to_vec(),
+        );
+        self.sound_effects.insert(
+            SoundEffect::EnemyHit,
+            include_bytes!("../assets/sounds/enemy_hit_1.ogg").to_vec(),
+        );
+        self.sound_effects.insert(
+            SoundEffect::BonusPickup,
+            include_bytes!("../assets/sounds/bonus.wav").to_vec(),
+        );
 
-        // Musique de fond
-        self.load_background_music(BackgroundMusic::Menu, "src/assets/sounds/menu_loop.ogg")?;
-        self.load_background_music(
+        self.background_music.insert(
+            BackgroundMusic::Menu,
+            include_bytes!("../assets/sounds/menu_loop.ogg").to_vec(),
+        );
+        self.background_music.insert(
             BackgroundMusic::Game,
-            "src/assets/sounds/eirik_suhrke-a_new_morning.ogg",
-        )?;
-        self.load_background_music(BackgroundMusic::Boss, "src/assets/sounds/boss1.ogg")?;
+            include_bytes!("../assets/sounds/eirik_suhrke-a_new_morning.ogg").to_vec(),
+        );
+        self.background_music.insert(
+            BackgroundMusic::Boss,
+            include_bytes!("../assets/sounds/boss1.ogg").to_vec(),
+        );
 
-        Ok(())
-    }
-
-    fn load_sound_effect(&mut self, effect: SoundEffect, path: &str) -> Result<()> {
-        if Path::new(path).exists() {
-            let data = std::fs::read(path)?;
-            self.sound_effects.insert(effect, data);
-            println!("Loaded sound effect: {:?} from {}", effect, path);
-        } else {
-            println!("Warning: Sound file not found: {}", path);
-        }
-        Ok(())
-    }
-
-    fn load_background_music(&mut self, music: BackgroundMusic, path: &str) -> Result<()> {
-        if Path::new(path).exists() {
-            let data = std::fs::read(path)?;
-            self.background_music.insert(music, data);
-            println!("Loaded background music: {:?} from {}", music, path);
-        } else {
-            println!("Warning: Music file not found: {}", path);
-        }
+        println!("Loaded all audio assets from included bytes");
         Ok(())
     }
 
