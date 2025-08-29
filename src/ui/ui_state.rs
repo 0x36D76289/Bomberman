@@ -3,7 +3,8 @@ use crate::{
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    ui::{button::Button, canvas::Canvas},
+    settings,
+    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings},
 };
 use glam::Vec4;
 use std::sync::Arc;
@@ -14,7 +15,7 @@ use vulkano::{
         CommandBufferUsage, SecondaryAutoCommandBuffer,
     },
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    pipeline::{graphics::viewport::Viewport, Pipeline, PipelineBindPoint},
+    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
 
 /// What UI is in use
@@ -22,6 +23,7 @@ use vulkano::{
 pub enum UIPage {
     MainMenu,
     Pause,
+    GameSettings(UIGameSettings),
 }
 
 #[derive(Debug, Clone)]
@@ -76,8 +78,9 @@ impl UiState {
         resources: &Resources,
     ) -> (Option<AppState>, u8) {
         match self.page {
-            UIPage::MainMenu => self.main_menu_tick(keys, resources),
+            UIPage::MainMenu => self.main_menu_tick(keys),
             UIPage::Pause => self.pause_tick(inputs, resources),
+            UIPage::GameSettings(_) => self.game_settings_tick(inputs, resources),
         }
     }
 
