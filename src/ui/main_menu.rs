@@ -4,7 +4,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::{
     app_state::{AppState, KeyMap},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-    ui::{canvas::Canvas, ui_state::UIPage, UiState},
+    ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
 impl UiState {

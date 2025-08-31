@@ -95,9 +95,12 @@ impl ApplicationHandler for App {
         let renderer = &mut self.graphics.renderer;
         let vulkan = &self.graphics.vulkan;
 
-        renderer.init_render_context(event_loop, vulkan);
-        renderer.create_gui_pipeline(vulkan);
-        renderer.create_game_pipeline(vulkan);
+        if !renderer.is_initialized() {
+            renderer.init_render_context(event_loop, vulkan);
+            renderer.create_gui_pipeline(vulkan);
+            renderer.create_game_pipeline(vulkan);
+            renderer.create_postprocess_pipeline(vulkan);
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
