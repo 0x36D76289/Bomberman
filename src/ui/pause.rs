@@ -5,10 +5,10 @@ use crate::{
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
     input::input::Input,
     ui::{
+        UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
         ui_state::UIPage,
-        UiState,
     },
 };
 

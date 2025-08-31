@@ -1,9 +1,6 @@
 use std::error::Error;
 
-use crate::{
-    game::map::{map::Map, map_settings::MapSettings},
-    settings::settings::Settings,
-};
+use crate::{game::map::map_settings::MapSettings, settings::settings::Settings};
 
 pub struct GameSettings {
     pub nb_humans: u32,

@@ -1,7 +1,3 @@
-use crate::{
-    graphics::transform::Transform,
-    input::{input::Input, input_state::InputState},
-};
 use glam::{Mat4, Vec3, Vec4};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -118,70 +114,5 @@ impl Camera {
             Vec4::new(w.x, w.y, w.z, 1.0),
             Vec4::new(position.x, position.y, position.z, 1.0),
         );
-    }
-
-    #[allow(unused)]
-    pub fn keyboard_move(&mut self, input_state: &Input, camera: &mut Transform, delta: f32) {
-        const MOVE_SPEED: f32 = 3.0;
-        const LOOK_SPEED: f32 = 1.5;
-
-        if input_state.bomb().is_down() {
-            let mut rotate = Vec3::ZERO;
-
-            if input_state.up() != InputState::Released {
-                rotate.x += 1.0;
-            }
-            if input_state.down() != InputState::Released {
-                rotate.x -= 1.0;
-            }
-            if input_state.right() != InputState::Released {
-                rotate.y += 1.0;
-            }
-            if input_state.left() != InputState::Released {
-                rotate.y -= 1.0;
-            }
-
-            if rotate.dot(rotate) > f32::EPSILON {
-                camera.rotation += LOOK_SPEED * delta * rotate.normalize()
-            }
-
-            camera.rotation.x = camera.rotation.x.clamp(-1.5, 1.5);
-            camera.rotation.y %= 2.0 * std::f32::consts::PI;
-        } else {
-            // if bomb is not pressed, move the camera position
-            let yaw = camera.rotation.y;
-            let up_dir = Vec3::new(0.0, -1.0, 0.0);
-            let forward_dir = Vec3::new(yaw.sin(), 0.0, yaw.cos());
-            let right_dir = Vec3::new(forward_dir.z, 0.0, -forward_dir.x);
-
-            let mut move_dir = Vec3::ZERO;
-
-            if input_state.up() != InputState::Released {
-                move_dir += forward_dir
-            }
-            if input_state.down() != InputState::Released {
-                move_dir -= forward_dir
-            }
-            if input_state.right() != InputState::Released {
-                move_dir += right_dir
-            }
-            if input_state.left() != InputState::Released {
-                move_dir -= right_dir
-            }
-            if input_state.up() != InputState::Released
-                && input_state.down() != InputState::Released
-            {
-                move_dir += up_dir;
-            }
-            if input_state.right() != InputState::Released
-                && input_state.left() != InputState::Released
-            {
-                move_dir -= up_dir;
-            }
-
-            if move_dir.dot(move_dir) > f32::EPSILON {
-                camera.translation += MOVE_SPEED * delta * move_dir.normalize()
-            }
-        }
     }
 }

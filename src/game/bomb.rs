@@ -6,7 +6,7 @@ use rand::random_range;
 use super::collision::Collision;
 use crate::{
     game::{
-        direction::{self, Direction},
+        direction::Direction,
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         powerup::PowerUp,
