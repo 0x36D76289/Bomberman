@@ -6,6 +6,7 @@ mod graphics;
 mod input;
 mod settings;
 mod ui;
+mod utils;
 
 use app::App;
 use game::resources::Resources;
