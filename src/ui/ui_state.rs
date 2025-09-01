@@ -4,7 +4,6 @@ use crate::{
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    settings,
     ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings},
 };
 use glam::Vec4;
@@ -73,7 +72,7 @@ impl UiState {
 
     pub fn tick(
         &mut self,
-        _delta_time: f32,
+        delta: f32,
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
@@ -86,8 +85,7 @@ impl UiState {
 =======
             UIPage::MainMenu => self.main_menu_tick(keys),
             UIPage::Pause => self.pause_tick(inputs, resources),
-            UIPage::GameSettings(_) => self.game_settings_tick(inputs, resources),
->>>>>>> 081d3f4 (started ui for game settings selection)
+            UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
         }
     }
 
