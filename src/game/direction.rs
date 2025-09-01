@@ -1,3 +1,4 @@
+use crate::utils::vec2::Grid;
 use glam::Vec2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,12 +32,20 @@ impl Direction {
 
     pub fn get_direction(start: &Vec2, goal: &Vec2) -> Direction {
         let delta = *goal - *start;
-        match (delta.x, delta.y) {
-            (x, _) if x > 0.0 => Direction::Right,
-            (x, _) if x < 0.0 => Direction::Left,
-            (_, y) if y > 0.0 => Direction::Down,
-            (_, y) if y < 0.0 => Direction::Up,
-            (_, _) => Direction::Up, // TODO: Find better default
+        let res: Direction;
+        if delta.x.abs() > delta.y.abs() {
+            if delta.x >= 0.0 {
+                res = Direction::Right
+            } else {
+                res = Direction::Left
+            }
+        } else {
+            if delta.y >= 0.0 {
+                res = Direction::Up
+            } else {
+                res = Direction::Down
+            }
         }
+        res
     }
 }
