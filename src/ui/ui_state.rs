@@ -98,6 +98,8 @@ impl UiState {
 
         let format = renderer.rcx().swapchain.image_format();
 
+        let window_size: [u32; 2] = renderer.window_size();
+
         let inheritance_rendering_info = CommandBufferInheritanceRenderingInfo {
             color_attachment_formats: vec![Some(format)],
             ..Default::default()
@@ -123,7 +125,7 @@ impl UiState {
                 0,
                 [Viewport {
                     offset: [0.0, 0.0],
-                    extent: renderer.rcx().window.inner_size().into(),
+                    extent: [window_size[0] as f32, window_size[1] as f32],
                     depth_range: 0.0..=1.0,
                 }]
                 .into_iter()
