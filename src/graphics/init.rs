@@ -1,7 +1,7 @@
 use crate::graphics::{Graphics, /*PointLightRenderSystem,*/ Renderer, Vulkan};
 use std::{error::Error, sync::Arc};
 use vulkano::{
-    VulkanLibrary,
+    Version, VulkanLibrary,
     buffer::{
         BufferUsage,
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
@@ -49,7 +49,7 @@ impl Vulkan {
 
         // selecting a physical device (eg. graphic card) and creating a Device and a queue from it that we will use to do all future operations
         let (device, queue) = {
-            let device_extensions = DeviceExtensions {
+            let mut device_extensions = DeviceExtensions {
                 khr_swapchain: true,
                 ..DeviceExtensions::empty()
             };
@@ -82,6 +82,10 @@ impl Vulkan {
                 physical_device.properties().device_name,
                 physical_device.properties().device_type
             );
+
+            if physical_device.api_version() < Version::V1_3 {
+                device_extensions.khr_dynamic_rendering = true;
+            }
 
             let (device, mut queues) = Device::new(
                 physical_device,
