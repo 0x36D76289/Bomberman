@@ -2,6 +2,7 @@ use glam::{Vec2, Vec4};
 
 use crate::{
     app_state::AppState,
+    audio::{AudioManager, BackgroundMusic},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
     input::input::Input,
     ui::{
@@ -103,11 +104,14 @@ impl UiState {
         &mut self,
         inputs: &Vec<Input>,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             return match self.selected {
-                0 => (None, 1),
+                0 => (None, 1), // Resume
                 1 => {
+                    // Restart - recommencer la musique du jeu
+                    audio_manager.play_background_music(BackgroundMusic::Game);
                     //TODO: make safe
                     (
                         Some(AppState::Game(
@@ -117,7 +121,11 @@ impl UiState {
                         2,
                     )
                 }
-                _ => (None, 2),
+                _ => {
+                    // Menu - retourner à la musique du menu
+                    audio_manager.play_background_music(BackgroundMusic::Menu);
+                    (None, 2)
+                }
             };
         }
         (None, 0)

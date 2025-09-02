@@ -1,5 +1,6 @@
 use crate::{
     app_state::{AppState, KeyMap},
+    audio::AudioManager,
     game::{
         Camera,
         bomb::{Bomb, BombState},
@@ -51,25 +52,21 @@ impl GameState {
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
+        for spawn in map.spawns.clone() {
+            players.push(Player::new(
+                id,
+                Vec2 {
+                    x: spawn.x as f32 + 0.5,
+                    y: spawn.y as f32 + 0.5,
+                },
+                spawn.direction,
+                resources,
+                id < *nb_humans,
+            ));
 
-        for y in 0..map.height {
-            for x in 0..map.width {
-                if let MapElement::SpawnPoint(dir) = map.get_elem(x, y) {
-                    players.push(Player::new(
-                        id,
-                        Vec2 {
-                            x: x as f32 + 0.5,
-                            y: y as f32 + 0.5,
-                        },
-                        *dir,
-                        resources,
-                        id < *nb_humans,
-                    ));
-
-                    id += 1;
-                }
-            }
+            id += 1;
         }
+
         players
     }
 
@@ -130,7 +127,6 @@ impl GameState {
             .iter()
             .filter_map(|el| match el {
                 MapElement::Empty => None,
-                MapElement::SpawnPoint(_) => None,
                 MapElement::Breakable(obj) => Some(obj),
                 MapElement::Unbreakable(obj) => Some(obj),
             })
@@ -168,7 +164,12 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn mp_game_tick(&mut self, delta: f32, resources: &Resources) {
+    fn mp_game_tick(
+        &mut self,
+        delta: f32,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+    ) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(
@@ -177,6 +178,7 @@ impl GameState {
                 &mut self.map,
                 &mut self.power_ups,
                 resources,
+                audio_manager,
             );
         }
         for i in 0..self.bombs.len() {
@@ -188,7 +190,7 @@ impl GameState {
         self.bombs.retain(|bomb| !bomb.despawn);
         //tick powerups
         for powerup in &mut self.power_ups {
-            powerup.tick(&mut self.players);
+            powerup.tick(&mut self.players, audio_manager);
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
@@ -199,6 +201,7 @@ impl GameState {
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
             {
+                audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)
             }
         }
@@ -245,6 +248,7 @@ impl GameState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         //Pause
         if keys
@@ -262,7 +266,7 @@ impl GameState {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
         self.inputs_to_game_inputs(inputs);
-        self.mp_game_tick(delta_time, resources);
+        self.mp_game_tick(delta_time, resources, audio_manager);
 
         #[cfg(debug_assertions)]
         if keys
