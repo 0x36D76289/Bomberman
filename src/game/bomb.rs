@@ -147,7 +147,13 @@ impl Bomb {
         }
     }
 
-    fn explode(&mut self, map: &mut Map, power_ups: &mut Vec<PowerUp>, resources: &Resources, audio_manager: &mut AudioManager) {
+    fn explode(
+        &mut self,
+        map: &mut Map,
+        power_ups: &mut Vec<PowerUp>,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+    ) {
         self.state = BombState::Exploding;
         self.center();
 
@@ -221,7 +227,12 @@ impl Bomb {
         }
     }
 
-    fn exploding_bomb(&mut self, delta: f32, players: &mut Vec<Player>, audio_manager: &mut AudioManager) {
+    fn exploding_bomb(
+        &mut self,
+        delta: f32,
+        players: &mut Vec<Player>,
+        audio_manager: &mut AudioManager,
+    ) {
         if self.timer >= BOMB_EXPLOSION_TIME {
             self.despawn = true;
             players[self.owner_id as usize].bombs_remaining += 1;

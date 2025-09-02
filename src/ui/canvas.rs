@@ -1,4 +1,4 @@
-use crate::graphics::{object::TextureIndex, GuiPush, GuiVertex};
+use crate::graphics::{GuiPush, GuiVertex, object::TextureIndex};
 use glam::{Vec2, Vec4};
 use std::sync::Arc;
 use vulkano::{
