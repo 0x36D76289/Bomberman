@@ -60,6 +60,7 @@ pub struct RenderContext {
     pub images: Vec<Arc<ImageView>>,
     pub color_image: Arc<ImageView>,
     pub depth_image: Arc<ImageView>,
+    pub shadow_map: Arc<ImageView>,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub time_info: TimeInfo,
@@ -181,6 +182,22 @@ impl Renderer {
             .unwrap(),
         )
         .unwrap();
+        let shadow_map = ImageView::new_default(
+            Image::new(
+                vulkan.memory_allocator.clone(),
+                ImageCreateInfo {
+                    image_type: ImageType::Dim2d,
+                    format: Format::D32_SFLOAT,
+                    extent: [window_size[0], window_size[1], 1],
+                    usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::SAMPLED,
+                    ..Default::default()
+                },
+                AllocationCreateInfo::default(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
         let images = images
             .iter()
             .map(|image| ImageView::new_default(image.clone()).unwrap())
@@ -203,6 +220,7 @@ impl Renderer {
             images,
             color_image,
             depth_image,
+            shadow_map,
             recreate_swapchain,
             previous_frame_end,
             time_info,
