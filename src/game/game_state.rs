@@ -325,6 +325,7 @@ impl GameState {
             projection: camera.projection_matrix.to_cols_array_2d(),
             view: camera.view_matrix.to_cols_array_2d(),
             inverse_view: camera.inverse_view_matrix.to_cols_array_2d(),
+            light_view: camera.view_matrix.to_cols_array_2d(),
             ambient_light_color: self.light.ambient_light_color.into(),
             direction_to_light: self.light.direction_to_light.to_array().into(),
             directional_light_color: self.light.directional_light_color.into(),
