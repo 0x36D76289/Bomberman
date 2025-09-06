@@ -450,7 +450,7 @@ impl Renderer {
         let rcx = self.rcx.as_ref().unwrap();
 
         let pass_info = match state {
-            AppState::Game(_) => {
+            AppState::Arena(_) | AppState::Campaign(_) => {
                 let mut color_attachment =
                     RenderingAttachmentInfo::image_view(rcx.color_image.clone());
                 color_attachment.store_op = AttachmentStoreOp::Store;
@@ -497,8 +497,11 @@ impl Renderer {
 
         primary_cb.end_rendering().unwrap();
 
-        if let AppState::Game(_) = state {
-            self.render_upscale_quad(vulkan, primary_cb, image_index);
+        match state {
+            AppState::Arena(_) | AppState::Campaign(_) => {
+                self.render_upscale_quad(vulkan, primary_cb, image_index);
+            }
+            AppState::Ui(_) => {}
         }
     }
 
