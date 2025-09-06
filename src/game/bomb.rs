@@ -8,6 +8,7 @@ use crate::{
     audio::{AudioManager, SoundEffect},
     game::{
         direction::Direction,
+        enemy::Enemy,
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         powerup::PowerUp,
@@ -94,7 +95,10 @@ impl Bomb {
         if self.collision_enabled {
             return;
         }
-        if !players[self.owner_id as usize].is_colliding_with(self.position, 0.5) {
+        if !players
+            .get(self.owner_id as usize)
+            .map_or(true, |p| p.is_colliding_with(self.position, 0.5))
+        {
             self.collision_enabled = true;
         }
     }
@@ -139,6 +143,9 @@ impl Bomb {
             ));
         }
         for x in -(self.explosion.left as i16)..=(self.explosion.right as i16) {
+            if x == 0 {
+                continue;
+            }
             self.objects.push(Self::create_object(
                 (self.position.x as i16 + x) as usize,
                 self.position.y as usize,
@@ -166,7 +173,6 @@ impl Bomb {
         self.set_explosion_objects(resources);
     }
 
-    /// tick for bombs that are Planted or Sliding
     fn live_bomb(
         &mut self,
         delta: f32,
@@ -183,7 +189,6 @@ impl Bomb {
         self.timer -= delta;
     }
 
-    /// returns y, x as usize
     fn pos_as_usize(&self) -> (usize, usize) {
         (self.position.y as usize, self.position.x as usize)
     }
@@ -209,7 +214,6 @@ impl Bomb {
         false
     }
 
-    /// finds every live bomb near it and explodes it
     pub fn chain_react(&self, bombs: &mut Vec<Self>) {
         for bomb in bombs {
             if self.in_range(bomb) {
@@ -231,18 +235,20 @@ impl Bomb {
         &mut self,
         delta: f32,
         players: &mut Vec<Player>,
+        enemies: &mut Vec<Enemy>,
         audio_manager: &mut AudioManager,
     ) {
         if self.timer >= BOMB_EXPLOSION_TIME {
             self.despawn = true;
-            players[self.owner_id as usize].bombs_remaining += 1;
+            if let Some(player) = players.get_mut(self.owner_id as usize) {
+                player.bombs_remaining += 1;
+            }
         }
         self.timer += delta;
 
         // kill players
         for player in players.alive() {
             let mut kill = false;
-
             let (px, py) = player.position.into();
             let (bx, by) = self.position.into();
 
@@ -267,6 +273,36 @@ impl Bomb {
             if kill {
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
                 player.kill();
+            }
+        }
+
+        // kill enemies
+        for enemy in enemies.iter_mut().filter(|e| e.alive) {
+            let mut kill = false;
+            let (ex, ey) = enemy.position.into();
+            let (bx, by) = self.position.into();
+
+            if ((ex - bx).abs() < (BOMB_EXPLOSION_RADIUS + enemy.get_size()))
+                && ((ey + enemy.get_size())
+                    > (by - self.explosion.up as f32 - BOMB_EXPLOSION_RADIUS))
+                && ((ey - enemy.get_size())
+                    < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
+            {
+                kill = true;
+            }
+
+            if ((ey - by).abs() < (BOMB_EXPLOSION_RADIUS + enemy.get_size()))
+                && ((ex + enemy.get_size())
+                    > (bx - self.explosion.left as f32 - BOMB_EXPLOSION_RADIUS))
+                && ((ex - enemy.get_size())
+                    < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
+            {
+                kill = true;
+            }
+
+            if kill {
+                audio_manager.play_sound_effect(SoundEffect::EnemyHit);
+                enemy.kill();
             }
         }
     }
@@ -306,6 +342,7 @@ impl Bomb {
         &mut self,
         delta: f32,
         players: &mut Vec<Player>,
+        enemies: &mut Vec<Enemy>,
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
@@ -317,7 +354,7 @@ impl Bomb {
                 self.slide(direction, delta, map, players);
                 self.live_bomb(delta, map, power_ups, resources, audio_manager);
             }
-            BombState::Exploding => self.exploding_bomb(delta, players, audio_manager),
+            BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
         }
         self.enable_collision(players);
     }

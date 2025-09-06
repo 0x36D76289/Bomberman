@@ -163,10 +163,10 @@ impl Map {
 
     fn cheese(mut self, cheesiness: u8) -> Self {
         for i in 0..self.content.len() {
-            if let MapElement::Breakable(_) = self.content[i]
-                && random_range(0..=100) > (100 - cheesiness.clamp(0, 100))
-            {
-                self.content[i] = MapElement::Empty;
+            if let MapElement::Breakable(_) = self.content[i] {
+                if random_range(0..=100) > (100 - cheesiness.clamp(0, 100)) {
+                    self.content[i] = MapElement::Empty;
+                }
             }
         }
         self
@@ -223,7 +223,6 @@ impl Map {
         Some(self)
     }
 
-    /// Return neighbouring empty cells
     pub fn get_neighbours(self, position: Vec2) -> Vec<Vec2> {
         Direction::iterator()
             .map(|dir| position + dir.to_vec2())
@@ -246,6 +245,35 @@ impl Map {
             ret = ret.walls(ressources);
         }
         Some(ret.fix_objects())
+    }
+
+    pub fn from_layout(layout: &'static str, ressources: &Resources) -> Self {
+        let lines: Vec<&str> = layout.trim().lines().map(|l| l.trim()).collect();
+        let height = lines.len();
+        let width = lines.get(0).map_or(0, |l| l.len());
+
+        let mut map = Self::empty(width as u8, height as u8, ressources);
+        let breakable_object = Self::create_breakable(ressources);
+        let unbreakable_object = Self::create_unbreakable(ressources);
+        let mut spawns = vec![];
+
+        for (y, line) in lines.iter().enumerate() {
+            for (x, char) in line.chars().enumerate() {
+                let elem = match char {
+                    '#' => MapElement::Breakable(breakable_object.clone()),
+                    'X' => MapElement::Unbreakable(unbreakable_object.clone()),
+                    'S' => {
+                        spawns.push(SpawnPoint::init(x as i32, y as i32));
+                        MapElement::Empty
+                    }
+                    'E' | '.' | ' ' => MapElement::Empty,
+                    _ => MapElement::Empty,
+                };
+                map.content[y * width + x] = elem;
+            }
+        }
+        map.spawns = spawns;
+        map.fix_objects()
     }
 
     #[cfg(debug_assertions)]
@@ -280,7 +308,6 @@ impl Map {
             return Err(());
         }
         self.content[y * self.width + x] = elem;
-        // TODO: update object
         Ok(())
     }
 

@@ -4,7 +4,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::{
     app_state::{AppState, KeyMap},
     audio::{AudioManager, BackgroundMusic},
-    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
+    game::{arena_state::ArenaState, game_settings::GameSettings, resources::Resources},
     ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
@@ -43,13 +43,10 @@ impl UiState {
     ) -> (Option<AppState>, u8) {
         match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
             Some(state) if state.is_pressed() => {
-                // Changer la musique pour le jeu
                 audio_manager.play_background_music(BackgroundMusic::Game);
-
                 (
-                    //TODO: replace with safe variant
-                    Some(AppState::Game(
-                        GameState::default_state(resources, GameSettings::default().unwrap())
+                    Some(AppState::Arena(
+                        ArenaState::default_state(resources, GameSettings::default().unwrap())
                             .unwrap(),
                     )),
                     0,

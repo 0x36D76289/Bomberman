@@ -5,7 +5,7 @@ use winit::{event::ElementState, keyboard::PhysicalKey};
 
 use crate::{
     audio::AudioManager,
-    game::{game_state::GameState, resources::Resources},
+    game::{arena_state::ArenaState, campaign_state::CampaignState, resources::Resources},
     graphics::{Renderer, Vulkan},
     input::input::Input,
     ui::UiState,
@@ -15,7 +15,8 @@ pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 
 #[derive(Debug, Clone)]
 pub enum AppState {
-    Game(GameState),
+    Arena(ArenaState),
+    Campaign(CampaignState),
     Ui(UiState),
 }
 
@@ -27,7 +28,10 @@ impl AppState {
         resources: &Resources,
     ) -> Arc<SecondaryAutoCommandBuffer> {
         match self {
-            AppState::Game(game_state) => game_state.render(vulkan, renderer, resources),
+            AppState::Arena(arena_state) => arena_state.render(vulkan, renderer, resources),
+            AppState::Campaign(campaign_state) => {
+                campaign_state.render(vulkan, renderer, resources)
+            }
             AppState::Ui(ui_state) => ui_state.render(vulkan, renderer, resources),
         }
     }
@@ -41,8 +45,11 @@ impl AppState {
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self {
-            AppState::Game(game_state) => {
-                game_state.tick(delta, inputs, keys, resources, audio_manager)
+            AppState::Arena(arena_state) => {
+                arena_state.tick(delta, inputs, keys, resources, audio_manager)
+            }
+            AppState::Campaign(campaign_state) => {
+                campaign_state.tick(delta, inputs, keys, resources, audio_manager)
             }
             AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources, audio_manager),
         }
@@ -50,7 +57,7 @@ impl AppState {
 
     pub fn is_transparent(&self) -> bool {
         match self {
-            AppState::Game(_) => false,
+            AppState::Arena(_) | AppState::Campaign(_) => false,
             AppState::Ui(state) => state.is_transparent(),
         }
     }
