@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <<<<<<< HEAD:src/game/arena_state.rs
 use crate::{
     app_state::{AppState, KeyMap},
@@ -35,6 +36,9 @@ use vulkano::{
     format::Format,
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 =======
+=======
+<<<<<<< HEAD:src/game/game_state.rs
+>>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
 use crate::app_state::{AppState, KeyMap};
 use crate::game::Camera;
 use crate::game::bomb::{Bomb, BombState};
@@ -52,6 +56,31 @@ use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::GetOrDefault;
 use crate::ui::UiState;
+<<<<<<< HEAD
+=======
+use crate::{audio::AudioManager, graphics::renderer::RENDER_RES_RATIO};
+=======
+use crate::{
+    app_state::{AppState, KeyMap},
+    audio::AudioManager,
+    game::{
+        bomb::{Bomb, BombState},
+        camera::Camera,
+        game_settings::GameSettings,
+        map::{map::Map, map_element::MapElement, map_settings::MapSettings},
+        player::Player,
+        powerup::PowerUp,
+        resources::Resources,
+    },
+    graphics::{
+        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
+        renderer::RENDER_RES_RATIO, transform::Transform,
+    },
+    input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
+    ui::UiState,
+};
+>>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing):src/game/arena_state.rs
+>>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
 use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
 use std::error::Error;
@@ -103,15 +132,25 @@ impl ArenaState {
         resources: &Resources,
         settings: GameSettings,
     ) -> Result<Self, Box<dyn Error>> {
+<<<<<<< HEAD
 <<<<<<< HEAD:src/game/arena_state.rs
         let map = Map::new(settings.map_settings, resources).unwrap();
 =======
+=======
+<<<<<<< HEAD:src/game/game_state.rs
+>>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
         //HACK: this is not safe, map can fail creation
         //LOIC: true
         let Some(map) = Map::new(settings.map_settings, &resources) else {
             return Err("Map creation fail".into());
         };
+<<<<<<< HEAD
 >>>>>>> 7dba894 (created consts.rs to store shared ui state, made menu start game):src/game/game_state.rs
+=======
+=======
+        let map = Map::new(settings.map_settings, resources).unwrap();
+>>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing):src/game/arena_state.rs
+>>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];

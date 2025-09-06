@@ -98,7 +98,18 @@ impl UiState {
             return match self.selected {
                 0 => (None, 1), // Resume
                 1 => {
+<<<<<<< HEAD
                     // Restart
+=======
+<<<<<<< HEAD
+                    // INFO: Je pense que c'est la creation des etats qui devraient demarrer la
+                    // musique
+
+                    // Restart - recommencer la musique du jeu
+=======
+                    // Restart
+>>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing)
+>>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
                     audio_manager.play_background_music(BackgroundMusic::Game);
                     (
                         Some(AppState::Arena(
