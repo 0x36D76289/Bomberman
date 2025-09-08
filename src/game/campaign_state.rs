@@ -104,6 +104,7 @@ impl CampaignState {
             delta_time,
             &self.map,
             &mut self.bombs,
+            &mut self.enemies,
         );
         if inputs.get_or_default(0).bomb() == InputState::Pressed {
             if let Some(bomb) = players_vec[0].create_bomb(resources, &self.bombs) {

@@ -4,6 +4,7 @@ use crate::{
         collision::Collision,
         map::map::Map,
         resources::{ResourceName, Resources},
+        enemy::Enemy,
     },
     graphics::{object::Object, transform::Transform},
     input::input::Input,
@@ -62,7 +63,7 @@ impl Player {
         }
     }
 
-    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>) {
+    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>, enemies: &mut Vec<Enemy>) {
         self.bound(map);
         self.collide_map(map, direction);
         for bomb in bombs {
@@ -74,6 +75,13 @@ impl Player {
                 && bomb.state == BombState::Planted
             {
                 bomb.state = BombState::Sliding(direction);
+            }
+        }
+
+        for enemy in enemies {
+            if self.resolve_collision_with(enemy.position, enemy.get_size(), direction) {
+                self.kill();
+                break;
             }
         }
     }
@@ -99,7 +107,7 @@ impl Player {
         ))
     }
 
-    pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
+    pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>, enemies: &mut Vec<Enemy>) {
         let mut motion = input.as_vec2()
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
@@ -118,7 +126,7 @@ impl Player {
                     motion.x += dist;
                     self.position.x -= dist;
                 }
-                self.handle_collisions(map, self.direction, bombs);
+                self.handle_collisions(map, self.direction, bombs, enemies);
             }
             if motion.y != 0.0 {
                 dist = motion.y.abs().min(1.0);
@@ -131,7 +139,7 @@ impl Player {
                     motion.y += dist;
                     self.position.y -= dist;
                 }
-                self.handle_collisions(map, self.direction, bombs);
+                self.handle_collisions(map, self.direction, bombs, enemies);
             }
         }
         match &mut self.object {

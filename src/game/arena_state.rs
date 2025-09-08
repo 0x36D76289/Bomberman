@@ -187,6 +187,7 @@ impl ArenaState {
                 delta,
                 &self.map,
                 &mut self.bombs,
+                &mut vec![], // No enemies in arena modes
             );
         }
     }
