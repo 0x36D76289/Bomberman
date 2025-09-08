@@ -2,7 +2,7 @@ use crate::{
     game::{
         bomb::{Bomb, BombState},
         collision::Collision,
-        map::map::Map,
+        map::{map::Map, map_element::MapElement},
         resources::{ResourceName, Resources},
     },
     graphics::{object::Object, transform::Transform},
@@ -99,8 +99,33 @@ impl Player {
         ))
     }
 
+    fn assist_input(&self, input: Input, map: &Map) -> Vec2 {
+        let ret = input.as_vec2();
+        if ret.y == 0.0 && ret.x != 0.0 {
+            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
+                if self.position.y % 1.0 > 0.55 {
+                    return ret + Vec2 { x: 0.0, y: -1.0 };
+                }
+                if self.position.y % 1.0 < 0.45 {
+                    return ret + Vec2 { x: 0.0, y: 1.0 };
+                }
+            }
+        }
+        if ret.x == 0.0 && ret.y != 0.0 {
+            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
+                if self.position.x % 1.0 > 0.55 {
+                    return ret + Vec2 { y: 0.0, x: -1.0 };
+                }
+                if self.position.x % 1.0 < 0.45 {
+                    return ret + Vec2 { y: 0.0, x: 1.0 };
+                }
+            }
+        }
+        ret
+    }
+
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
-        let mut motion = input.as_vec2()
+        let mut motion = self.assist_input(input, map)
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
