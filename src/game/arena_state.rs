@@ -103,7 +103,15 @@ impl ArenaState {
         resources: &Resources,
         settings: GameSettings,
     ) -> Result<Self, Box<dyn Error>> {
+<<<<<<< HEAD:src/game/arena_state.rs
         let map = Map::new(settings.map_settings, resources).unwrap();
+=======
+        //HACK: this is not safe, map can fail creation
+        //LOIC: true
+        let Some(map) = Map::new(settings.map_settings, &resources) else {
+            return Err("Map creation fail".into());
+        };
+>>>>>>> 7dba894 (created consts.rs to store shared ui state, made menu start game):src/game/game_state.rs
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
