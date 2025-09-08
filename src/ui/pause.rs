@@ -31,6 +31,7 @@ impl UiState {
                 text_size: Some(1.6),
                 ..Default::default()
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 1,
@@ -50,6 +51,7 @@ impl UiState {
                 text_size: Some(1.6),
                 ..Default::default()
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 2,
@@ -67,6 +69,7 @@ impl UiState {
                 text_size: Some(1.6),
                 ..Default::default()
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 1,
                 down: 2,
