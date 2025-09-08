@@ -65,9 +65,10 @@ impl TextRenderer {
         text_size: f32,
         position: Vec2,
         memory_allocator: Arc<StandardMemoryAllocator>,
+        ratio: f32,
     ) -> Subbuffer<[GuiVertex]> {
-        let char_screen_width = text_size * (CHAR_WIDTH as f32 / CHAR_HEIGHT as f32) * 0.05;
-        let char_screen_height = text_size * (CHAR_HEIGHT as f32 / CHAR_WIDTH as f32) * 0.05;
+        let char_screen_width = text_size * CHAR_WIDTH as f32 * 0.01 / ratio.max(1.0);
+        let char_screen_height = text_size * CHAR_HEIGHT as f32 * 0.01 / (1.0 / ratio).max(1.0);
         let spacing = 0.9;
 
         let text_width = s.len() as f32 * char_screen_width * spacing;

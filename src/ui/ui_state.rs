@@ -3,7 +3,7 @@ use crate::{
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings},
+    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings, utils::GetRatio},
 };
 use glam::Vec4;
 use std::sync::Arc;
@@ -154,9 +154,21 @@ impl UiState {
             .unwrap();
 
         let canvases = self.canvases.iter();
-        let button_canvaces = self.buttons.iter().map(|b| &b.canvas);
+        let button_canvaces = {
+            let mut ret = Vec::new();
+            for canvas in self
+                .buttons
+                .iter()
+                .map(|b| b.generate_canvases(renderer.window_size().get_ratio()))
+                .flatten()
+                .flatten()
+            {
+                ret.push(canvas);
+            }
+            ret
+        };
 
-        for canvas in canvases.chain(button_canvaces) {
+        for canvas in canvases.chain(button_canvaces.iter()) {
             // draw the canvas
             let vertex_buffer = canvas.into_vertex_buffer(vulkan.memory_allocator.clone());
             let vertex_buffer_len = vertex_buffer.len() as u32;
@@ -181,6 +193,7 @@ impl UiState {
                         canvas.text_size.unwrap_or(1.0),
                         canvas.center,
                         vulkan.memory_allocator.clone(),
+                        renderer.window_size().get_ratio(),
                     );
 
                     let push_constant = GuiPush {
