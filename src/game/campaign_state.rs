@@ -105,9 +105,13 @@ impl CampaignState {
             &self.map,
             &mut self.bombs,
 <<<<<<< HEAD
+<<<<<<< HEAD
             &mut self.enemies,
 =======
 >>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
+=======
+            &mut self.enemies,
+>>>>>>> c19f531 (feat: Add enemy handling to player movement and collision detection)
         );
         if inputs.get_or_default(0).bomb() == InputState::Pressed {
             if let Some(bomb) = players_vec[0].create_bomb(resources, &self.bombs) {
