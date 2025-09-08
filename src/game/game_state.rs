@@ -72,7 +72,9 @@ impl GameState {
     ) -> Result<Self, Box<dyn Error>> {
         //HACK: this is not safe, map can fail creation
         //LOIC: true
-        let map = Map::new(settings.map_settings, &resources).unwrap();
+        let Some(map) = Map::new(settings.map_settings, &resources) else {
+            return Err("Map creation fail".into());
+        };
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
