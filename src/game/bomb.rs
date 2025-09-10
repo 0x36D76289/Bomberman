@@ -49,7 +49,7 @@ pub struct Bomb {
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
 const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
-const BOMB_RADIUS: f32 = 0.5;
+pub const BOMB_RADIUS: f32 = 0.5;
 const BOMB_SLIDE_RADIUS: f32 = 0.45;
 const BOMB_SLIDE_SPEED: f32 = 4.0;
 
@@ -194,19 +194,19 @@ impl Bomb {
     }
 
     fn in_range(&self, bomb: &Self) -> bool {
-        let (sy, sx) = self.pos_as_usize();
-        let (oy, ox) = bomb.pos_as_usize();
+        let (self_y, self_x) = self.pos_as_usize();
+        let (other_y, other_x) = bomb.pos_as_usize();
 
-        if (sy == oy)
-            && (ox >= (sx - self.explosion.left as usize))
-            && (ox <= (sx + self.explosion.right as usize))
+        if (self_y == other_y)
+            && (other_x >= (self_x - self.explosion.left as usize))
+            && (other_x <= (self_x + self.explosion.right as usize))
         {
             return true;
         }
 
-        if (sx == ox)
-            && (oy >= (sy - self.explosion.up as usize))
-            && (oy <= (sy + self.explosion.down as usize))
+        if (self_x == other_x)
+            && (other_y >= (self_y - self.explosion.up as usize))
+            && (other_y <= (self_y + self.explosion.down as usize))
         {
             return true;
         }
@@ -307,7 +307,8 @@ impl Bomb {
         }
     }
 
-    fn stop_slide(&mut self) {
+    fn stop_slide(&mut self, map: &Map) {
+        self.bound(map);
         self.center();
         self.update_model_pos();
         self.state = BombState::Planted;
@@ -325,11 +326,11 @@ impl Bomb {
             self.position += dist;
             self.bound(map);
             if self.collide_map(map, direction) {
-                return self.stop_slide();
+                return self.stop_slide(map);
             }
             for player in players {
                 if self.resolve_collision_with(player.position, player.get_size(), direction) {
-                    return self.stop_slide();
+                    return self.stop_slide(map);
                 }
             }
 
