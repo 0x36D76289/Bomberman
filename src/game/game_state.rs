@@ -15,20 +15,23 @@ use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::GetOrDefault;
 use crate::ui::UiState;
+use crate::{audio::AudioManager, graphics::renderer::RENDER_RES_RATIO};
 use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
 use std::error::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec::Vec;
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferInheritanceInfo, CommandBufferInheritanceRenderPassType,
-    CommandBufferInheritanceRenderingInfo, CommandBufferUsage, SecondaryAutoCommandBuffer,
+use vulkano::{
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
+        CommandBufferInheritanceRenderPassType, CommandBufferInheritanceRenderingInfo,
+        CommandBufferUsage, SecondaryAutoCommandBuffer,
+    },
+    descriptor_set::{DescriptorSet, WriteDescriptorSet},
+    format::Format,
+    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
-use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
-use vulkano::format::Format;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{Pipeline, PipelineBindPoint};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone)]
@@ -80,7 +83,7 @@ impl GameState {
         let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
-            translation: Vec3::new(map.width as f32 / 2.0, -27.5, -1.25),
+            translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
             scale: Vec3::ONE,
             rotation: Vec3::new(-1.25, 0.0, 0.0),
         };
@@ -161,7 +164,12 @@ impl GameState {
         print!("{}", display);
     }
 
-    fn mp_game_tick(&mut self, delta: f32, resources: &Resources) {
+    fn mp_game_tick(
+        &mut self,
+        delta: f32,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+    ) {
         // tick bombs
         for bomb in &mut self.bombs {
             bomb.tick(
@@ -170,6 +178,7 @@ impl GameState {
                 &mut self.map,
                 &mut self.power_ups,
                 resources,
+                audio_manager,
             );
         }
         for i in 0..self.bombs.len() {
@@ -181,7 +190,7 @@ impl GameState {
         self.bombs.retain(|bomb| !bomb.despawn);
         //tick powerups
         for powerup in &mut self.power_ups {
-            powerup.tick(&mut self.players);
+            powerup.tick(&mut self.players, audio_manager);
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
@@ -192,6 +201,7 @@ impl GameState {
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
             {
+                audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)
             }
         }
@@ -238,6 +248,7 @@ impl GameState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         //Pause
         if keys
@@ -255,7 +266,7 @@ impl GameState {
         //     Mode::MpGame => Self::mp_game_tick,
         // };
         self.inputs_to_game_inputs(inputs);
-        self.mp_game_tick(delta_time, resources);
+        self.mp_game_tick(delta_time, resources, audio_manager);
 
         #[cfg(debug_assertions)]
         if keys
@@ -286,20 +297,29 @@ impl GameState {
         let pipeline = match renderer.game_pipeline.as_ref() {
             Some(pipeline) => pipeline.clone(),
             None => panic!(
-                "Called render on a GameState object but the world_pipeline is not initialized in the renderer"
+                "Called render on a GameState object but the game_pipeline is not initialized in the renderer"
             ),
         };
 
-        let window_size = renderer.window_size();
+        let window_size: [u32; 2] = renderer.window_size();
+        let game_resolution = [
+            window_size[0] / RENDER_RES_RATIO[0],
+            window_size[1] / RENDER_RES_RATIO[1],
+        ];
 
+        let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
         let mut camera = Camera::new();
-        camera.set_view_xyz(self.camera.translation, self.camera.rotation);
-        camera.set_perspective_projection(
-            0.6,
-            window_size[0] as f32 / window_size[1] as f32,
-            0.1,
-            100.0,
+        let mut clipping = self.map.width.max(self.map.height) as f32 / 2.0;
+        clipping *= 1.15;
+        camera.set_orthographic_projection(
+            -clipping * aspect_ratio,
+            clipping * aspect_ratio,
+            -clipping,
+            clipping,
+            -clipping,
+            clipping,
         );
+        camera.set_view_xyz(self.camera.translation, self.camera.rotation);
 
         let global_ubo = GlobalUbo {
             projection: camera.projection_matrix.to_cols_array_2d(),
@@ -338,7 +358,7 @@ impl GameState {
                 0,
                 [Viewport {
                     offset: [0.0, 0.0],
-                    extent: renderer.rcx().window.inner_size().into(),
+                    extent: [game_resolution[0] as f32, game_resolution[1] as f32],
                     depth_range: 0.0..=1.0,
                 }]
                 .into_iter()

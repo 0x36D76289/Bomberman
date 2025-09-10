@@ -5,8 +5,9 @@ use rand::random_range;
 
 use super::collision::Collision;
 use crate::{
+    audio::{AudioManager, SoundEffect},
     game::{
-        direction::{self, Direction},
+        direction::Direction,
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         powerup::PowerUp,
@@ -146,9 +147,18 @@ impl Bomb {
         }
     }
 
-    fn explode(&mut self, map: &mut Map, power_ups: &mut Vec<PowerUp>, resources: &Resources) {
+    fn explode(
+        &mut self,
+        map: &mut Map,
+        power_ups: &mut Vec<PowerUp>,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+    ) {
         self.state = BombState::Exploding;
         self.center();
+
+        audio_manager.play_sound_effect(SoundEffect::BombExplosion);
+
         self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
         self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 }, power_ups, resources);
         self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 }, power_ups, resources);
@@ -163,10 +173,11 @@ impl Bomb {
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode(map, power_ups, resources);
+            self.explode(map, power_ups, resources, audio_manager);
             return;
         }
         self.timer -= delta;
@@ -216,7 +227,12 @@ impl Bomb {
         }
     }
 
-    fn exploding_bomb(&mut self, delta: f32, players: &mut Vec<Player>) {
+    fn exploding_bomb(
+        &mut self,
+        delta: f32,
+        players: &mut Vec<Player>,
+        audio_manager: &mut AudioManager,
+    ) {
         if self.timer >= BOMB_EXPLOSION_TIME {
             self.despawn = true;
             players[self.owner_id as usize].bombs_remaining += 1;
@@ -249,6 +265,7 @@ impl Bomb {
             }
 
             if kill {
+                audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
                 player.kill();
             }
         }
@@ -292,14 +309,15 @@ impl Bomb {
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) {
         match self.state {
-            BombState::Planted => self.live_bomb(delta, map, power_ups, resources),
+            BombState::Planted => self.live_bomb(delta, map, power_ups, resources, audio_manager),
             BombState::Sliding(direction) => {
                 self.slide(direction, delta, map, players);
-                self.live_bomb(delta, map, power_ups, resources);
+                self.live_bomb(delta, map, power_ups, resources, audio_manager);
             }
-            BombState::Exploding => self.exploding_bomb(delta, players),
+            BombState::Exploding => self.exploding_bomb(delta, players, audio_manager),
         }
         self.enable_collision(players);
     }
