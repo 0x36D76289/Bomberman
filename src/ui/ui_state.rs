@@ -1,5 +1,6 @@
 use crate::{
     app_state::{AppState, KeyMap},
+    audio::AudioManager,
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
@@ -75,10 +76,11 @@ impl UiState {
         inputs: &Vec<Input>,
         keys: &KeyMap,
         resources: &Resources,
+        audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self.page {
-            UIPage::MainMenu => self.main_menu_tick(keys),
-            UIPage::Pause => self.pause_tick(inputs, resources),
+            UIPage::MainMenu => self.main_menu_tick(keys, audio_manager),
+            UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
             UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
         }
     }
@@ -97,6 +99,8 @@ impl UiState {
         };
 
         let format = renderer.rcx().swapchain.image_format();
+
+        let window_size: [u32; 2] = renderer.window_size();
 
         let inheritance_rendering_info = CommandBufferInheritanceRenderingInfo {
             color_attachment_formats: vec![Some(format)],
@@ -123,7 +127,7 @@ impl UiState {
                 0,
                 [Viewport {
                     offset: [0.0, 0.0],
-                    extent: renderer.rcx().window.inner_size().into(),
+                    extent: [window_size[0] as f32, window_size[1] as f32],
                     depth_range: 0.0..=1.0,
                 }]
                 .into_iter()
