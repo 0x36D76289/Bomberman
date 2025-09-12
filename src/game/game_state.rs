@@ -270,6 +270,18 @@ impl GameState {
 
         #[cfg(debug_assertions)]
         if keys
+            .get(&PhysicalKey::Code(KeyCode::KeyE))
+            .unwrap_or(&winit::event::ElementState::Released)
+            .is_pressed()
+        {
+            println!("CHEAT CODE ACTIVATED");
+            for player in &mut self.players {
+                player.make_op(resources);
+            }
+        }
+
+        #[cfg(debug_assertions)]
+        if keys
             .get(&PhysicalKey::Code(KeyCode::KeyT))
             .unwrap_or(&winit::event::ElementState::Released)
             .is_pressed()
