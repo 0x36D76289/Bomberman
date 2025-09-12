@@ -1,29 +1,27 @@
-use crate::{
-    app_state::{AppState, KeyMap},
-    audio::AudioManager,
-    game::{
-        Camera,
-        bomb::{Bomb, BombState},
-        game_settings::GameSettings,
-        map::{map::Map, map_element::MapElement, map_settings::MapSettings},
-        player::Player,
-        powerup::PowerUp,
-        resources::Resources,
-    },
-    graphics::{
-        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
-        renderer::RENDER_RES_RATIO, transform::Transform,
-    },
-    input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
-    ui::UiState,
-};
+use crate::app_state::{AppState, KeyMap};
+use crate::game::Camera;
+use crate::game::bomb::{Bomb, BombState};
+use crate::game::game_settings::GameSettings;
+use crate::game::map::map::Map;
+use crate::game::map::map_element::MapElement;
+use crate::game::map::map_settings::MapSettings;
+use crate::game::player::Player;
+use crate::game::powerup::PowerUp;
+use crate::game::resources::Resources;
+use crate::graphics::object::Object;
+use crate::graphics::transform::Transform;
+use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
+use crate::input::input::Input;
+use crate::input::input_state::InputState;
+use crate::input::input_vec::GetOrDefault;
+use crate::ui::UiState;
+use crate::{audio::AudioManager, graphics::renderer::RENDER_RES_RATIO};
 use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-    vec::Vec,
-};
+use std::error::Error;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::vec::Vec;
 use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
@@ -77,7 +75,9 @@ impl GameState {
     ) -> Result<Self, Box<dyn Error>> {
         //HACK: this is not safe, map can fail creation
         //LOIC: true
-        let map = Map::new(settings.map_settings, &resources).unwrap();
+        let Some(map) = Map::new(settings.map_settings, &resources) else {
+            return Err("Map creation fail".into());
+        };
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];

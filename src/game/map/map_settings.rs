@@ -17,6 +17,12 @@ pub struct MapSettings {
 
 impl Default for MapSettings {
     fn default() -> Self {
+        Self::corners()
+    }
+}
+
+impl MapSettings {
+    pub fn corners() -> Self {
         MapSettings {
             width: 15,
             height: 15,
@@ -29,9 +35,7 @@ impl Default for MapSettings {
             attempts: 100,
         }
     }
-}
 
-impl MapSettings {
     pub fn default_cheese() -> Self {
         MapSettings {
             width: 15,
