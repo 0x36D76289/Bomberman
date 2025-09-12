@@ -37,6 +37,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 1,
@@ -60,6 +61,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 2,
@@ -81,6 +83,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 1,
                 down: 2,
@@ -110,6 +113,9 @@ impl UiState {
             return match self.selected {
                 0 => (None, 1), // Resume
                 1 => {
+                    // INFO: Je pense que c'est la creation des etats qui devraient demarrer la
+                    // musique
+
                     // Restart - recommencer la musique du jeu
                     audio_manager.play_background_music(BackgroundMusic::Game);
                     //TODO: make safe

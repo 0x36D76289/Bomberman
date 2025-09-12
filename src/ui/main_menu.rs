@@ -3,7 +3,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::{
     app_state::{AppState, KeyMap},
-    audio::{AudioManager, BackgroundMusic},
+    audio::{AudioManager, BackgroundMusic, audio_manager},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
     ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
@@ -34,24 +34,18 @@ impl UiState {
             page: UIPage::MainMenu,
         }
     }
-
     pub fn main_menu_tick(
         &self,
         keys: &KeyMap,
-        resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
             Some(state) if state.is_pressed() => {
                 // Changer la musique pour le jeu
                 audio_manager.play_background_music(BackgroundMusic::Game);
-
                 (
-                    //TODO: replace with safe variant
-                    Some(AppState::Game(
-                        GameState::default_state(resources, GameSettings::default().unwrap())
-                            .unwrap(),
-                    )),
+                    // TODO: replace player count with value gotten from settings/previous ui
+                    Some(AppState::Ui(UiState::game_settings(2))),
                     0,
                 )
             }
