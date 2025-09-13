@@ -16,6 +16,7 @@ impl Zone {
     /// also add to entities the players encountered
     pub fn fill_zone(mut self, start: Vec2, players: &[Player], map: &Map) -> Self {
         let players_position: Vec<Vec2> = players.iter().map(Player::get_pos).collect();
+        self.add_cell(start, players, &players_position);
         self.filling_zone(start, players, &players_position, map);
         self
     }
@@ -34,14 +35,18 @@ impl Zone {
         let neighbours: Vec<Vec2> = map
             .get_neighbours(start)
             .into_iter()
-            .filter(|neighbour| self.cells.contains(&neighbour))
+            .filter(|neighbour| !self.cells.contains(&neighbour))
             .collect();
         for neighbour in neighbours {
-            self.cells.push(neighbour);
-            if let Some(player_id) = players_position.iter().position(|pos| *pos == neighbour) {
-                self.entities.push(EntityType::Player(player_id as i32));
-            }
+            self.add_cell(neighbour, players, players_position);
             self.filling_zone(neighbour, players, players_position, map);
+        }
+    }
+
+    fn add_cell(&mut self, cell: Vec2, players: &[Player], players_position: &[Vec2]) {
+        self.cells.push(cell);
+        if let Some(player_id) = players_position.iter().position(|pos| *pos == cell) {
+            self.entities.push(EntityType::Player(player_id as i32));
         }
     }
 }
