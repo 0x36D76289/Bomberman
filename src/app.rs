@@ -1,9 +1,10 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::audio::{AudioManager, BackgroundMusic};
-use crate::game::{campaign_state::CampaignState, resources::Resources};
+use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
+use crate::ui::UiState;
 use std::error::Error;
 use winit::event::ElementState;
 use winit::keyboard::PhysicalKey;
@@ -33,13 +34,13 @@ impl App {
         let keys = KeyMap::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        // TEST
-        let campaign_state = AppState::Campaign(CampaignState::new(0, &resources));
-        let state_stack = vec![campaign_state];
+        let gui_state1 = AppState::Ui(UiState::main_menu());
+
+        let state_stack = vec![gui_state1];
 
         let mut audio_manager = AudioManager::new()?;
 
-        audio_manager.play_background_music(BackgroundMusic::Game);
+        audio_manager.play_background_music(BackgroundMusic::Menu);
 
         Ok(Self {
             state_stack,

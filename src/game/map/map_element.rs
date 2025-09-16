@@ -1,3 +1,4 @@
+use glam::Vec2;
 use rand::random_range;
 
 use crate::{game::direction::Direction, graphics::object::Object};
