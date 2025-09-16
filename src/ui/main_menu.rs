@@ -3,21 +3,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::{
     app_state::{AppState, KeyMap},
-<<<<<<< HEAD
-<<<<<<< HEAD
-    audio::{AudioManager, BackgroundMusic},
-    game::{arena_state::ArenaState, game_settings::GameSettings, resources::Resources},
-=======
-    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
->>>>>>> 081d3f4 (started ui for game settings selection)
-=======
     audio::{AudioManager, BackgroundMusic, audio_manager},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-=======
-    audio::{AudioManager, BackgroundMusic},
-    game::{arena_state::ArenaState, game_settings::GameSettings, resources::Resources},
->>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing)
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
     ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
@@ -47,45 +34,21 @@ impl UiState {
             page: UIPage::MainMenu,
         }
     }
-<<<<<<< HEAD
-
     pub fn main_menu_tick(
         &self,
         keys: &KeyMap,
-        resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
             Some(state) if state.is_pressed() => {
+                // Changer la musique pour le jeu
                 audio_manager.play_background_music(BackgroundMusic::Game);
                 (
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
                     // TODO: replace player count with value gotten from settings/previous ui
                     Some(AppState::Ui(UiState::game_settings(2))),
-=======
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
-                    Some(AppState::Arena(
-                        ArenaState::default_state(resources, GameSettings::default().unwrap())
-                            .unwrap(),
-                    )),
-<<<<<<< HEAD
-=======
->>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing)
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
                     0,
                 )
             }
-=======
-    pub fn main_menu_tick(&self, keys: &KeyMap) -> (Option<AppState>, u8) {
-        match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
-            Some(state) if state.is_pressed() => (
-                // TODO: replace player count with value gotten from settings/previous ui
-                Some(AppState::Ui(UiState::game_settings(2))),
-                0,
-            ),
->>>>>>> 081d3f4 (started ui for game settings selection)
             _ => (None, 0),
         }
     }

@@ -79,12 +79,8 @@ impl UiState {
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self.page {
-<<<<<<< HEAD
-            UIPage::MainMenu => self.main_menu_tick(keys, resources, audio_manager),
+            UIPage::MainMenu => self.main_menu_tick(keys, audio_manager),
             UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
-=======
-            UIPage::MainMenu => self.main_menu_tick(keys),
-            UIPage::Pause => self.pause_tick(inputs, resources),
             UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
         }
     }

@@ -4,7 +4,6 @@ use crate::{
         collision::Collision,
         map::{map::Map, map_element::MapElement},
         resources::{ResourceName, Resources},
-        enemy::Enemy,
     },
     graphics::{object::Object, transform::Transform},
     input::input::Input,
@@ -53,12 +52,6 @@ impl Player {
         }
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>, enemies: &mut Vec<Enemy>) {
-=======
-=======
->>>>>>> c19f531 (feat: Add enemy handling to player movement and collision detection)
     fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
@@ -87,13 +80,6 @@ impl Player {
     }
 
     fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>) {
-<<<<<<< HEAD
->>>>>>> 5c17962 (Fixed:)
-=======
-=======
-    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>, enemies: &mut Vec<Enemy>) {
->>>>>>> 317cd01 (feat: Add enemy handling to player movement and collision detection)
->>>>>>> c19f531 (feat: Add enemy handling to player movement and collision detection)
         self.bound(map);
         self.collide_map(map, direction);
         for bomb in bombs {
@@ -105,13 +91,6 @@ impl Player {
                 && bomb.state == BombState::Planted
             {
                 bomb.state = BombState::Sliding(direction);
-            }
-        }
-
-        for enemy in enemies {
-            if self.resolve_collision_with(enemy.position, enemy.get_size(), direction) {
-                self.kill();
-                break;
             }
         }
     }
@@ -137,7 +116,6 @@ impl Player {
         ))
     }
 
-<<<<<<< HEAD
     fn assist_input(&self, input: Input, map: &Map) -> Vec2 {
         let ret = input.as_vec2();
         if ret.y == 0.0 && ret.x != 0.0 {
@@ -165,10 +143,6 @@ impl Player {
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
         let mut motion = self.assist_input(input, map)
-=======
-    pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>, enemies: &mut Vec<Enemy>) {
-        let mut motion = input.as_vec2()
->>>>>>> 317cd01 (feat: Add enemy handling to player movement and collision detection)
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
@@ -186,7 +160,7 @@ impl Player {
                     motion.x += dist;
                     self.position.x -= dist;
                 }
-                self.handle_collisions(map, self.direction, bombs, enemies);
+                self.handle_collisions(map, self.direction, bombs);
             }
             if motion.y != 0.0 {
                 dist = motion.y.abs().min(1.0);
@@ -199,7 +173,7 @@ impl Player {
                     motion.y += dist;
                     self.position.y -= dist;
                 }
-                self.handle_collisions(map, self.direction, bombs, enemies);
+                self.handle_collisions(map, self.direction, bombs);
             }
         }
         match &mut self.object {

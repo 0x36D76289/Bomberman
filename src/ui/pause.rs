@@ -3,7 +3,7 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     audio::{AudioManager, BackgroundMusic},
-    game::{arena_state::ArenaState, game_settings::GameSettings, resources::Resources},
+    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
     input::input::Input,
     ui::{
         UiState,
@@ -20,16 +20,22 @@ impl UiState {
             width: 0.5,
             height: 0.5,
             color: Vec4::ZERO.with_w(0.6),
-            ..Default::default()
+            texture: None,
+            text: None,
+            text_color: None,
+            text_size: None,
         };
 
         let mut resume = Button {
             canvas: Canvas {
                 center: Vec2::new(0.0, -0.2),
+                width: 0.0,
+                height: 0.0,
+                color: Vec4::ZERO,
+                texture: None,
                 text: Some("Resume".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
-                ..Default::default()
             },
             outline_color: None,
             neighbors: ButtonNeighbors {
@@ -38,18 +44,22 @@ impl UiState {
                 left: 0,
                 right: 0,
             },
+            selected_color: Vec4::ZERO,
             selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            ..Default::default()
+            selected_texture: None,
         };
         resume.toggle();
 
         let restart = Button {
             canvas: Canvas {
                 center: Vec2::new(0.0, 0.0),
+                width: 0.0,
+                height: 0.0,
+                color: Vec4::ZERO,
+                texture: None,
                 text: Some("Restart".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
-                ..Default::default()
             },
             outline_color: None,
             neighbors: ButtonNeighbors {
@@ -58,16 +68,20 @@ impl UiState {
                 left: 1,
                 right: 1,
             },
+            selected_color: Vec4::ZERO,
             selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            ..Default::default()
+            selected_texture: None,
         };
         let menu = Button {
             canvas: Canvas {
                 center: Vec2::new(0.0, 0.2),
+                width: 0.0,
+                height: 0.0,
+                color: Vec4::ZERO,
+                texture: None,
                 text: Some("Menu".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
-                ..Default::default()
             },
             outline_color: None,
             neighbors: ButtonNeighbors {
@@ -76,8 +90,9 @@ impl UiState {
                 left: 2,
                 right: 2,
             },
+            selected_color: Vec4::ZERO,
             selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            ..Default::default()
+            selected_texture: None,
         };
 
         Self {
@@ -98,29 +113,22 @@ impl UiState {
             return match self.selected {
                 0 => (None, 1), // Resume
                 1 => {
-<<<<<<< HEAD
-                    // Restart
-=======
-<<<<<<< HEAD
                     // INFO: Je pense que c'est la creation des etats qui devraient demarrer la
                     // musique
 
                     // Restart - recommencer la musique du jeu
-=======
-                    // Restart
->>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing)
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
                     audio_manager.play_background_music(BackgroundMusic::Game);
+                    //TODO: make safe
                     (
-                        Some(AppState::Arena(
-                            ArenaState::default_state(resources, GameSettings::default().unwrap())
+                        Some(AppState::Game(
+                            GameState::default_state(resources, GameSettings::default().unwrap())
                                 .unwrap(),
                         )),
                         2,
                     )
                 }
                 _ => {
-                    // Menu
+                    // Menu - retourner à la musique du menu
                     audio_manager.play_background_music(BackgroundMusic::Menu);
                     (None, 2)
                 }

@@ -1,44 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD:src/game/arena_state.rs
-use crate::{
-    app_state::{AppState, KeyMap},
-    audio::AudioManager,
-    game::{
-        bomb::{Bomb, BombState},
-        camera::Camera,
-        game_settings::GameSettings,
-        map::{map::Map, map_element::MapElement, map_settings::MapSettings},
-        player::Player,
-        powerup::PowerUp,
-        resources::Resources,
-    },
-    graphics::{
-        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
-        renderer::RENDER_RES_RATIO, transform::Transform,
-    },
-    input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
-    ui::UiState,
-};
-use glam::{Vec2, Vec3, Vec4, bool};
-use rand::random_range;
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-    vec::Vec,
-};
-use vulkano::{
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
-        CommandBufferInheritanceRenderPassType, CommandBufferInheritanceRenderingInfo,
-        CommandBufferUsage, SecondaryAutoCommandBuffer,
-    },
-    descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    format::Format,
-    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
-=======
-=======
-<<<<<<< HEAD:src/game/game_state.rs
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
 use crate::app_state::{AppState, KeyMap};
 use crate::game::Camera;
 use crate::game::bomb::{Bomb, BombState};
@@ -56,46 +15,27 @@ use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::GetOrDefault;
 use crate::ui::UiState;
-<<<<<<< HEAD
-=======
 use crate::{audio::AudioManager, graphics::renderer::RENDER_RES_RATIO};
-=======
-use crate::{
-    app_state::{AppState, KeyMap},
-    audio::AudioManager,
-    game::{
-        bomb::{Bomb, BombState},
-        camera::Camera,
-        game_settings::GameSettings,
-        map::{map::Map, map_element::MapElement, map_settings::MapSettings},
-        player::Player,
-        powerup::PowerUp,
-        resources::Resources,
-    },
-    graphics::{
-        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
-        renderer::RENDER_RES_RATIO, transform::Transform,
-    },
-    input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
-    ui::UiState,
-};
->>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing):src/game/arena_state.rs
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
 use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
 use std::error::Error;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec::Vec;
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferInheritanceInfo, CommandBufferInheritanceRenderPassType,
-    CommandBufferInheritanceRenderingInfo, CommandBufferUsage, SecondaryAutoCommandBuffer,
->>>>>>> 081d3f4 (started ui for game settings selection):src/game/game_state.rs
+use vulkano::{
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
+        CommandBufferInheritanceRenderPassType, CommandBufferInheritanceRenderingInfo,
+        CommandBufferUsage, SecondaryAutoCommandBuffer,
+    },
+    descriptor_set::{DescriptorSet, WriteDescriptorSet},
+    format::Format,
+    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone)]
-pub struct ArenaState {
+pub struct GameState {
     players: Vec<Player>,
     game_inputs: Vec<Input>,
     nb_humans: u32,
@@ -106,7 +46,7 @@ pub struct ArenaState {
     light: LightInfo,
 }
 
-impl ArenaState {
+impl GameState {
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
@@ -128,29 +68,16 @@ impl ArenaState {
         players
     }
 
+    //TODO: add get_input_player -> returns Released if p doesn't exist
     pub fn default_state(
         resources: &Resources,
         settings: GameSettings,
     ) -> Result<Self, Box<dyn Error>> {
-<<<<<<< HEAD
-<<<<<<< HEAD:src/game/arena_state.rs
-        let map = Map::new(settings.map_settings, resources).unwrap();
-=======
-=======
-<<<<<<< HEAD:src/game/game_state.rs
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
         //HACK: this is not safe, map can fail creation
         //LOIC: true
         let Some(map) = Map::new(settings.map_settings, &resources) else {
             return Err("Map creation fail".into());
         };
-<<<<<<< HEAD
->>>>>>> 7dba894 (created consts.rs to store shared ui state, made menu start game):src/game/game_state.rs
-=======
-=======
-        let map = Map::new(settings.map_settings, resources).unwrap();
->>>>>>> 360c3aa (feat: Implement a simple single-player system, with enemies, and pathing):src/game/arena_state.rs
->>>>>>> 71022cd (feat: Implement a simple single-player system, with enemies, and pathing)
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
@@ -215,6 +142,28 @@ impl ArenaState {
             .chain(power_up_objects)
     }
 
+    #[cfg(debug_assertions)]
+    #[allow(unused)]
+    pub fn print(&self) {
+        let mut display = self.map.to_str();
+        for player in &self.players {
+            println!("player pos: {} {}", player.position.x, player.position.y);
+            let y: usize = player.position.y as usize;
+            let x: usize = player.position.x as usize;
+            println!("player pos: {} {}", x, y);
+            let pos: usize = y * (self.map.width + 1) + x;
+            display.replace_range(pos..pos + 1, "+");
+        }
+        for bomb in &self.bombs {
+            let y: usize = bomb.position.y as usize;
+            let x: usize = bomb.position.x as usize;
+            let pos: usize = y * (self.map.width + 1) + x;
+            display.replace_range(pos..pos + 1, "O");
+        }
+
+        print!("{}", display);
+    }
+
     fn mp_game_tick(
         &mut self,
         delta: f32,
@@ -226,7 +175,6 @@ impl ArenaState {
             bomb.tick(
                 delta,
                 &mut self.players,
-                &mut vec![], // No enemies in arena mode
                 &mut self.map,
                 &mut self.power_ups,
                 resources,
@@ -250,11 +198,11 @@ impl ArenaState {
             if !player.alive {
                 continue;
             }
-            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed {
-                if let Some(bomb) = player.create_bomb(resources, &self.bombs) {
-                    audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
-                    self.bombs.push(bomb)
-                }
+            if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
+                && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
+            {
+                audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
+                self.bombs.push(bomb)
             }
         }
         for (i, player) in self.players.iter_mut().enumerate() {
@@ -263,9 +211,10 @@ impl ArenaState {
                 delta,
                 &self.map,
                 &mut self.bombs,
-                &mut vec![], // No enemies in arena modes
             );
         }
+        // uncomment this and comment the previous line to control the camera
+        // self.camera.keyboard_move(&self.game_inputs[0], delta);
     }
 
     fn restart_inside(&mut self, keys: &KeyMap, resources: &Resources) {
@@ -278,6 +227,7 @@ impl ArenaState {
             .is_pressed();
 
         if is_pressed && !*was_pressed {
+            //HACK: this is the only part that would be kept if this wasn't a silly bind
             self.map = Map::new(
                 MapSettings {
                     spawns: random_range(2..=8),
@@ -300,6 +250,7 @@ impl ArenaState {
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
+        //Pause
         if keys
             .get(&PhysicalKey::Code(KeyCode::Escape))
             .unwrap_or(&winit::event::ElementState::Released)
@@ -311,6 +262,9 @@ impl ArenaState {
         #[cfg(debug_assertions)]
         self.restart_inside(keys, resources);
 
+        // let state_func = match self.mode {
+        //     Mode::MpGame => Self::mp_game_tick,
+        // };
         self.inputs_to_game_inputs(inputs);
         self.mp_game_tick(delta_time, resources, audio_manager);
 
@@ -332,12 +286,14 @@ impl ArenaState {
             .unwrap_or(&winit::event::ElementState::Released)
             .is_pressed()
         {
-            return (Some(AppState::Arena(self.recreate(resources))), 1);
+            return (Some(AppState::Game(self.recreate(resources))), 1);
         }
 
+        //TODO: return new AppState if needed and number of elements to pop from appstate_stack
         (None, 0)
     }
 
+    // Put the inputs read into game inputs
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
             self.game_inputs[i] = input.clone();
@@ -350,12 +306,19 @@ impl ArenaState {
         renderer: &Renderer,
         resources: &Resources,
     ) -> Arc<SecondaryAutoCommandBuffer> {
-        let pipeline = renderer.game_pipeline.as_ref().unwrap().clone();
+        let pipeline = match renderer.game_pipeline.as_ref() {
+            Some(pipeline) => pipeline.clone(),
+            None => panic!(
+                "Called render on a GameState object but the game_pipeline is not initialized in the renderer"
+            ),
+        };
+
         let window_size: [u32; 2] = renderer.window_size();
         let game_resolution = [
             window_size[0] / RENDER_RES_RATIO[0],
             window_size[1] / RENDER_RES_RATIO[1],
         ];
+
         let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
         let mut camera = Camera::new();
         let mut clipping = self.map.width.max(self.map.height) as f32 / 2.0;
@@ -380,11 +343,13 @@ impl ArenaState {
         };
 
         let format = renderer.rcx().swapchain.image_format();
+
         let inheritance_rendering_info = CommandBufferInheritanceRenderingInfo {
             color_attachment_formats: vec![Some(format)],
             depth_attachment_format: Some(Format::D32_SFLOAT),
             ..Default::default()
         };
+
         let mut secondary_builder = AutoCommandBufferBuilder::secondary(
             vulkan.command_buffer_allocator.clone(),
             vulkan.queue.queue_family_index(),
@@ -416,6 +381,7 @@ impl ArenaState {
         let uniform_buffer = {
             let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
             *buffer.write().unwrap() = global_ubo;
+
             buffer
         };
 
