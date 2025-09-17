@@ -5,6 +5,7 @@ use crate::{
     graphics::{GuiPush, Renderer, Vulkan},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings, utils::GetRatio},
+    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings, utils::GetRatio},
 };
 use glam::Vec4;
 use std::sync::Arc;
@@ -77,6 +78,7 @@ impl UiState {
 
     pub fn tick(
         &mut self,
+        delta: f32,
         delta: f32,
         inputs: &Vec<Input>,
         _keys: &KeyMap,
@@ -178,7 +180,21 @@ impl UiState {
             }
             ret
         };
+        let button_canvaces = {
+            let mut ret = Vec::new();
+            for canvas in self
+                .buttons
+                .iter()
+                .map(|b| b.generate_canvases(renderer.window_size().get_ratio()))
+                .flatten()
+                .flatten()
+            {
+                ret.push(canvas);
+            }
+            ret
+        };
 
+        for canvas in canvases.chain(button_canvaces.iter()) {
         for canvas in canvases.chain(button_canvaces.iter()) {
             // draw the canvas
             let vertex_buffer = canvas.into_vertex_buffer(vulkan.memory_allocator.clone());
@@ -204,6 +220,7 @@ impl UiState {
                         canvas.text_size.unwrap_or(1.0),
                         canvas.center,
                         vulkan.memory_allocator.clone(),
+                        renderer.window_size().get_ratio(),
                         renderer.window_size().get_ratio(),
                     );
 

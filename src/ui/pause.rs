@@ -114,7 +114,7 @@ impl UiState {
             return match self.selected {
                 0 => (None, 1), // Resume
                 1 => {
-                    // Restart
+                    // Restart - recommencer la musique du jeu
                     audio_manager.play_background_music(BackgroundMusic::Game);
                     if let Some(game_state) = GameState::new_campaign(1, 3) {
                         (Some(AppState::Game(game_state)), 2)
