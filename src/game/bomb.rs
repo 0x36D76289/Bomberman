@@ -3,7 +3,7 @@ use core::f32;
 use glam::{Vec2, Vec3, usize};
 use rand::random_range;
 
-use super::collision::Collision;
+use super::{collision::Collision, enemy::Enemy};
 use crate::{
     audio::{AudioManager, SoundEffect},
     game::{
@@ -94,7 +94,11 @@ impl Bomb {
         if self.collision_enabled {
             return;
         }
-        if !players[self.owner_id as usize].is_colliding_with(self.position, 0.5) {
+        if let Some(owner) = players.get(self.owner_id as usize) {
+            if !owner.is_colliding_with(self.position, 0.5) {
+                self.collision_enabled = true;
+            }
+        } else {
             self.collision_enabled = true;
         }
     }
@@ -115,7 +119,7 @@ impl Bomb {
             let pos = self.position + dirvec * i as f32;
             let elem = map.get_elem_pos(pos);
             match elem {
-                MapElement::Empty => continue,
+                MapElement::Empty | MapElement::Exit(_) => continue,
                 MapElement::Breakable(_) => {
                     let _ = map.set_elem_pos(pos, MapElement::Empty);
                     if random_range(1..=100) <= PERCENTAGE_POWERUP_SPAWN {
@@ -227,46 +231,55 @@ impl Bomb {
         }
     }
 
+    fn is_pos_in_explosion(&self, pos: Vec2, radius: f32) -> bool {
+        let (px, py) = pos.into();
+        let (bx, by) = self.position.into();
+
+        if ((px - bx).abs() < (BOMB_EXPLOSION_RADIUS + radius))
+            && ((py + radius) > (by - self.explosion.up as f32 - BOMB_EXPLOSION_RADIUS))
+            && ((py - radius) < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
+        {
+            return true;
+        }
+
+        if ((py - by).abs() < (BOMB_EXPLOSION_RADIUS + radius))
+            && ((px + radius) > (bx - self.explosion.left as f32 - BOMB_EXPLOSION_RADIUS))
+            && ((px - radius) < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
+        {
+            return true;
+        }
+
+        false
+    }
+
     fn exploding_bomb(
         &mut self,
         delta: f32,
         players: &mut Vec<Player>,
+        enemies: &mut Vec<Enemy>,
         audio_manager: &mut AudioManager,
     ) {
         if self.timer >= BOMB_EXPLOSION_TIME {
             self.despawn = true;
-            players[self.owner_id as usize].bombs_remaining += 1;
+            if let Some(player) = players.get_mut(self.owner_id as usize) {
+                player.bombs_remaining += 1;
+            }
         }
         self.timer += delta;
 
         // kill players
         for player in players.alive() {
-            let mut kill = false;
-
-            let (px, py) = player.position.into();
-            let (bx, by) = self.position.into();
-
-            if ((px - bx).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()))
-                && ((py + player.get_size())
-                    > (by - self.explosion.up as f32 - BOMB_EXPLOSION_RADIUS))
-                && ((py - player.get_size())
-                    < (by + self.explosion.down as f32 + BOMB_EXPLOSION_RADIUS))
-            {
-                kill = true;
-            }
-
-            if ((py - by).abs() < (BOMB_EXPLOSION_RADIUS + player.get_size()))
-                && ((px + player.get_size())
-                    > (bx - self.explosion.left as f32 - BOMB_EXPLOSION_RADIUS))
-                && ((px - player.get_size())
-                    < (bx + self.explosion.right as f32 + BOMB_EXPLOSION_RADIUS))
-            {
-                kill = true;
-            }
-
-            if kill {
+            if self.is_pos_in_explosion(player.position, player.get_size()) {
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
                 player.kill();
+            }
+        }
+
+        // kill enemies
+        for enemy in enemies.iter_mut().filter(|e| e.alive) {
+            if self.is_pos_in_explosion(enemy.position, enemy.get_size()) {
+                audio_manager.play_sound_effect(SoundEffect::EnemyDeath);
+                enemy.kill();
             }
         }
     }
@@ -307,6 +320,7 @@ impl Bomb {
         &mut self,
         delta: f32,
         players: &mut Vec<Player>,
+        enemies: &mut Vec<Enemy>,
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
@@ -318,7 +332,7 @@ impl Bomb {
                 self.slide(direction, delta, map, players);
                 self.live_bomb(delta, map, power_ups, resources, audio_manager);
             }
-            BombState::Exploding => self.exploding_bomb(delta, players, audio_manager),
+            BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
         }
         self.enable_collision(players);
     }

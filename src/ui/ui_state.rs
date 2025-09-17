@@ -18,12 +18,17 @@ use vulkano::{
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
 
-/// What UI is in use
 #[derive(Debug, Copy, Clone)]
 pub enum UIPage {
     MainMenu,
     Pause,
     GameSettings(UIGameSettings),
+    GameOver,
+    StageClear {
+        timer: f32,
+        next_level: u32,
+        lives: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +58,7 @@ impl UiState {
 
     /// Returns true if confirm button is used
     pub fn button_inputs(&mut self, inputs: &Vec<Input>) -> bool {
-        if self.buttons.len() != 0 {
+        if !self.buttons.is_empty() {
             if inputs.menu_up() == InputState::Pressed {
                 self.select_button(self.buttons[self.selected].neighbors.up);
             }
@@ -74,14 +79,16 @@ impl UiState {
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
-        keys: &KeyMap,
+        _keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         match self.page {
-            UIPage::MainMenu => self.main_menu_tick(keys, audio_manager),
+            UIPage::MainMenu => self.main_menu_tick(inputs, audio_manager),
             UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
             UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
+            UIPage::GameOver => self.game_over_tick(inputs, audio_manager),
+            UIPage::StageClear { .. } => self.stage_clear_tick(delta),
         }
     }
 

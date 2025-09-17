@@ -1,5 +1,3 @@
-// game/mod.rs
-
 pub mod bomb;
 pub mod camera;
 pub mod collision;
