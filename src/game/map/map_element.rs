@@ -20,6 +20,10 @@ impl SpawnPoint {
         };
         SpawnPoint { direction, x, y }
     }
+
+    pub fn position(&self) -> Vec2 {
+        Vec2::new(self.x as f32 + 0.5, self.y as f32 + 0.5)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,6 +31,7 @@ pub enum MapElement {
     Empty,
     Breakable(Object),
     Unbreakable(Object),
+    Exit(Object),
 }
 
 impl MapElement {
@@ -37,6 +42,7 @@ impl MapElement {
             MapElement::Empty => ' ',
             MapElement::Breakable(_) => '#',
             MapElement::Unbreakable(_) => 'X',
+            MapElement::Exit(_) => 'O',
         }
     }
 }

@@ -53,6 +53,10 @@ impl App {
         })
     }
 
+    pub fn get_resources(&self) -> &Resources {
+        &self.resources
+    }
+
     fn record_key(&mut self, code: PhysicalKey, state: ElementState) {
         self.keys.insert(code, state);
     }
@@ -77,11 +81,12 @@ impl App {
             &mut self.audio_manager,
         );
         for _ in 0..res.1 {
-            self.state_stack.pop();
-            //TODO: if last state popped then handle application stop
+            if self.state_stack.pop().is_none() {
+                // TODO: Handle application stop if last state is popped
+            }
         }
-        if res.0.is_some() {
-            self.state_stack.push(res.0.unwrap());
+        if let Some(new_state) = res.0 {
+            self.state_stack.push(new_state);
         }
     }
 

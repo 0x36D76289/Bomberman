@@ -653,13 +653,16 @@ impl Renderer {
         )
         .unwrap();
 
-        let states_to_skip = states.len()
-            - 1
-            - states
-                .iter()
-                .rev()
-                .take_while(|s| s.is_transparent())
-                .count();
+        let transparent_count = states
+            .iter()
+            .rev()
+            .take_while(|s| s.is_transparent())
+            .count();
+        let states_to_skip = if states.len() > 0 {
+            (states.len() - 1).saturating_sub(transparent_count)
+        } else {
+            0
+        };
         let mut is_first = true;
         for state in states.iter().skip(states_to_skip) {
             self.render_state(
