@@ -289,7 +289,7 @@ impl GameState {
 
         // Tick enemies
         for enemy in &mut self.enemies {
-            enemy.tick(delta, &self.map);
+            enemy.tick(delta, &self.map, &self.bombs);
             if self.players[0].alive
                 && enemy.alive
                 && self.players[0].is_colliding_with(enemy.position, enemy.get_size())
