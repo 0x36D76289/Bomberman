@@ -1,28 +1,29 @@
-use crate::app_state::{AppState, KeyMap};
-use crate::game::bomb::{Bomb, BombState};
-use crate::game::camera::Camera;
-use crate::game::collision::Collision;
-use crate::game::enemy::Enemy;
-use crate::game::game_settings::GameSettings;
-use crate::game::map::map::{LevelData, Map};
-use crate::game::map::map_element::MapElement;
-use crate::game::map::map_settings::MapSettings;
-use crate::game::player::Player;
-use crate::game::powerup::PowerUp;
-use crate::game::resources::{ResourceName, Resources};
-use crate::graphics::object::Object;
-use crate::graphics::renderer::RENDER_RES_RATIO;
-use crate::graphics::transform::Transform;
-use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
-use crate::input::input::Input;
-use crate::input::input_state::InputState;
-use crate::input::input_vec::GetOrDefault;
-use crate::ui::UiState;
-use crate::{audio::AudioManager, audio::SoundEffect};
-use glam::{Vec2, Vec3, Vec4};
-use std::error::Error;
-use std::sync::Arc;
-use std::vec::Vec;
+use crate::{
+    app_state::{AppState, KeyMap},
+    audio::AudioManager,
+    game::{
+        Camera,
+        bomb::{Bomb, BombState},
+        game_settings::GameSettings,
+        map::{map::Map, map_element::MapElement, map_settings::MapSettings},
+        player::Player,
+        powerup::PowerUp,
+        resources::Resources,
+    },
+    graphics::{
+        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
+        renderer::RENDER_RES_RATIO, transform::Transform,
+    },
+    input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
+    ui::UiState,
+};
+use glam::{Vec2, Vec3, Vec4, bool};
+use rand::random_range;
+use std::{
+    error::Error,
+    sync::{Arc, Mutex},
+    vec::Vec,
+};
 use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
@@ -77,9 +78,9 @@ impl GameState {
         resources: &Resources,
         settings: GameSettings,
     ) -> Result<Self, Box<dyn Error>> {
-        let Some(map) = MapSettings::new_map(settings.map_settings, resources) else {
-            return Err("Map creation fail".into());
-        };
+        //HACK: this is not safe, map can fail creation
+        //LOIC: true
+        let map = Map::new(settings.map_settings, &resources).unwrap();
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
@@ -350,34 +351,22 @@ impl GameState {
         }
 
         self.inputs_to_game_inputs(inputs);
+        self.mp_game_tick(delta_time, resources, audio_manager);
 
-        let result = match self.mode {
-            GameMode::Multiplayer => {
-                self.mp_game_tick(delta_time, resources, audio_manager);
-                GameTickResult::None
-            }
-            GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
-        };
-
-        match result {
-            GameTickResult::LevelComplete => {
-                if let Some(progress) = &self.campaign_progress {
-                    (
-                        Some(AppState::Ui(UiState::stage_clear(
-                            progress.level,
-                            progress.lives,
-                        ))),
-                        1,
-                    )
-                } else {
-                    (None, 0)
-                }
-            }
-            GameTickResult::GameOver => (Some(AppState::Ui(UiState::game_over())), 1),
-            GameTickResult::None => (None, 0),
+        #[cfg(debug_assertions)]
+        if keys
+            .get(&PhysicalKey::Code(KeyCode::KeyT))
+            .unwrap_or(&winit::event::ElementState::Released)
+            .is_pressed()
+        {
+            return (Some(AppState::Game(self.recreate(resources))), 1);
         }
+
+        //TODO: return new AppState if needed and number of elements to pop from appstate_stack
+        (None, 0)
     }
 
+    // Put the inputs read into game inputs
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
             if i < self.game_inputs.len() {

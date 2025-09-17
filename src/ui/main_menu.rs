@@ -1,15 +1,10 @@
 use glam::{Vec2, Vec4};
 
 use crate::{
-    app_state::AppState,
-    audio::AudioManager,
-    input::input::Input,
-    ui::{
-        UiState,
-        button::{Button, ButtonNeighbors},
-        canvas::Canvas,
-        ui_state::UIPage,
-    },
+    app_state::{AppState, KeyMap},
+    audio::{AudioManager, BackgroundMusic},
+    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
+    ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
 impl UiState {
@@ -67,31 +62,27 @@ impl UiState {
             page: UIPage::MainMenu,
         }
     }
-
     pub fn main_menu_tick(
-        &mut self,
-        inputs: &Vec<Input>,
+        &self,
+        keys: &KeyMap,
+        resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        if self.button_inputs(inputs) {
-            audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
-            return match self.selected {
-                0 => {
-                    // Campaign
-                    match crate::game::game_state::GameState::new_campaign(1, 3) {
-                        Some(game_state) => (Some(AppState::Game(game_state)), 1),
-                        None => {
-                            println!("Error: Failed to load campaign level 1");
-                            (None, 0)
-                        }
-                    }
-                }
-                1 => {
-                    // Multiplayer
-                    (Some(AppState::Ui(UiState::game_settings(2))), 1)
-                }
-                _ => (None, 0),
-            };
+        match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
+            Some(state) if state.is_pressed() => {
+                // Changer la musique pour le jeu
+                audio_manager.play_background_music(BackgroundMusic::Game);
+
+                (
+                    //TODO: replace with safe variant
+                    Some(AppState::Game(
+                        GameState::default_state(resources, GameSettings::default().unwrap())
+                            .unwrap(),
+                    )),
+                    0,
+                )
+            }
+            _ => (None, 0),
         }
         (None, 0)
     }

@@ -145,10 +145,7 @@ impl Player {
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
-        if !self.alive {
-            return;
-        }
-        let mut motion = self.assist_input(input, map)
+        let mut motion = input.as_vec2()
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
