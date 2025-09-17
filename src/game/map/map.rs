@@ -288,7 +288,7 @@ impl Map {
                     }
                     'O' => {
                         exit_pos = pos;
-                        MapElement::Breakable(breakable_obj.clone());
+                        MapElement::Breakable(breakable_obj.clone())
                     }
                     _ => MapElement::Empty,
                 };
