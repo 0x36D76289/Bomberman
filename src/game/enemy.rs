@@ -53,7 +53,7 @@ impl Enemy {
         self.object = None;
     }
 
-    pub fn tick(&mut self, delta: f32, map: &Map, bombs: &[super::bomb::Bomb]) {
+    pub fn tick(&mut self, delta: f32, map: &Map) {
         if !self.alive {
             return;
         }
@@ -67,17 +67,6 @@ impl Enemy {
             let mut rng = rand::rng();
             let directions: Vec<_> = Direction::iterator().collect();
             self.direction = **directions.choose(&mut rng).unwrap();
-        }
-
-        // Check for bomb collisions
-        for bomb in bombs {
-            if self.is_colliding_with(bomb.get_pos(), bomb.get_size()) {
-                self.position -= motion; // step back
-                let mut rng = rand::rng();
-                let directions: Vec<_> = Direction::iterator().collect();
-                self.direction = **directions.choose(&mut rng).unwrap();
-                break;
-            }
         }
 
         // Update object visuals
