@@ -1,5 +1,7 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::audio::{AudioManager, BackgroundMusic};
+use crate::game::game_settings::GameSettings;
+use crate::game::game_state::GameState;
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
@@ -35,8 +37,11 @@ impl App {
         let inputs = vec![Input::default(); settings.binds.len()];
 
         let gui_state1 = AppState::Ui(UiState::main_menu());
+        let game_state1 = AppState::Game(
+            GameState::default_state(&resources, GameSettings::default().unwrap()).unwrap(),
+        );
 
-        let state_stack = vec![gui_state1];
+        let state_stack = vec![game_state1];
 
         let mut audio_manager = AudioManager::new()?;
 
@@ -86,9 +91,11 @@ impl App {
     }
 
     fn render(&mut self) {
-        self.graphics
-            .renderer
-            .render(&self.graphics.vulkan, &self.state_stack, &self.resources);
+        self.graphics.renderer.render_states(
+            &self.graphics.vulkan,
+            &self.state_stack,
+            &self.resources,
+        );
         self.graphics.renderer.update_time();
         self.graphics.renderer.update_title(&format!(
             "Bomberman!! fps: {:.0}",
@@ -105,9 +112,7 @@ impl ApplicationHandler for App {
 
         if !renderer.is_initialized() {
             renderer.init_render_context(event_loop, vulkan);
-            renderer.create_gui_pipeline(vulkan);
-            renderer.create_game_pipeline(vulkan);
-            renderer.create_postprocess_pipeline(vulkan);
+            renderer.create_pipelines(vulkan);
         }
     }
 

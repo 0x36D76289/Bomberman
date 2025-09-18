@@ -10,30 +10,13 @@ use crate::{
         powerup::PowerUp,
         resources::Resources,
     },
-    graphics::{
-        GamePush, GlobalUbo, LightInfo, Renderer, Vulkan, object::Object,
-        renderer::RENDER_RES_RATIO, transform::Transform,
-    },
+    graphics::{GlobalUbo, LightInfo, object::Object, transform::Transform},
     input::{input::Input, input_state::InputState, input_vec::GetOrDefault},
     ui::UiState,
 };
 use glam::{Vec2, Vec3, Vec4, bool};
 use rand::random_range;
-use std::{
-    error::Error,
-    sync::{Arc, Mutex},
-    vec::Vec,
-};
-use vulkano::{
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferInheritanceInfo,
-        CommandBufferInheritanceRenderPassType, CommandBufferInheritanceRenderingInfo,
-        CommandBufferUsage, SecondaryAutoCommandBuffer,
-    },
-    descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    format::Format,
-    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
-};
+use std::{error::Error, sync::Mutex, vec::Vec};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone)]
@@ -90,7 +73,7 @@ impl GameState {
 
         let light = LightInfo {
             ambient_light_color: Vec4::ONE.with_w(0.8),
-            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            direction_to_light: Vec3::new(-1.0, -1.0, 1.0).normalize(),
             directional_light_color: Vec4::ONE.with_w(0.6),
         };
 
@@ -288,139 +271,58 @@ impl GameState {
         }
     }
 
-    pub fn render(
-        &self,
-        vulkan: &Vulkan,
-        renderer: &Renderer,
-        resources: &Resources,
-    ) -> Arc<SecondaryAutoCommandBuffer> {
-        let pipeline = match renderer.game_pipeline.as_ref() {
-            Some(pipeline) => pipeline.clone(),
-            None => panic!(
-                "Called render on a GameState object but the game_pipeline is not initialized in the renderer"
-            ),
+    pub fn create_ubo(&self, aspect_ratio: f32) -> GlobalUbo {
+        let camera = {
+            let mut camera = Camera::new();
+            let clip = (self.map.width.max(self.map.height) as f32 / 2.0) * 1.15;
+            camera.set_orthographic_projection(
+                -clip * aspect_ratio,
+                clip * aspect_ratio,
+                -clip,
+                clip,
+                -clip,
+                clip * 2.0,
+            );
+            camera.set_view_xyz(self.camera.translation, self.camera.rotation);
+            camera
         };
 
-        let window_size: [u32; 2] = renderer.window_size();
-        let game_resolution = [
-            window_size[0] / RENDER_RES_RATIO[0],
-            window_size[1] / RENDER_RES_RATIO[1],
-        ];
+        let light = {
+            let mut light = Camera::new();
+            let clip = (self.map.width.max(self.map.height) as f32 / 2.0) * 2.0;
+            light.set_orthographic_projection(
+                -clip * aspect_ratio,
+                clip * aspect_ratio,
+                -clip,
+                clip,
+                -clip,
+                clip * 2.0,
+            );
+            let map_center = Vec3::new(
+                self.map.width as f32 / 2.0,
+                0.0,
+                self.map.height as f32 / 2.0,
+            );
+            let direction_to_light = self.light.direction_to_light;
+            let light_pos = Vec3::new(
+                map_center.x + map_center.x * direction_to_light.x,
+                direction_to_light.y,
+                map_center.z + map_center.z * direction_to_light.z,
+            );
+            light.set_view_direction(light_pos, direction_to_light * -1.0);
+            light
+        };
 
-        let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
-        let mut camera = Camera::new();
-        let mut clipping = self.map.width.max(self.map.height) as f32 / 2.0;
-        clipping *= 1.15;
-        camera.set_orthographic_projection(
-            -clipping * aspect_ratio,
-            clipping * aspect_ratio,
-            -clipping,
-            clipping,
-            -clipping,
-            clipping,
-        );
-        camera.set_view_xyz(self.camera.translation, self.camera.rotation);
-
-        let global_ubo = GlobalUbo {
+        GlobalUbo {
             projection: camera.projection_matrix.to_cols_array_2d(),
             view: camera.view_matrix.to_cols_array_2d(),
             inverse_view: camera.inverse_view_matrix.to_cols_array_2d(),
-            light_view: camera.view_matrix.to_cols_array_2d(),
+            light_view: light.view_matrix.to_cols_array_2d(),
+            light_projection: light.projection_matrix.to_cols_array_2d(),
             ambient_light_color: self.light.ambient_light_color.into(),
             direction_to_light: self.light.direction_to_light.to_array().into(),
             directional_light_color: self.light.directional_light_color.into(),
-        };
-
-        let format = renderer.rcx().swapchain.image_format();
-
-        let inheritance_rendering_info = CommandBufferInheritanceRenderingInfo {
-            color_attachment_formats: vec![Some(format)],
-            depth_attachment_format: Some(Format::D32_SFLOAT),
-            ..Default::default()
-        };
-
-        let mut secondary_builder = AutoCommandBufferBuilder::secondary(
-            vulkan.command_buffer_allocator.clone(),
-            vulkan.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-            CommandBufferInheritanceInfo {
-                render_pass: Some(CommandBufferInheritanceRenderPassType::BeginRendering(
-                    inheritance_rendering_info,
-                )),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-
-        secondary_builder
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .set_viewport(
-                0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: [game_resolution[0] as f32, game_resolution[1] as f32],
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
-            )
-            .unwrap();
-
-        let uniform_buffer = {
-            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-            *buffer.write().unwrap() = global_ubo;
-
-            buffer
-        };
-
-        let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new_variable(
-            vulkan.descriptor_set_allocator.clone(),
-            layout.clone(),
-            resources.textures.len() as u32,
-            [
-                WriteDescriptorSet::buffer(0, uniform_buffer),
-                WriteDescriptorSet::sampler(1, renderer.sampler.clone()),
-                WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
-            ],
-            [],
-        )
-        .unwrap();
-
-        secondary_builder
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .unwrap();
-
-        for object in self.objects_to_render() {
-            let push_constant = GamePush {
-                model_matrix: object.transform.mat4().to_cols_array_2d(),
-                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-                color: object.color.to_array(),
-                tex_index: object.texture.unwrap_or(-1),
-            };
-
-            secondary_builder
-                .push_constants(pipeline.layout().clone(), 0, push_constant)
-                .unwrap()
-                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
-                .unwrap()
-                .bind_index_buffer(object.model.index_buffer.clone())
-                .unwrap();
-
-            unsafe {
-                secondary_builder
-                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
-                    .unwrap();
-            }
         }
-
-        secondary_builder.build().unwrap()
     }
 
     pub fn get_player(&self, id: u32) -> Option<&Player> {

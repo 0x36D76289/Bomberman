@@ -1,12 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use vulkano::command_buffer::SecondaryAutoCommandBuffer;
 use winit::{event::ElementState, keyboard::PhysicalKey};
 
 use crate::{
     audio::AudioManager,
     game::{game_state::GameState, resources::Resources},
-    graphics::{Renderer, Vulkan},
     input::input::Input,
     ui::UiState,
 };
@@ -20,17 +18,17 @@ pub enum AppState {
 }
 
 impl AppState {
-    pub fn render(
-        &self,
-        renderer: &Renderer,
-        vulkan: &Vulkan,
-        resources: &Resources,
-    ) -> Arc<SecondaryAutoCommandBuffer> {
-        match self {
-            AppState::Game(game_state) => game_state.render(vulkan, renderer, resources),
-            AppState::Ui(ui_state) => ui_state.render(vulkan, renderer, resources),
-        }
-    }
+    // pub fn render(
+    //     &self,
+    //     renderer: &Renderer,
+    //     vulkan: &Vulkan,
+    //     resources: &Resources,
+    // ) -> Arc<SecondaryAutoCommandBuffer> {
+    //     match self {
+    //         AppState::Game(game_state) => game_state.render(vulkan, renderer, resources),
+    //         AppState::Ui(ui_state) => ui_state.render(vulkan, renderer, resources),
+    //     }
+    // }
 
     pub fn tick(
         &mut self,

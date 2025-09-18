@@ -1,5 +1,4 @@
-// pub mod entity_render_system;
-// pub mod ui_render_system;
+pub mod game_state;
 pub mod init;
 pub mod light;
 pub mod model;
@@ -8,6 +7,7 @@ pub mod renderer;
 pub mod text;
 pub mod texture;
 pub mod transform;
+pub mod ui_state;
 
 pub use {
     light::LightInfo,

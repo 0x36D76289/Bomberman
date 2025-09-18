@@ -13,6 +13,7 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     mat4 view;
     mat4 inverse_view;
     mat4 light_view;
+    mat4 light_projection;
     vec4 ambient_light_color;
     vec3 direction_to_light;
     vec4 directional_light_color;
