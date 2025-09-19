@@ -98,26 +98,31 @@ impl Renderer {
             )
             .unwrap();
 
-        let uniform_buffer = {
-            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-            *buffer.write().unwrap() = global_ubo;
+        
+        let descriptor_set = {
+            let uniform_buffer = {
+                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+                *buffer.write().unwrap() = global_ubo;
 
-            buffer
+                buffer
+            };
+
+            let layout = &pipeline.layout().set_layouts()[0];
+
+            DescriptorSet::new_variable(
+                vulkan.descriptor_set_allocator.clone(),
+                layout.clone(),
+                resources.textures.len() as u32,
+                [
+                    WriteDescriptorSet::buffer(0, uniform_buffer),
+                    WriteDescriptorSet::image_view_sampler(1, rcx.shadow_map.clone(), self.sampler.clone()),
+                    WriteDescriptorSet::sampler(2, self.sampler.clone()),
+                    WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
+                ],
+                [],
+            )
+            .unwrap()
         };
-
-        let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new_variable(
-            vulkan.descriptor_set_allocator.clone(),
-            layout.clone(),
-            resources.textures.len() as u32,
-            [
-                WriteDescriptorSet::buffer(0, uniform_buffer),
-                WriteDescriptorSet::sampler(1, self.sampler.clone()),
-                WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
-            ],
-            [],
-        )
-        .unwrap();
 
         command_buffer
             .bind_descriptor_sets(
@@ -210,21 +215,24 @@ impl Renderer {
             )
             .unwrap();
 
-        let uniform_buffer = {
-            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-            *buffer.write().unwrap() = global_ubo;
+        let descriptor_set = {
+            let uniform_buffer = {
+                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+                *buffer.write().unwrap() = global_ubo;
 
-            buffer
+                buffer
+            };
+
+            let layout = &pipeline.layout().set_layouts()[0];
+
+            DescriptorSet::new(
+                vulkan.descriptor_set_allocator.clone(),
+                layout.clone(),
+                [WriteDescriptorSet::buffer(0, uniform_buffer)],
+                [],
+            )
+            .unwrap()
         };
-
-        let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new(
-            vulkan.descriptor_set_allocator.clone(),
-            layout.clone(),
-            [WriteDescriptorSet::buffer(0, uniform_buffer)],
-            [],
-        )
-        .unwrap();
 
         command_buffer
             .bind_descriptor_sets(

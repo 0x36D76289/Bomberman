@@ -1,47 +1,25 @@
 use crate::{
     app_state::AppState,
     game::resources::Resources,
-    graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
+    graphics::{GameVertex, GlobalUbo, GuiVertex, TextRenderer, TimeInfo, Vulkan},
 };
 use std::{collections::BTreeMap, sync::Arc, time::Instant};
 use vulkano::{
-    Validated, VulkanError,
-    buffer::{Buffer, BufferCreateInfo, BufferUsage},
-    command_buffer::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer}, command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, CopyImageToBufferInfo,
         PrimaryAutoCommandBuffer,
-    },
-    descriptor_set::layout::DescriptorBindingFlags,
-    format::Format,
-    image::{
-        Image, ImageCreateInfo, ImageType, ImageUsage,
-        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
-        view::ImageView,
-    },
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    pipeline::{
-        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+    }, descriptor_set::layout::DescriptorBindingFlags, format::Format, image::{
+        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo}, view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage
+    }, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter}, pipeline::{
         graphics::{
-            GraphicsPipelineCreateInfo,
-            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{CompareOp, DepthState, DepthStencilState},
-            input_assembly::InputAssemblyState,
-            multisample::MultisampleState,
-            rasterization::RasterizationState,
-            subpass::{PipelineRenderingCreateInfo, PipelineSubpassType},
-            vertex_input::{Vertex, VertexDefinition, VertexInputState},
-        },
-        layout::PipelineDescriptorSetLayoutCreateInfo,
-    },
-    shader::EntryPoint,
-    swapchain::{
-        ColorSpace, PresentMode, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
-        SwapchainPresentInfo, acquire_next_image,
-    },
-    sync::{self, GpuFuture},
+            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{CompareOp, DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, subpass::{PipelineRenderingCreateInfo, PipelineSubpassType}, vertex_input::{Vertex, VertexDefinition, VertexInputState}, GraphicsPipelineCreateInfo
+        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo
+    }, shader::EntryPoint, swapchain::{
+        acquire_next_image, ColorSpace, PresentMode, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo
+    }, sync::{self, GpuFuture}, Validated, VulkanError
 };
 use winit::{
-    event_loop::ActiveEventLoop, platform::macos::WindowAttributesExtMacOS, window::Window,
+    event_loop::ActiveEventLoop, window::Window,
 };
 
 pub const RENDER_RES_RATIO: [u32; 2] = [1, 1];
@@ -211,7 +189,7 @@ impl Renderer {
                 vertex_input_state,
                 true,
                 true,
-                Some(2),
+                Some(3),
             ))
         };
         self.gui_pipeline = {
@@ -512,12 +490,6 @@ impl Renderer {
                 rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
         }
-
-        // if rcx.time_info.avg_fps >= 60.0 {
-        //     debug_depth_image(vulkan, rcx.shadow_map.clone()).unwrap();
-        //     // debug_color_image(vulkan, rcx.color_image.clone()).unwrap();
-        //     std::process::exit(0);
-        // }
     }
 
     pub fn update_time(&mut self) {
@@ -557,8 +529,7 @@ fn create_images(
                 format: color_format,
                 extent: [resolution[0], resolution[1], 1],
                 usage: ImageUsage::COLOR_ATTACHMENT
-                    | ImageUsage::SAMPLED
-                    | ImageUsage::TRANSFER_SRC,
+                    | ImageUsage::SAMPLED,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -574,8 +545,7 @@ fn create_images(
                 format: depth_format,
                 extent: [resolution[0], resolution[1], 1],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                    | ImageUsage::SAMPLED
-                    | ImageUsage::TRANSFER_SRC,
+                    | ImageUsage::TRANSIENT_ATTACHMENT,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -591,8 +561,7 @@ fn create_images(
                 format: depth_format,
                 extent: [resolution[0], resolution[1], 1],
                 usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                    | ImageUsage::SAMPLED
-                    | ImageUsage::TRANSFER_SRC,
+                    | ImageUsage::SAMPLED,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),

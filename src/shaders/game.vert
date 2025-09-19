@@ -8,6 +8,7 @@ layout(location = 0) out vec3 out_color;
 layout(location = 1) out vec3 out_position_world;
 layout(location = 2) out vec3 out_normal_world;
 layout(location = 3) out vec2 out_uv;
+layout(location = 4) out vec4 out_shadow_coords;
 
 layout(set = 0, binding = 0) uniform GlobalUbo {
     mat4 projection;
@@ -27,6 +28,13 @@ layout(push_constant) uniform GamePush {
     int tex_index;
 } push;
 
+mat4 bias_matrix = mat4(
+    0.5, 0.0, 0.0, 0.0,
+    0.0, 0.5, 0.0, 0.0,
+    0.0, 0.0, 0.5, 0.0,
+    0.5, 0.5, 0.5, 1.0
+);
+
 void main() {
     vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
     gl_Position = ubo.projection * ubo.view * position_world;
@@ -35,4 +43,5 @@ void main() {
     out_position_world = position_world.xyz;
     out_normal_world = normalize(mat3(push.normal_matrix) * in_normal);
     out_uv = in_uv;
+    out_shadow_coords = bias_matrix * ubo.light_projection * ubo.light_view * position_world;
 }
