@@ -40,6 +40,9 @@ impl App {
         let game_state1 = AppState::Game(
             GameState::default_state(&resources, GameSettings::default().unwrap()).unwrap(),
         );
+        // let game_state1 = AppState::Game(
+        //     GameState::default_state(&resources, GameSettings {map_settings: MapSettings {height: 100, width: 100, ..Default::default()}, ..GameSettings::default().unwrap()}).unwrap(),
+        // );
 
         let state_stack = vec![game_state1];
 

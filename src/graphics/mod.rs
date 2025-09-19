@@ -114,3 +114,18 @@ impl Hash for GameVertex {
         }
     }
 }
+
+impl Default for GlobalUbo {
+    fn default() -> Self {
+        GlobalUbo { 
+            projection: Default::default(),
+            view: Default::default(),
+            inverse_view: Default::default(),
+            light_view: Default::default(),
+            light_projection: Default::default(),
+            ambient_light_color: Default::default(),
+            direction_to_light: Default::default(),
+            directional_light_color: Default::default()
+        }
+    }
+}
