@@ -3,6 +3,7 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     game::game_state::GameState,
+    settings::save::SaveState,
     ui::{UiState, canvas::Canvas, ui_state::UIPage},
 };
 
@@ -10,6 +11,14 @@ const STAGE_CLEAR_DURATION: f32 = 2.0;
 
 impl UiState {
     pub fn stage_clear(level: u32, lives: u32) -> Self {
+        println!("Stage clear! Saving progress for next level.");
+        let next_level_state = SaveState {
+            level: level + 1,
+            lives,
+            score: 0, // TODO: Implement scoring and carry it over
+        };
+        next_level_state.save();
+
         let shadow = Canvas {
             center: Vec2::ZERO,
             width: 2.0,
@@ -47,16 +56,12 @@ impl UiState {
         } = &mut self.page
         {
             *timer -= delta;
-            // println!("Stage clear timer: {:.2} next level: {}", *timer, *next_level);
             if *timer <= 0.0 {
-                // println!("timer expired attempting to load level {}", *next_level);
-                // TODO: Handle case where next level doesn't exist (game won)
                 let next_game_state = GameState::new_campaign(*next_level, *lives);
                 if let Some(game_state) = next_game_state {
-                    // println!("Successfully loaded level {}", *next_level);
                     return (Some(AppState::Game(game_state)), 1);
                 } else {
-                    // println!("Failed to load level {} ta grand mere", *next_level);
+                    println!("No more levels found. Returning to main menu.");
                     return (Some(AppState::Ui(UiState::main_menu())), 1);
                 }
             }
