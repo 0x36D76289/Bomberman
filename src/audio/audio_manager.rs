@@ -9,6 +9,7 @@ pub enum SoundEffect {
     PlayerDeath,
     PlayerHurt,
     EnemyHit,
+    EnemyDeath,
     BonusPickup,
 }
 
@@ -76,6 +77,10 @@ impl AudioManager {
         );
         self.sound_effects.insert(
             SoundEffect::EnemyHit,
+            include_bytes!("../assets/sounds/enemy_hit_1.ogg").to_vec(),
+        );
+        self.sound_effects.insert(
+            SoundEffect::EnemyDeath,
             include_bytes!("../assets/sounds/enemy_hit_1.ogg").to_vec(),
         );
         self.sound_effects.insert(

@@ -1,19 +1,14 @@
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage},
-    command_buffer::{
-        CopyImageToBufferInfo, RenderingAttachmentInfo, RenderingAttachmentResolveInfo,
-        RenderingInfo, SubpassContents,
-    },
+    command_buffer::{RenderingAttachmentInfo, RenderingInfo, SubpassContents},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
     format::ClearValue,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
 };
 
 use crate::{
-    game::{Camera, game_state::GameState, resources::Resources},
-    graphics::{GamePush, GlobalUbo, Renderer, Vulkan, renderer::RENDER_RES_RATIO},
+    game::{game_state::GameState, resources::Resources},
+    graphics::{GamePush, Renderer, Vulkan, renderer::RENDER_RES_RATIO},
 };
 
 impl Renderer {
@@ -25,7 +20,6 @@ impl Renderer {
         image_index: u32,
         is_first: bool,
     ) {
-        self.shadow_pass(vulkan, state);
         self.game_pass(vulkan, resources, state, is_first);
         self.postprocess_pass(vulkan, image_index, is_first);
     }
@@ -98,7 +92,6 @@ impl Renderer {
             )
             .unwrap();
 
-        
         let descriptor_set = {
             let uniform_buffer = {
                 let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
@@ -115,120 +108,9 @@ impl Renderer {
                 resources.textures.len() as u32,
                 [
                     WriteDescriptorSet::buffer(0, uniform_buffer),
-                    WriteDescriptorSet::image_view_sampler(1, rcx.shadow_map.clone(), self.sampler.clone()),
-                    WriteDescriptorSet::sampler(2, self.sampler.clone()),
-                    WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
+                    WriteDescriptorSet::sampler(1, self.sampler.clone()),
+                    WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
                 ],
-                [],
-            )
-            .unwrap()
-        };
-
-        command_buffer
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .unwrap();
-
-        for object in state.objects_to_render() {
-            let push_constant = GamePush {
-                model_matrix: object.transform.mat4().to_cols_array_2d(),
-                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-                color: object.color.to_array(),
-                tex_index: object.texture.unwrap_or(-1),
-            };
-
-            command_buffer
-                .push_constants(pipeline.layout().clone(), 0, push_constant)
-                .unwrap()
-                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
-                .unwrap()
-                .bind_index_buffer(object.model.index_buffer.clone())
-                .unwrap();
-
-            unsafe {
-                command_buffer
-                    .draw_indexed(object.model.index_buffer.len() as u32, 1, 0, 0, 0)
-                    .unwrap();
-            }
-        }
-
-        command_buffer.end_rendering().unwrap();
-    }
-
-    fn shadow_pass(&mut self, vulkan: &Vulkan, state: &GameState) {
-        let (pipeline, command_buffer, rcx) = match (
-            self.shadows_pipeline.as_ref(),
-            self.command_buffer.as_mut(),
-            self.rcx.as_ref(),
-        ) {
-            (Some(pipeline), Some(command_buffer), Some(rcx)) => {
-                (pipeline.clone(), command_buffer, rcx)
-            }
-            (None, _, _) => panic!("Pipeline is not initialized"),
-            (_, None, _) => panic!("Command buffer is not started"),
-            (_, _, None) => panic!("Render context is not initialized"),
-        };
-
-        let window_size: [u32; 2] = rcx.swapchain.image_extent();
-        let game_resolution = [
-            window_size[0] / RENDER_RES_RATIO[0],
-            window_size[1] / RENDER_RES_RATIO[1],
-        ];
-
-        let global_ubo = {
-            let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
-            state.create_ubo(aspect_ratio)
-        };
-
-        let rendering_info = {
-            let depth_attachment = RenderingAttachmentInfo {
-                load_op: AttachmentLoadOp::Clear,
-                store_op: AttachmentStoreOp::Store,
-                clear_value: Some(1f32.into()),
-                ..RenderingAttachmentInfo::image_view(rcx.depth_image.clone())
-            };
-            RenderingInfo {
-                depth_attachment: Some(depth_attachment),
-                contents: SubpassContents::Inline,
-                ..Default::default()
-            }
-        };
-
-        command_buffer.begin_rendering(rendering_info).unwrap();
-
-        command_buffer
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .set_viewport(
-                0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: [game_resolution[0] as f32, game_resolution[1] as f32],
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
-            )
-            .unwrap();
-
-        let descriptor_set = {
-            let uniform_buffer = {
-                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-                *buffer.write().unwrap() = global_ubo;
-
-                buffer
-            };
-
-            let layout = &pipeline.layout().set_layouts()[0];
-
-            DescriptorSet::new(
-                vulkan.descriptor_set_allocator.clone(),
-                layout.clone(),
-                [WriteDescriptorSet::buffer(0, uniform_buffer)],
                 [],
             )
             .unwrap()

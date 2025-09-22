@@ -5,7 +5,6 @@ layout(location = 0) in vec3 in_color;
 layout(location = 1) in vec3 in_position_world;
 layout(location = 2) in vec3 in_normal_world;
 layout(location = 3) in vec2 in_uv;
-layout(location = 4) in vec4 in_shadow_coords;
 
 layout(location = 0) out vec4 f_color;
 
@@ -13,15 +12,12 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     mat4 projection;
     mat4 view;
     mat4 inverse_view;
-    mat4 light_view;
-    mat4 light_projection;
     vec4 ambient_light_color;
     vec3 direction_to_light;
     vec4 directional_light_color;
 } ubo;
-layout(set = 0, binding = 1) uniform sampler2D shadow_map;
-layout(set = 0, binding = 2) uniform sampler s;
-layout(set = 0, binding = 3) uniform texture2D tex[];
+layout(set = 0, binding = 1) uniform sampler s;
+layout(set = 0, binding = 2) uniform texture2D tex[];
 
 layout(push_constant) uniform GamePush {
     mat4 model_matrix;
@@ -50,12 +46,6 @@ void main() {
     blinn_term = pow(blinn_term, 512.0);
     vec3 specular_light = vec3(0.3) * blinn_term;
 
-    // shadow
-    float visibility = 1.0;
-    if (texture(shadow_map, in_shadow_coords.xy).r < in_shadow_coords.z) {
-        visibility = 0.1;
-    }
-
     // get the texture color if the object has one or get the object color
     vec3 color;
     if (push.tex_index >= 0) {
@@ -64,6 +54,5 @@ void main() {
         color = in_color;
     }
 
-    // f_color = vec4((ambient_light + visibility * (diffuse_light + specular_light)) * color, 1.0);
-    f_color = vec4(visibility * color, 1.0);
+    f_color = vec4((ambient_light + diffuse_light + specular_light) * color, 1.0);
 }

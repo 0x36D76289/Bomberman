@@ -3,7 +3,7 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     audio::{AudioManager, BackgroundMusic},
-    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
+    game::{game_state::GameState, resources::Resources},
     input::input::Input,
     ui::{
         UiState,
@@ -37,6 +37,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 1,
@@ -60,6 +61,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 0,
                 down: 2,
@@ -81,6 +83,7 @@ impl UiState {
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.6),
             },
+            outline_color: None,
             neighbors: ButtonNeighbors {
                 up: 1,
                 down: 2,
@@ -100,31 +103,33 @@ impl UiState {
             page: UIPage::Pause,
         }
     }
+
     pub fn pause_tick(
         &mut self,
         inputs: &Vec<Input>,
-        resources: &Resources,
+        _resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             return match self.selected {
                 0 => (None, 1), // Resume
                 1 => {
-                    // Restart - recommencer la musique du jeu
+                    // Restart
                     audio_manager.play_background_music(BackgroundMusic::Game);
-                    //TODO: make safe
-                    (
-                        Some(AppState::Game(
-                            GameState::default_state(resources, GameSettings::default().unwrap())
-                                .unwrap(),
-                        )),
-                        2,
-                    )
+                    if let Some(game_state) = GameState::new_campaign(1, 3) {
+                        (Some(AppState::Game(game_state)), 2)
+                    } else {
+                        println!(
+                            "Error: Failed to load campaign level 1 for restart. Returning to menu."
+                        );
+                        audio_manager.play_background_music(BackgroundMusic::Menu);
+                        (Some(AppState::Ui(UiState::main_menu())), 2)
+                    }
                 }
                 _ => {
-                    // Menu - retourner à la musique du menu
+                    // Menu
                     audio_manager.play_background_music(BackgroundMusic::Menu);
-                    (None, 2)
+                    (Some(AppState::Ui(UiState::main_menu())), 2)
                 }
             };
         }

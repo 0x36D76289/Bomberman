@@ -1,8 +1,8 @@
 use crate::{
     game::{
-        bomb::{Bomb, BombState},
+        bomb::{BOMB_RADIUS, Bomb, BombState},
         collision::Collision,
-        map::map::Map,
+        map::{map::Map, map_element::MapElement},
         resources::{ResourceName, Resources},
     },
     graphics::{object::Object, transform::Transform},
@@ -38,7 +38,6 @@ impl Player {
         resources: &Resources,
         is_human: bool,
     ) -> Self {
-        let dir_vec = direction.to_vec2();
         Player {
             id,
             position,
@@ -49,27 +48,45 @@ impl Player {
             bombs_remaining: 1,
             is_human,
             can_kick_bomb: false,
-            object: Some(Object {
-                model: resources.models[&ResourceName::Player].clone(),
-                texture: Some(resources.textures_index[&ResourceName::Player]),
-                color: Vec3::ONE,
-                transform: Transform {
-                    translation: Vec3::new(position.x, 0.0, position.y),
-                    scale: Vec3::splat(0.35),
-                    rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
-                },
-            }),
+            object: Some(Self::create_object(resources, position, direction)),
         }
+    }
+
+    fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
+        let dir_vec = direction.to_vec2();
+        Object {
+            model: resources.models[&ResourceName::Player].clone(),
+            texture: Some(resources.textures_index[&ResourceName::Player]),
+            color: Vec3::ONE,
+            transform: Transform {
+                translation: Vec3::new(position.x, 0.0, position.y),
+                scale: Vec3::splat(0.35),
+                rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
+            },
+        }
+    }
+
+    pub fn make_op(&mut self, resources: &Resources) {
+        self.object = Some(Self::create_object(
+            resources,
+            self.position,
+            self.direction,
+        ));
+        self.alive = true;
+        self.power_level = 10;
+        self.speed_level = 4;
+        self.bombs_remaining = 100;
+        self.can_kick_bomb = true;
     }
 
     fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>) {
         self.bound(map);
         self.collide_map(map, direction);
         for bomb in bombs {
-            if bomb.owner_id == self.id && !bomb.collision_enabled {
+            if !bomb.collision_enabled {
                 continue;
             }
-            if self.resolve_collision_with(bomb.position, bomb.get_size(), direction)
+            if self.resolve_collision_with(bomb.position, BOMB_RADIUS, direction)
                 && self.can_kick_bomb
                 && bomb.state == BombState::Planted
             {
@@ -82,25 +99,56 @@ impl Player {
         if self.bombs_remaining == 0 {
             return None;
         }
+
+        let target_x = self.position.x as usize;
+        let target_y = self.position.y as usize;
+
         for bomb in bombs {
-            if bomb.owner_id == self.id && !bomb.collision_enabled {
+            if bomb.position.x as usize == target_x && bomb.position.y as usize == target_y {
                 return None;
             }
         }
-        //TODO:
-        // check position doesn't have another player
+
         self.bombs_remaining -= 1;
         Some(Bomb::new(
             self.id,
-            self.position.x as usize,
-            self.position.y as usize,
+            target_x,
+            target_y,
             self.power_level,
             resources,
         ))
     }
 
+    fn assist_input(&self, input: Input, map: &Map) -> Vec2 {
+        let ret = input.as_vec2();
+        if ret.y == 0.0 && ret.x != 0.0 {
+            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
+                if self.position.y % 1.0 > 0.60 {
+                    return ret + Vec2 { x: 0.0, y: -1.0 };
+                }
+                if self.position.y % 1.0 < 0.40 {
+                    return ret + Vec2 { x: 0.0, y: 1.0 };
+                }
+            }
+        }
+        if ret.x == 0.0 && ret.y != 0.0 {
+            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
+                if self.position.x % 1.0 > 0.60 {
+                    return ret + Vec2 { y: 0.0, x: -1.0 };
+                }
+                if self.position.x % 1.0 < 0.40 {
+                    return ret + Vec2 { y: 0.0, x: 1.0 };
+                }
+            }
+        }
+        ret
+    }
+
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
-        let mut motion = input.as_vec2()
+        if !self.alive {
+            return;
+        }
+        let mut motion = self.assist_input(input, map)
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
@@ -149,6 +197,16 @@ impl Player {
     pub fn kill(&mut self) {
         self.alive = false;
         self.object = None;
+    }
+
+    pub fn respawn(&mut self, position: Vec2, resources: &Resources) {
+        self.alive = true;
+        self.position = position;
+        self.object = Some(Self::create_object(resources, position, self.direction));
+        self.power_level = 2;
+        self.speed_level = 0;
+        self.bombs_remaining = 1;
+        self.can_kick_bomb = false;
     }
 }
 
