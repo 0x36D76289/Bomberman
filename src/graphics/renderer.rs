@@ -1,26 +1,42 @@
 use crate::{
     app_state::AppState,
     game::resources::Resources,
-    graphics::{GameVertex, GlobalUbo, GuiVertex, TextRenderer, TimeInfo, Vulkan},
+    graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
 };
-use std::{collections::BTreeMap, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer}, command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, CopyImageToBufferInfo,
-        PrimaryAutoCommandBuffer,
-    }, descriptor_set::layout::DescriptorBindingFlags, format::Format, image::{
-        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo}, view::ImageView, Image, ImageCreateInfo, ImageType, ImageUsage
-    }, memory::allocator::{AllocationCreateInfo, MemoryTypeFilter}, pipeline::{
+    Validated, VulkanError,
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    descriptor_set::layout::DescriptorBindingFlags,
+    format::Format,
+    image::{
+        Image, ImageCreateInfo, ImageType, ImageUsage,
+        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+        view::ImageView,
+    },
+    memory::allocator::AllocationCreateInfo,
+    pipeline::{
+        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
-            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState}, depth_stencil::{CompareOp, DepthState, DepthStencilState}, input_assembly::InputAssemblyState, multisample::MultisampleState, rasterization::RasterizationState, subpass::{PipelineRenderingCreateInfo, PipelineSubpassType}, vertex_input::{Vertex, VertexDefinition, VertexInputState}, GraphicsPipelineCreateInfo
-        }, layout::PipelineDescriptorSetLayoutCreateInfo, DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo
-    }, shader::EntryPoint, swapchain::{
-        acquire_next_image, ColorSpace, PresentMode, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo, SwapchainPresentInfo
-    }, sync::{self, GpuFuture}, Validated, VulkanError
+            GraphicsPipelineCreateInfo,
+            color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState},
+            depth_stencil::{CompareOp, DepthState, DepthStencilState},
+            input_assembly::InputAssemblyState,
+            multisample::MultisampleState,
+            rasterization::RasterizationState,
+            subpass::{PipelineRenderingCreateInfo, PipelineSubpassType},
+            vertex_input::{Vertex, VertexDefinition, VertexInputState},
+        },
+        layout::PipelineDescriptorSetLayoutCreateInfo,
+    },
+    shader::EntryPoint,
+    swapchain::{
+        ColorSpace, PresentMode, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+        SwapchainPresentInfo, acquire_next_image,
+    },
+    sync::{self, GpuFuture},
 };
-use winit::{
-    event_loop::ActiveEventLoop, window::Window,
-};
+use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub const RENDER_RES_RATIO: [u32; 2] = [1, 1];
 
@@ -29,7 +45,6 @@ pub struct Renderer {
     pub game_pipeline: Option<Arc<GraphicsPipeline>>,
     pub gui_pipeline: Option<Arc<GraphicsPipeline>>,
     pub post_process_pipeline: Option<Arc<GraphicsPipeline>>,
-    pub shadows_pipeline: Option<Arc<GraphicsPipeline>>,
     pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
     pub text_renderer: TextRenderer,
     pub sampler: Arc<Sampler>,
@@ -41,7 +56,6 @@ pub struct RenderContext {
     pub images: Vec<Arc<ImageView>>,
     pub color_image: Arc<ImageView>,
     pub depth_image: Arc<ImageView>,
-    pub shadow_map: Arc<ImageView>,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub time_info: TimeInfo,
@@ -68,7 +82,6 @@ impl Renderer {
             game_pipeline: None,
             gui_pipeline: None,
             post_process_pipeline: None,
-            shadows_pipeline: None,
             command_buffer: None,
             text_renderer,
             sampler,
@@ -135,7 +148,7 @@ impl Renderer {
             .unwrap()
         };
 
-        let (color_image, depth_image, shadow_map) = create_images(
+        let (color_image, depth_image) = create_images(
             vulkan,
             game_resolution,
             images[0].format(),
@@ -164,7 +177,6 @@ impl Renderer {
             images,
             color_image,
             depth_image,
-            shadow_map,
             recreate_swapchain,
             previous_frame_end,
             time_info,
@@ -189,7 +201,7 @@ impl Renderer {
                 vertex_input_state,
                 true,
                 true,
-                Some(3),
+                Some(2),
             ))
         };
         self.gui_pipeline = {
@@ -229,22 +241,6 @@ impl Renderer {
                 vertex_input_state,
                 true,
                 false,
-                None,
-            ))
-        };
-        self.shadows_pipeline = {
-            let vertex_shader = shadows_vs::load(vulkan.device.clone())
-                .unwrap()
-                .entry_point("main")
-                .unwrap();
-            let vertex_input_state = GameVertex::per_vertex().definition(&vertex_shader).unwrap();
-            Some(self.create_pipeline(
-                vulkan,
-                vertex_shader,
-                None,
-                vertex_input_state,
-                false,
-                true,
                 None,
             ))
         };
@@ -345,7 +341,6 @@ impl Renderer {
             && self.game_pipeline.is_some()
             && self.gui_pipeline.is_some()
             && self.post_process_pipeline.is_some()
-            && self.shadows_pipeline.is_some()
     }
 
     pub fn get_delta_time(&self) -> f32 {
@@ -390,7 +385,7 @@ impl Renderer {
                 .expect("failed to recreate swapchain");
 
             rcx.swapchain = new_swapchain;
-            (rcx.color_image, rcx.depth_image, rcx.shadow_map) = create_images(
+            (rcx.color_image, rcx.depth_image) = create_images(
                 vulkan,
                 game_resolution,
                 rcx.images[0].format(),
@@ -426,13 +421,16 @@ impl Renderer {
             .unwrap(),
         );
 
-        let states_to_skip = states.len()
-            - 1
-            - states
-                .iter()
-                .rev()
-                .take_while(|s| s.is_transparent())
-                .count();
+        let transparent_count = states
+            .iter()
+            .rev()
+            .take_while(|s| s.is_transparent())
+            .count();
+        let states_to_skip = if states.len() > 0 {
+            (states.len() - 1).saturating_sub(transparent_count)
+        } else {
+            0
+        };
         let mut is_first = true;
         for state in states.iter().skip(states_to_skip) {
             match state {
@@ -520,7 +518,7 @@ fn create_images(
     resolution: [u32; 2],
     color_format: Format,
     depth_format: Format,
-) -> (Arc<ImageView>, Arc<ImageView>, Arc<ImageView>) {
+) -> (Arc<ImageView>, Arc<ImageView>) {
     let color_image = ImageView::new_default(
         Image::new(
             vulkan.memory_allocator.clone(),
@@ -528,8 +526,7 @@ fn create_images(
                 image_type: ImageType::Dim2d,
                 format: color_format,
                 extent: [resolution[0], resolution[1], 1],
-                usage: ImageUsage::COLOR_ATTACHMENT
-                    | ImageUsage::SAMPLED,
+                usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -544,24 +541,7 @@ fn create_images(
                 image_type: ImageType::Dim2d,
                 format: depth_format,
                 extent: [resolution[0], resolution[1], 1],
-                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                    | ImageUsage::TRANSIENT_ATTACHMENT,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    let shadow_map = ImageView::new_default(
-        Image::new(
-            vulkan.memory_allocator.clone(),
-            ImageCreateInfo {
-                image_type: ImageType::Dim2d,
-                format: depth_format,
-                extent: [resolution[0], resolution[1], 1],
-                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                    | ImageUsage::SAMPLED,
+                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
                 ..Default::default()
             },
             AllocationCreateInfo::default(),
@@ -570,7 +550,7 @@ fn create_images(
     )
     .unwrap();
 
-    (color_image, depth_image, shadow_map)
+    (color_image, depth_image)
 }
 
 pub mod game_vs {
@@ -613,127 +593,4 @@ pub mod postprocess_fs {
         ty: "fragment",
         path: "src/shaders/post_process.frag"
     }
-}
-
-pub mod shadows_vs {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/shaders/shadows.vert"
-    }
-}
-
-fn debug_depth_image(
-    vulkan: &Vulkan,
-    depth_image: Arc<ImageView>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a CPU-accessible buffer
-
-    let image_extent = depth_image.image().extent();
-    let buffer = Buffer::from_iter(
-        vulkan.memory_allocator.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::TRANSFER_DST,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_RANDOM_ACCESS,
-            ..Default::default()
-        },
-        (0..(image_extent[0] * image_extent[1] * image_extent[2])).map(|_| 0u16),
-    )?;
-
-    // Copy depth image to buffer
-    let mut builder = AutoCommandBufferBuilder::primary(
-        vulkan.command_buffer_allocator.clone(),
-        vulkan.queue.queue_family_index(),
-        CommandBufferUsage::OneTimeSubmit,
-    )?;
-
-    builder.copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
-        depth_image.image().clone(),
-        buffer.clone(),
-    ))?;
-
-    let command_buffer = builder.build()?;
-
-    // Execute the command buffer
-    let future = sync::now(vulkan.device.clone())
-        .then_execute(vulkan.queue.clone(), command_buffer)
-        .unwrap()
-        .then_signal_fence_and_flush()
-        .unwrap();
-
-    future.wait(None).unwrap();
-
-    // Read and print depth values
-    let depth_data = buffer.read()?;
-    let mut values: BTreeMap<u16, u32> = BTreeMap::new();
-    for value in depth_data.iter() {
-        *values.entry(*value).or_insert(1) += 1;
-    }
-    println!("Values:");
-    for (value, count) in values.iter() {
-        println!("{value}: {count}");
-    }
-
-    Ok(())
-}
-
-fn debug_color_image(
-    vulkan: &Vulkan,
-    depth_image: Arc<ImageView>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a CPU-accessible buffer
-
-    let image_extent = depth_image.image().extent();
-    let buffer = Buffer::from_iter(
-        vulkan.memory_allocator.clone(),
-        BufferCreateInfo {
-            usage: BufferUsage::TRANSFER_DST,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_RANDOM_ACCESS,
-            ..Default::default()
-        },
-        (0..(image_extent[0] * image_extent[1] * image_extent[2]) * 4).map(|_| 0u8),
-    )?;
-
-    // Copy depth image to buffer
-    let mut builder = AutoCommandBufferBuilder::primary(
-        vulkan.command_buffer_allocator.clone(),
-        vulkan.queue.queue_family_index(),
-        CommandBufferUsage::OneTimeSubmit,
-    )?;
-
-    builder.copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
-        depth_image.image().clone(),
-        buffer.clone(),
-    ))?;
-
-    let command_buffer = builder.build()?;
-
-    // Execute the command buffer
-    let future = sync::now(vulkan.device.clone())
-        .then_execute(vulkan.queue.clone(), command_buffer)
-        .unwrap()
-        .then_signal_fence_and_flush()
-        .unwrap();
-
-    future.wait(None).unwrap();
-
-    // Read and print depth values
-    let depth_data = buffer.read()?;
-    let mut values: BTreeMap<u8, u32> = BTreeMap::new();
-    for value in depth_data.iter() {
-        *values.entry(*value).or_insert(1) += 1;
-    }
-    println!("Values:");
-    for (value, count) in values.iter() {
-        println!("{value}: {count}");
-    }
-
-    Ok(())
 }

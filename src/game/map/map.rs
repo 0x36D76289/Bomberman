@@ -1,5 +1,6 @@
 use glam::{Vec2, Vec3, i16, usize};
 use rand::random_range;
+use std::fs;
 
 use crate::{
     game::{
@@ -20,6 +21,13 @@ pub struct Map {
     content: Vec<MapElement>,
     pub spawns: Vec<SpawnPoint>,
     pub floor: Object,
+}
+
+pub struct LevelData {
+    pub map: Map,
+    pub player_spawn: Vec2,
+    pub enemy_spawns: Vec<Vec2>,
+    pub exit_pos: Vec2,
 }
 
 impl Map {
@@ -45,7 +53,7 @@ impl Map {
         for y in 0..self.height {
             for x in 0..self.width {
                 match &mut self.content[y * self.width + x] {
-                    MapElement::Empty => (),
+                    MapElement::Empty | MapElement::Exit(_) => (),
                     MapElement::Breakable(obj) => {
                         obj.transform = Transform {
                             translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
@@ -246,6 +254,65 @@ impl Map {
             ret = ret.walls(ressources);
         }
         Some(ret.fix_objects())
+    }
+
+    pub fn from_file(level: u32, resources: &Resources) -> Option<LevelData> {
+        let path = format!("src/assets/levels/1-{}.level", level);
+        let file_content = fs::read_to_string(path).ok()?;
+
+        let lines: Vec<&str> = file_content.lines().collect();
+        let height = lines.len();
+        let width = lines.get(0)?.len();
+
+        let mut content = vec![MapElement::Empty; width * height];
+        let mut player_spawn = Vec2::ZERO;
+        let mut enemy_spawns = Vec::new();
+        let mut exit_pos = Vec2::ZERO;
+
+        let breakable_obj = Self::create_breakable(resources);
+        let unbreakable_obj = Self::create_unbreakable(resources);
+
+        for (y, line) in lines.iter().enumerate() {
+            for (x, char) in line.chars().enumerate() {
+                let pos = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+                content[y * width + x] = match char {
+                    'X' => MapElement::Unbreakable(unbreakable_obj.clone()),
+                    '#' => MapElement::Breakable(breakable_obj.clone()),
+                    'P' => {
+                        player_spawn = pos;
+                        MapElement::Empty
+                    }
+                    'E' => {
+                        enemy_spawns.push(pos);
+                        MapElement::Empty
+                    }
+                    'O' => {
+                        exit_pos = pos;
+                        MapElement::Breakable(breakable_obj.clone())
+                    }
+                    _ => MapElement::Empty,
+                };
+            }
+        }
+
+        let map = Map {
+            width,
+            height,
+            content,
+            spawns: vec![SpawnPoint::init(
+                player_spawn.x as i32,
+                player_spawn.y as i32,
+            )],
+            floor: Self::create_floor(width as u8, height as u8, resources),
+        }
+        .fix_objects();
+
+        Some(LevelData {
+            map,
+            player_spawn,
+            enemy_spawns,
+            exit_pos,
+        })
     }
 
     #[cfg(debug_assertions)]

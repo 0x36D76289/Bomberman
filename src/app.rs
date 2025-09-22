@@ -1,7 +1,5 @@
 use crate::app_state::{AppState, KeyMap};
 use crate::audio::{AudioManager, BackgroundMusic};
-use crate::game::game_settings::GameSettings;
-use crate::game::game_state::GameState;
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
@@ -37,14 +35,8 @@ impl App {
         let inputs = vec![Input::default(); settings.binds.len()];
 
         let gui_state1 = AppState::Ui(UiState::main_menu());
-        let game_state1 = AppState::Game(
-            GameState::default_state(&resources, GameSettings::default().unwrap()).unwrap(),
-        );
-        // let game_state1 = AppState::Game(
-        //     GameState::default_state(&resources, GameSettings {map_settings: MapSettings {height: 100, width: 100, ..Default::default()}, ..GameSettings::default().unwrap()}).unwrap(),
-        // );
 
-        let state_stack = vec![game_state1];
+        let state_stack = vec![gui_state1];
 
         let mut audio_manager = AudioManager::new()?;
 
@@ -59,6 +51,10 @@ impl App {
             settings,
             audio_manager,
         })
+    }
+
+    pub fn get_resources(&self) -> &Resources {
+        &self.resources
     }
 
     fn record_key(&mut self, code: PhysicalKey, state: ElementState) {
@@ -85,11 +81,12 @@ impl App {
             &mut self.audio_manager,
         );
         for _ in 0..res.1 {
-            self.state_stack.pop();
-            //TODO: if last state popped then handle application stop
+            if self.state_stack.pop().is_none() {
+                // TODO: Handle application stop if last state is popped
+            }
         }
-        if res.0.is_some() {
-            self.state_stack.push(res.0.unwrap());
+        if let Some(new_state) = res.0 {
+            self.state_stack.push(new_state);
         }
     }
 
