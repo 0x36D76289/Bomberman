@@ -4,6 +4,7 @@ use crate::{
     app_state::AppState,
     audio::AudioManager,
     input::input::Input,
+    settings::save::SaveState,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -15,17 +16,17 @@ use crate::{
 impl UiState {
     pub fn main_menu() -> Self {
         let title = Canvas {
-            center: Vec2::new(0.0, -0.3),
+            center: Vec2::new(0.0, -0.4),
             text: Some("BOMBERMAN".to_string()),
             text_color: Some(Vec4::ONE),
             text_size: Some(2.0),
             ..Default::default()
         };
 
-        let mut campaign_button = Button {
+        let mut continue_button = Button {
             canvas: Canvas {
-                center: Vec2::new(0.0, 0.2),
-                text: Some("Campaign".to_string()),
+                center: Vec2::new(0.0, 0.1),
+                text: Some("Continue".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.2),
                 ..Default::default()
@@ -39,19 +40,19 @@ impl UiState {
             selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
             ..Default::default()
         };
-        campaign_button.toggle();
+        continue_button.toggle();
 
-        let multi_button = Button {
+        let new_game_button = Button {
             canvas: Canvas {
-                center: Vec2::new(0.0, 0.4),
-                text: Some("Multiplayer".to_string()),
+                center: Vec2::new(0.0, 0.3),
+                text: Some("New Game".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.2),
                 ..Default::default()
             },
             neighbors: ButtonNeighbors {
                 up: 0,
-                down: 1,
+                down: 2,
                 left: 1,
                 right: 1,
             },
@@ -59,9 +60,27 @@ impl UiState {
             ..Default::default()
         };
 
+        let multi_button = Button {
+            canvas: Canvas {
+                center: Vec2::new(0.0, 0.5),
+                text: Some("Multiplayer".to_string()),
+                text_color: Some(Vec4::ONE),
+                text_size: Some(1.2),
+                ..Default::default()
+            },
+            neighbors: ButtonNeighbors {
+                up: 1,
+                down: 2,
+                left: 2,
+                right: 2,
+            },
+            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
+            ..Default::default()
+        };
+
         Self {
             canvases: vec![title],
-            buttons: vec![campaign_button, multi_button],
+            buttons: vec![continue_button, new_game_button, multi_button],
             is_transparent: false,
             selected: 0,
             page: UIPage::MainMenu,
@@ -77,19 +96,29 @@ impl UiState {
             audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
             return match self.selected {
                 0 => {
-                    // Campaign
-                    match crate::game::game_state::GameState::new_campaign(1, 3) {
+                    let save = SaveState::load();
+                    match crate::game::game_state::GameState::new_campaign(save.level, save.lives) {
                         Some(game_state) => (Some(AppState::Game(game_state)), 1),
                         None => {
-                            println!("Error: Failed to load campaign level 1");
-                            (None, 0)
+                            println!("Error: Failed to load saved campaign level {}", save.level);
+                            (
+                                Some(AppState::Game(
+                                    crate::game::game_state::GameState::new_campaign(1, 3)
+                                        .expect("Could not load level 1 as fallback"),
+                                )),
+                                1,
+                            )
                         }
                     }
                 }
-                1 => {
-                    // Multiplayer
-                    (Some(AppState::Ui(UiState::game_settings(2))), 1)
-                }
+                1 => match crate::game::game_state::GameState::new_campaign(1, 3) {
+                    Some(game_state) => (Some(AppState::Game(game_state)), 1),
+                    None => {
+                        println!("Error: Failed to load campaign level 1 for new game");
+                        (None, 0)
+                    }
+                },
+                2 => (Some(AppState::Ui(UiState::game_settings(2))), 1),
                 _ => (None, 0),
             };
         }
