@@ -288,11 +288,17 @@ impl GameState {
         }
 
         // Tick enemies
-        for enemy in &mut self.enemies {
-            enemy.tick(delta, &self.map, &self.bombs);
+        for i in 0..self.enemies.len() {
+            let (left, right) = self.enemies.split_at_mut(i);
+            if let Some((current, right)) = right.split_first_mut() {
+                let other_enemies: Vec<_> = left.iter().chain(right.iter()).cloned().collect();
+                current.tick(delta, &self.map, &self.bombs, &other_enemies);
+            }
+
             if self.players[0].alive
-                && enemy.alive
-                && self.players[0].is_colliding_with(enemy.position, enemy.get_size())
+                && self.enemies[i].alive
+                && self.players[0]
+                    .is_colliding_with(self.enemies[i].position, self.enemies[i].get_size())
             {
                 self.players[0].kill();
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
