@@ -34,7 +34,7 @@ impl App {
         let keys = KeyMap::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        let gui_state1 = AppState::Ui(UiState::main_menu());
+        let gui_state1 = AppState::ui(UiState::main_menu());
 
         let state_stack = vec![gui_state1];
 

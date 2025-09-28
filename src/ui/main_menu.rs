@@ -65,6 +65,7 @@ impl UiState {
             is_transparent: false,
             selected: 0,
             page: UIPage::MainMenu,
+            render_info: Default::default(),
         }
     }
 
@@ -79,7 +80,7 @@ impl UiState {
                 0 => {
                     // Campaign
                     match crate::game::game_state::GameState::new_campaign(1, 3) {
-                        Some(game_state) => (Some(AppState::Game(game_state)), 1),
+                        Some(game_state) => (Some(AppState::game(game_state)), 1),
                         None => {
                             println!("Error: Failed to load campaign level 1");
                             (None, 0)
@@ -88,7 +89,7 @@ impl UiState {
                 }
                 1 => {
                     // Multiplayer
-                    (Some(AppState::Ui(UiState::game_settings(2))), 1)
+                    (Some(AppState::ui(UiState::game_settings(2))), 1)
                 }
                 _ => (None, 0),
             };

@@ -12,11 +12,12 @@ use crate::game::powerup::PowerUp;
 use crate::game::resources::{ResourceName, Resources};
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
-use crate::graphics::{GlobalUbo, LightInfo};
+use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::GetOrDefault;
 use crate::ui::UiState;
+use crate::ui::game_settings::UIGameSettings;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
 use std::error::Error;
@@ -58,6 +59,7 @@ pub struct GameState {
     map: Map,
     camera: Transform,
     light: LightInfo,
+    pub render_info: StateRenderInfo,
 }
 
 impl GameState {
@@ -84,6 +86,11 @@ impl GameState {
             directional_light_color: Vec4::ONE.with_w(0.6),
         };
 
+        let render_info = StateRenderInfo {
+            drawn_first: true,
+            ..Default::default()
+        };
+
         Ok(Self {
             mode: GameMode::Multiplayer,
             campaign_progress: None,
@@ -98,6 +105,7 @@ impl GameState {
             map,
             camera,
             light,
+            render_info,
         })
     }
 
@@ -141,6 +149,11 @@ impl GameState {
             directional_light_color: Vec4::ONE.with_w(0.6),
         };
 
+        let render_info = StateRenderInfo {
+            drawn_first: true,
+            ..Default::default()
+        };
+
         Some(Self {
             mode: GameMode::Campaign,
             campaign_progress: Some(CampaignProgress {
@@ -159,7 +172,19 @@ impl GameState {
             map,
             camera,
             light,
+            render_info,
         })
+    }
+
+    pub fn new_settings_preview(settings: GameSettings, resources: &Resources) -> Self {
+        Self {
+            render_info: StateRenderInfo {
+                top_left_coord: [-1.0, -0.5],
+                bottom_right_coord: [0.0, 0.5],
+                drawn_first: false,
+            },
+            ..GameState::new_multiplayer(resources, settings).unwrap()
+        }
     }
 
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
@@ -334,7 +359,7 @@ impl GameState {
             .unwrap_or(&winit::event::ElementState::Released)
             .is_pressed()
         {
-            return (Some(AppState::Ui(UiState::pause())), 0);
+            return (Some(AppState::ui(UiState::pause())), 0);
         }
 
         self.inputs_to_game_inputs(inputs);
@@ -351,7 +376,7 @@ impl GameState {
             GameTickResult::LevelComplete => {
                 if let Some(progress) = &self.campaign_progress {
                     (
-                        Some(AppState::Ui(UiState::stage_clear(
+                        Some(AppState::ui(UiState::stage_clear(
                             progress.level,
                             progress.lives,
                         ))),
@@ -361,7 +386,7 @@ impl GameState {
                     (None, 0)
                 }
             }
-            GameTickResult::GameOver => (Some(AppState::Ui(UiState::game_over())), 1),
+            GameTickResult::GameOver => (Some(AppState::ui(UiState::game_over())), 1),
             GameTickResult::None => (None, 0),
         }
     }
@@ -398,6 +423,23 @@ impl GameState {
             direction_to_light: self.light.direction_to_light.to_array().into(),
             directional_light_color: self.light.directional_light_color.into(),
         }
+    }
+
+    pub fn update_from_ui_settings(self, settings: &UIGameSettings, resources: &Resources) -> Self {
+        let map = &self.map;
+        // println!("map.height = {} settings.height = {} map.width = {} settings.width = {}", map.height, )
+        if map.height - 2 == settings.height as usize && map.width - 2 == settings.width as usize {
+            return self;
+        }
+
+        let map_settings = settings.into_map_settings();
+
+        let game_settings = GameSettings {
+            nb_humans: settings.player_count.into(),
+            map_settings,
+        };
+
+        GameState::new_settings_preview(game_settings, resources)
     }
 
     pub fn get_player(&self, id: u32) -> Option<&Player> {
