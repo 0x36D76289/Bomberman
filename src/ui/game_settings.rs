@@ -6,6 +6,7 @@ use crate::{
         game_settings::GameSettings, game_state::GameState, map::map_settings::MapSettings,
         resources::Resources,
     },
+    graphics::StateRenderInfo,
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
@@ -24,7 +25,7 @@ const PRESET_GRID_START_INDEX: u8 = 0;
 
 const PRESET_VERTICAL_HEIGHT: f32 = -0.65;
 
-const SETTINGS_SIZE: Vec2 = Vec2::new(1.0, 0.2);
+const SETTINGS_SIZE: Vec2 = Vec2::new(0.9, 0.2);
 const SETTING_GRID_COUNT: u8 = 8;
 const SETTING_GRID_START_INDEX: u8 = 2;
 
@@ -66,15 +67,15 @@ enum GameSettingPreset {
 pub struct UIGameSettings {
     preset: GameSettingPreset,
     /// map width
-    width: u8,
+    pub width: u8,
     /// map height
-    height: u8,
+    pub height: u8,
     /// percentage of removable blocks that are missing at round start
-    cheesiness: u8,
+    pub cheesiness: u8,
     /// amount of human players
-    player_count: u8,
+    pub player_count: u8,
     /// amount of ai players
-    bot_count: u8,
+    pub bot_count: u8,
     /// alpha channel of error message multiplied by ERROR_VISIBILITY_TIME
     opacity: f32,
 }
@@ -135,6 +136,26 @@ impl UIGameSettings {
             player_count,
             bot_count,
             opacity: 0.0,
+        }
+    }
+
+    pub fn into_map_settings(&self) -> MapSettings {
+        match self.preset {
+            GameSettingPreset::Corners => MapSettings {
+                width: self.width,
+                height: self.height,
+                cheesiness: self.cheesiness,
+                spawns: self.player_count + self.bot_count,
+                ..MapSettings::corners()
+            },
+            _ => MapSettings {
+                // Arena, Preset3, and Custom all use random generation
+                width: self.width,
+                height: self.height,
+                cheesiness: self.cheesiness,
+                spawns: self.player_count + self.bot_count,
+                ..MapSettings::default_cheese()
+            },
         }
     }
 }
@@ -243,7 +264,7 @@ impl UiState {
         // width
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 0),
             },
             SETTINGS_SIZE,
@@ -260,7 +281,7 @@ impl UiState {
         // height
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 1),
             },
             SETTINGS_SIZE,
@@ -277,7 +298,7 @@ impl UiState {
         // cheese
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 2),
             },
             SETTINGS_SIZE,
@@ -294,7 +315,7 @@ impl UiState {
         // bot count
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 3),
             },
             SETTINGS_SIZE,
@@ -311,7 +332,7 @@ impl UiState {
         // Start
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: -PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
@@ -330,7 +351,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 0),
                 },
                 width: 0.0,
@@ -347,7 +368,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 1),
                 },
                 width: 0.0,
@@ -364,7 +385,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 2),
                 },
                 width: 0.0,
@@ -381,7 +402,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 3),
                 },
                 width: 0.0,
@@ -412,6 +433,10 @@ impl UiState {
             is_transparent: false,
             selected: 0,
             page: UIPage::GameSettings(settings),
+            render_info: StateRenderInfo {
+                drawn_first: true,
+                ..Default::default()
+            },
         }
     }
 
@@ -574,23 +599,7 @@ impl UiState {
             return (None, 0);
         }
 
-        let map_settings = match settings.preset {
-            GameSettingPreset::Corners => MapSettings {
-                width: settings.width,
-                height: settings.height,
-                cheesiness: settings.cheesiness,
-                spawns: settings.player_count + settings.bot_count,
-                ..MapSettings::corners()
-            },
-            _ => MapSettings {
-                // Arena, Preset3, and Custom all use random generation
-                width: settings.width,
-                height: settings.height,
-                cheesiness: settings.cheesiness,
-                spawns: settings.player_count + settings.bot_count,
-                ..MapSettings::default_cheese()
-            },
-        };
+        let map_settings = settings.into_map_settings();
 
         let game_settings = GameSettings {
             nb_humans: settings.player_count.into(),
@@ -598,7 +607,7 @@ impl UiState {
         };
 
         match GameState::new_multiplayer(resources, game_settings) {
-            Ok(game_state) => (Some(AppState::Game(game_state)), 1),
+            Ok(game_state) => (Some(AppState::game(game_state)), 1),
             Err(_) => {
                 self.set_error("Map creation failed. Try reducing player/bot count.".to_string());
                 (None, 0)

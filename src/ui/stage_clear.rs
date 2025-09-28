@@ -36,6 +36,7 @@ impl UiState {
                 next_level: level + 1,
                 lives,
             },
+            render_info: Default::default(),
         }
     }
 
@@ -52,13 +53,13 @@ impl UiState {
                 // println!("timer expired attempting to load level {}", *next_level);
                 // TODO: Handle case where next level doesn't exist (game won)
                 let next_game_state = GameState::new_campaign(*next_level, *lives);
-                if let Some(game_state) = next_game_state {
-                    // println!("Successfully loaded level {}", *next_level);
-                    return (Some(AppState::Game(game_state)), 1);
-                } else {
-                    // println!("Failed to load level {} ta grand mere", *next_level);
-                    return (Some(AppState::Ui(UiState::main_menu())), 1);
-                }
+                let app_state = {
+                    match next_game_state {
+                        Some(game_state) => AppState::game(game_state),
+                        None => AppState::ui(UiState::main_menu()),
+                    }
+                };
+                return (Some(app_state), 1);
             }
         }
         (None, 0)

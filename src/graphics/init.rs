@@ -1,4 +1,4 @@
-use crate::graphics::{Graphics, /*PointLightRenderSystem,*/ Renderer, Vulkan};
+use crate::graphics::{Graphics, Renderer, Resolution, Vulkan};
 use std::{error::Error, sync::Arc};
 use vulkano::{
     Version, VulkanLibrary,
@@ -24,7 +24,7 @@ impl Graphics {
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let vulkan = Vulkan::init(event_loop)?;
 
-        let renderer = Renderer::new(&vulkan);
+        let renderer = Renderer::new(&vulkan, Resolution::Full);
 
         Ok(Graphics { vulkan, renderer })
     }

@@ -8,7 +8,9 @@ use vulkano::{
 
 use crate::{
     game::{game_state::GameState, resources::Resources},
-    graphics::{GamePush, Renderer, Vulkan, renderer::RENDER_RES_RATIO},
+    graphics::{
+        GamePush, PostProcessPush, Renderer, StateRenderInfo, Vulkan, renderer::resolution,
+    },
 };
 
 impl Renderer {
@@ -20,17 +22,11 @@ impl Renderer {
         image_index: u32,
         is_first: bool,
     ) {
-        self.game_pass(vulkan, resources, state, is_first);
-        self.postprocess_pass(vulkan, image_index, is_first);
+        self.game_pass(vulkan, resources, state);
+        self.postprocess_pass(vulkan, &state.render_info, image_index, is_first);
     }
 
-    fn game_pass(
-        &mut self,
-        vulkan: &Vulkan,
-        resources: &Resources,
-        state: &GameState,
-        is_first: bool,
-    ) {
+    fn game_pass(&mut self, vulkan: &Vulkan, resources: &Resources, state: &GameState) {
         let (pipeline, command_buffer, rcx) = match (
             self.game_pipeline.as_ref(),
             self.command_buffer.as_mut(),
@@ -45,10 +41,7 @@ impl Renderer {
         };
 
         let window_size: [u32; 2] = rcx.swapchain.image_extent();
-        let game_resolution = [
-            window_size[0] / RENDER_RES_RATIO[0],
-            window_size[1] / RENDER_RES_RATIO[1],
-        ];
+        let game_resolution = resolution(window_size, &self.game_resolution);
 
         let global_ubo = {
             let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
@@ -58,11 +51,9 @@ impl Renderer {
         let rendering_info = {
             let mut color_attachment = RenderingAttachmentInfo::image_view(rcx.color_image.clone());
             color_attachment.store_op = AttachmentStoreOp::Store;
-            color_attachment.load_op = AttachmentLoadOp::Load;
-            if is_first {
-                color_attachment.load_op = AttachmentLoadOp::Clear;
-                color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-            }
+            color_attachment.load_op = AttachmentLoadOp::Clear;
+            color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
+
             let mut depth_attachment = RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
             depth_attachment.load_op = AttachmentLoadOp::Clear;
             depth_attachment.store_op = AttachmentStoreOp::Store;
@@ -151,7 +142,13 @@ impl Renderer {
         command_buffer.end_rendering().unwrap();
     }
 
-    fn postprocess_pass(&mut self, vulkan: &Vulkan, image_index: u32, is_first: bool) {
+    fn postprocess_pass(
+        &mut self,
+        vulkan: &Vulkan,
+        render_info: &StateRenderInfo,
+        image_index: u32,
+        is_first: bool,
+    ) {
         let (pipeline, command_buffer, rcx) = match (
             self.post_process_pipeline.as_ref(),
             self.command_buffer.as_mut(),
@@ -220,8 +217,30 @@ impl Renderer {
             )
             .unwrap();
 
+        let push_constant = {
+            let top_left = render_info.top_left_coord;
+            let bottom_right = render_info.bottom_right_coord;
+            let top_right = [bottom_right[0], top_left[1]];
+            let bottom_left = [top_left[0], bottom_right[1]];
+
+            let positions: [[f32; 2]; 6] = [
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_left,
+                bottom_right,
+                top_right,
+            ];
+
+            PostProcessPush { positions }
+        };
+
+        command_buffer
+            .push_constants(pipeline.layout().clone(), 0, push_constant)
+            .unwrap();
+
         unsafe {
-            command_buffer.draw(3, 1, 0, 0).unwrap();
+            command_buffer.draw(6, 1, 0, 0).unwrap();
         }
 
         command_buffer.end_rendering().unwrap();

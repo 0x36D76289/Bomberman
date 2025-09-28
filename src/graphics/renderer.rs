@@ -38,8 +38,6 @@ use vulkano::{
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
-pub const RENDER_RES_RATIO: [u32; 2] = [1, 1];
-
 pub struct Renderer {
     pub rcx: Option<RenderContext>,
     pub game_pipeline: Option<Arc<GraphicsPipeline>>,
@@ -48,6 +46,7 @@ pub struct Renderer {
     pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
     pub text_renderer: TextRenderer,
     pub sampler: Arc<Sampler>,
+    pub game_resolution: Resolution,
 }
 
 pub struct RenderContext {
@@ -61,8 +60,33 @@ pub struct RenderContext {
     pub time_info: TimeInfo,
 }
 
+#[derive(Debug, Clone)]
+pub enum Resolution {
+    Full,
+    Custom(u32, u32),
+    DividedBy(u32),
+}
+
+#[derive(Debug, Clone)]
+/// Represents how a state is rendered
+pub struct StateRenderInfo {
+    pub top_left_coord: [f32; 2],
+    pub bottom_right_coord: [f32; 2],
+    pub drawn_first: bool,
+}
+
+impl Default for StateRenderInfo {
+    fn default() -> Self {
+        Self {
+            top_left_coord: [-1.0, -1.0],
+            bottom_right_coord: [1.0, 1.0],
+            drawn_first: false,
+        }
+    }
+}
+
 impl Renderer {
-    pub fn new(vulkan: &Vulkan) -> Self {
+    pub fn new(vulkan: &Vulkan, game_resolution: Resolution) -> Self {
         let text_renderer = TextRenderer::new();
 
         let sampler = Sampler::new(
@@ -85,6 +109,7 @@ impl Renderer {
             command_buffer: None,
             text_renderer,
             sampler,
+            game_resolution,
         }
     }
 
@@ -99,10 +124,7 @@ impl Renderer {
             .expect("Could not create surface");
 
         let window_size: [u32; 2] = window.inner_size().into();
-        let game_resolution = [
-            window_size[0] / RENDER_RES_RATIO[0],
-            window_size[1] / RENDER_RES_RATIO[1],
-        ];
+        let game_resolution = resolution(window_size, &self.game_resolution);
 
         // Create the swapchain which holds a queue of images that are waiting to be presented on the screen
         let (swapchain, images) = {
@@ -360,14 +382,39 @@ impl Renderer {
         self.rcx.as_ref().unwrap().window.request_redraw();
     }
 
+    pub fn render_state(
+        &mut self,
+        vulkan: &Vulkan,
+        resources: &Resources,
+        state: &AppState,
+        image_index: u32,
+        is_first: bool,
+    ) {
+        match (&state.game, &state.ui) {
+            (Some(game_state), Some(ui_state)) => {
+                if ui_state.render_info.drawn_first && !game_state.render_info.drawn_first {
+                    self.render_ui(vulkan, resources, ui_state, image_index, is_first);
+                    self.render_game(vulkan, resources, game_state, image_index, false)
+                } else {
+                    self.render_game(vulkan, resources, game_state, image_index, is_first);
+                    self.render_ui(vulkan, resources, ui_state, image_index, false);
+                }
+            }
+            (Some(game_state), None) => {
+                self.render_game(vulkan, resources, game_state, image_index, is_first)
+            }
+            (None, Some(ui_state)) => {
+                self.render_ui(vulkan, resources, ui_state, image_index, is_first)
+            }
+            (None, None) => (),
+        }
+    }
+
     pub fn render_states(&mut self, vulkan: &Vulkan, states: &[AppState], resources: &Resources) {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
-        let game_resolution = [
-            window_size.width / RENDER_RES_RATIO[0],
-            window_size.height / RENDER_RES_RATIO[1],
-        ];
+        let game_resolution = resolution(window_size.into(), &self.game_resolution);
 
         if window_size.width == 0 || window_size.height == 0 {
             return;
@@ -433,14 +480,7 @@ impl Renderer {
         };
         let mut is_first = true;
         for state in states.iter().skip(states_to_skip) {
-            match state {
-                AppState::Game(game_state) => {
-                    self.render_game(vulkan, resources, game_state, image_index, is_first)
-                }
-                AppState::Ui(ui_state) => {
-                    self.render_ui(vulkan, resources, ui_state, image_index, is_first)
-                }
-            }
+            self.render_state(vulkan, resources, state, image_index, is_first);
             if is_first {
                 is_first = false
             }
@@ -551,6 +591,14 @@ fn create_images(
     .unwrap();
 
     (color_image, depth_image)
+}
+
+pub fn resolution(window_size: [u32; 2], resolution: &Resolution) -> [u32; 2] {
+    match resolution {
+        Resolution::Full => window_size,
+        Resolution::Custom(width, height) => [*width, *height],
+        Resolution::DividedBy(devisor) => [window_size[0] / devisor, window_size[1] / devisor],
+    }
 }
 
 pub mod game_vs {

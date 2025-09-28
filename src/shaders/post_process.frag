@@ -17,7 +17,7 @@ float scanlineEffect(vec2 coord, float resolution) {
 
 void main() {
     // Sample the low-resolution texture
-    vec4 color = vec4(texture(renderedImage, inTexCoord).rgb, 1.0);
+    vec4 color = texture(renderedImage, inTexCoord);
 
     // float depth = texture(renderedImage, inTexCoord).r;
     // depth = pow(depth, 0.5);
