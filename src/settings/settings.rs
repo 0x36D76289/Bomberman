@@ -1,48 +1,61 @@
 use std::fs::OpenOptions;
 
 use serde::{Deserialize, Serialize};
-use winit::keyboard::KeyCode;
+use winit::keyboard::{KeyCode, PhysicalKey};
 
-use crate::input::{input::Binds, input_name::InputName};
+use crate::{
+    input::{
+        input::{Binds, default_binds},
+        input_name::InputName,
+    },
+    settings::path::get_settings_path,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
+    // The resolution of the display in pixel as (x, y)
     pub resolution: (u32, u32),
+    // If scaling should use nearest neighbor or bilinear TODO:
+    pub filtering: bool,
+    // Should the window be displayed in fullscreen
     pub fullscreen: bool,
-    pub framerate_limit: u32,
+    // what is the framerate limit in fps, -1 if none, 0 for vsync
+    pub framerate_limit: i32,
+    // Music Volume, between 0 and 1
     pub volume_music: f32,
+    // SFX Volume, between 0 and 1
     pub volume_sfx: f32,
+    // Each member of the vector is a player, the content of the element are in order of InputName
     pub binds: Vec<Binds>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        let mut p1_binds: Binds = [KeyCode::F35; 5];
-        p1_binds[InputName::Up as usize] = KeyCode::KeyW;
-        p1_binds[InputName::Down as usize] = KeyCode::KeyS;
-        p1_binds[InputName::Left as usize] = KeyCode::KeyA;
-        p1_binds[InputName::Right as usize] = KeyCode::KeyD;
-        p1_binds[InputName::Bomb as usize] = KeyCode::Space;
+        let mut p1_binds: Binds = default_binds();
+        p1_binds[InputName::Up as usize] = PhysicalKey::Code(KeyCode::KeyW);
+        p1_binds[InputName::Down as usize] = PhysicalKey::Code(KeyCode::KeyS);
+        p1_binds[InputName::Left as usize] = PhysicalKey::Code(KeyCode::KeyA);
+        p1_binds[InputName::Right as usize] = PhysicalKey::Code(KeyCode::KeyD);
+        p1_binds[InputName::Bomb as usize] = PhysicalKey::Code(KeyCode::Space);
 
-        let mut p2_binds: Binds = [KeyCode::F35; 5];
-        p2_binds[InputName::Up as usize] = KeyCode::ArrowUp;
-        p2_binds[InputName::Down as usize] = KeyCode::ArrowDown;
-        p2_binds[InputName::Left as usize] = KeyCode::ArrowLeft;
-        p2_binds[InputName::Right as usize] = KeyCode::ArrowRight;
-        p2_binds[InputName::Bomb as usize] = KeyCode::ShiftRight;
+        let mut p2_binds: Binds = default_binds();
+        p2_binds[InputName::Up as usize] = PhysicalKey::Code(KeyCode::ArrowUp);
+        p2_binds[InputName::Down as usize] = PhysicalKey::Code(KeyCode::ArrowDown);
+        p2_binds[InputName::Left as usize] = PhysicalKey::Code(KeyCode::ArrowLeft);
+        p2_binds[InputName::Right as usize] = PhysicalKey::Code(KeyCode::ArrowRight);
+        p2_binds[InputName::Bomb as usize] = PhysicalKey::Code(KeyCode::ShiftRight);
 
         Self {
             resolution: (800, 600),
+            filtering: false,
             fullscreen: false,
             framerate_limit: 60,
-            volume_music: 100.0,
-            volume_sfx: 100.0,
+            volume_music: 1.0,
+            volume_sfx: 1.0,
             binds: vec![p1_binds, p2_binds],
         }
     }
 }
-
-const SETTINGS_PATH: &str = "./settings.bomb";
 
 impl Settings {
     pub fn save(&self) {
@@ -51,33 +64,33 @@ impl Settings {
             .write(true)
             .create(true)
             .truncate(true)
-            .open(SETTINGS_PATH);
+            .open(get_settings_path());
         if settings_file.is_err() {
-            println!("save: failed to open {}", SETTINGS_PATH);
+            println!("save: failed to open {}", get_settings_path());
             return;
         }
 
         let settings_file = settings_file.unwrap();
 
         if serde_cbor::to_writer(settings_file, self).is_err() {
-            println!("save: couldn't write settings to {}", SETTINGS_PATH);
+            println!("save: couldn't write settings to {}", get_settings_path());
         }
     }
 
     pub fn load_settings() -> Self {
-        let settings_file = OpenOptions::new().read(true).open(SETTINGS_PATH);
+        let settings_file = OpenOptions::new().read(true).open(get_settings_path());
 
         if settings_file.is_err() {
             println!(
                 "couldn't read file \"{}\", loading default settings",
-                SETTINGS_PATH
+                get_settings_path()
             );
             return Self::default();
         }
         let load: Result<Settings, serde_cbor::Error> =
             serde_cbor::from_reader(settings_file.unwrap());
         if load.is_err() {
-            println!("file {} is invalid, saving defaults", SETTINGS_PATH);
+            println!("file {} is invalid, saving defaults", get_settings_path());
             let default = Self::default();
             default.save();
             return default;

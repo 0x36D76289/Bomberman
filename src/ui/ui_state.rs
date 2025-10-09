@@ -3,8 +3,9 @@ use crate::{
     audio::AudioManager,
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
-    input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    ui::{button::Button, canvas::Canvas, game_settings::UIGameSettings, utils::GetRatio},
+    input::{event::InputEvent, input::Input, input_state::InputState, input_vec::MenuInput},
+    settings::settings::Settings,
+    ui::{button::Button, canvas::Canvas, pages::game_settings::UIGameSettings, utils::GetRatio},
 };
 use glam::Vec4;
 use std::sync::Arc;
@@ -24,6 +25,8 @@ pub enum UIPage {
     MainMenu,
     Pause,
     GameSettings(UIGameSettings),
+    Settings { selected_player: usize },
+    Binds { player: usize, waiting: isize },
 }
 
 #[derive(Debug, Clone)]
@@ -74,14 +77,19 @@ impl UiState {
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
+        events: &Vec<InputEvent>,
         keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
+        settings: &mut Settings,
+        ratio: f32,
     ) -> (Option<AppState>, u8) {
         match self.page {
             UIPage::MainMenu => self.main_menu_tick(keys, audio_manager),
             UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
             UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
+            UIPage::Settings { .. } => self.settings_tick(inputs, settings, ratio),
+            UIPage::Binds { .. } => self.binds_tick(inputs, events, settings),
         }
     }
 

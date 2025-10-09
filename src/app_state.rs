@@ -7,7 +7,8 @@ use crate::{
     audio::AudioManager,
     game::{game_state::GameState, resources::Resources},
     graphics::{Renderer, Vulkan},
-    input::input::Input,
+    input::{event::InputEvent, input::Input},
+    settings::settings::Settings,
     ui::UiState,
 };
 
@@ -36,15 +37,27 @@ impl AppState {
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
+        events: &Vec<InputEvent>,
         keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
+        settings: &mut Settings,
+        ratio: f32,
     ) -> (Option<AppState>, u8) {
         match self {
             AppState::Game(game_state) => {
                 game_state.tick(delta, inputs, keys, resources, audio_manager)
             }
-            AppState::Ui(ui_state) => ui_state.tick(delta, inputs, keys, resources, audio_manager),
+            AppState::Ui(ui_state) => ui_state.tick(
+                delta,
+                inputs,
+                events,
+                keys,
+                resources,
+                audio_manager,
+                settings,
+                ratio,
+            ),
         }
     }
 

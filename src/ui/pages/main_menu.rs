@@ -39,17 +39,24 @@ impl UiState {
         keys: &KeyMap,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        match keys.get(&PhysicalKey::Code(KeyCode::Enter)) {
-            Some(state) if state.is_pressed() => {
-                // Changer la musique pour le jeu
-                audio_manager.play_background_music(BackgroundMusic::Game);
-                (
-                    // TODO: replace player count with value gotten from settings/previous ui
-                    Some(AppState::Ui(UiState::game_settings(2))),
-                    0,
-                )
-            }
-            _ => (None, 0),
+        if let Some(state) = keys.get(&PhysicalKey::Code(KeyCode::Enter))
+            && state.is_pressed()
+        {
+            // INFO: Le jeu devrait demarrer sa musique je pense
+
+            // Changer la musique pour le jeu
+            audio_manager.play_background_music(BackgroundMusic::Game);
+            return (
+                // TODO: replace player count with value gotten from settings/previous ui
+                Some(AppState::Ui(UiState::game_settings(2))),
+                0,
+            );
         }
+        if let Some(state) = keys.get(&PhysicalKey::Code(KeyCode::Backspace))
+            && state.is_pressed()
+        {
+            return (Some(AppState::Ui(UiState::settings())), 0);
+        }
+        (None, 0)
     }
 }

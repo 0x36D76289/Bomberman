@@ -10,12 +10,13 @@ mod ui;
 use app::App;
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::settings::settings::Settings;
+use crate::settings::{path::init_settings_path, settings::Settings};
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
+    init_settings_path();
     let settings = Settings::load_settings();
 
     let mut app = App::init(settings, &event_loop).unwrap();

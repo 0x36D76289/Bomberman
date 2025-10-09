@@ -1,4 +1,4 @@
-use crate::game::direction::Direction;
+use crate::{game::direction::Direction, input::input::BIND_LEN};
 
 #[derive(Clone, Copy)]
 pub enum InputName {
@@ -7,16 +7,18 @@ pub enum InputName {
     Left,
     Right,
     Bomb,
+    Back,
 }
 
 impl InputName {
     pub fn iterator() -> impl Iterator<Item = &'static InputName> {
-        static DIRECTIONS: [InputName; 5] = [
+        static DIRECTIONS: [InputName; BIND_LEN] = [
             InputName::Up,
             InputName::Down,
             InputName::Left,
             InputName::Right,
             InputName::Bomb,
+            InputName::Back,
         ];
         DIRECTIONS.iter()
     }

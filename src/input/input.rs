@@ -5,24 +5,38 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::input::{input_name::InputName, input_state::InputState};
+use crate::{
+    app_state::KeyMap,
+    input::{input_name::InputName, input_state::InputState},
+};
 
-pub type Binds = [KeyCode; 5];
+pub const BIND_LEN: usize = 6;
+pub type Binds = [PhysicalKey; BIND_LEN];
+
+pub fn default_binds() -> Binds {
+    [PhysicalKey::Code(KeyCode::F35); BIND_LEN]
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Input {
-    states: [InputState; 5],
+    states: [InputState; BIND_LEN],
 }
 
 impl Default for Input {
     fn default() -> Self {
         Self {
-            states: [InputState::Released; 5],
+            states: [InputState::Released; BIND_LEN],
         }
     }
 }
 
 impl Input {
+    pub fn held_new() -> Self {
+        Self {
+            states: [InputState::Held; BIND_LEN],
+        }
+    }
+
     fn axis_to_float(negative: InputState, positive: InputState) -> f32 {
         -(negative.is_down() as u8 as f32) + positive.is_down() as u8 as f32
     }
@@ -53,6 +67,9 @@ impl Input {
     pub fn bomb(&self) -> InputState {
         self.get_state(InputName::Bomb)
     }
+    pub fn back(&self) -> InputState {
+        self.get_state(InputName::Back)
+    }
 
     /// Updates an individual input component
     pub fn update_input_component(&mut self, key_down: bool, input: InputName) {
@@ -81,21 +98,21 @@ impl Input {
         }
     }
 
-    fn update_input_keycode(
+    fn update_input_physical_key(
         &mut self,
         map: &HashMap<PhysicalKey, ElementState>,
-        key: KeyCode,
+        key: PhysicalKey,
         input: InputName,
     ) {
-        if let Some(state) = map.get(&PhysicalKey::Code(key)) {
+        if let Some(state) = map.get(&key) {
             self.update_input_component(state.is_pressed(), input);
         }
     }
 
     /// Updates all of a player's input by using their keybinds
-    pub fn update_input_player(&mut self, map: &HashMap<PhysicalKey, ElementState>, codes: Binds) {
+    pub fn update_input_player(&mut self, map: &KeyMap, codes: Binds) {
         for input in InputName::iterator() {
-            self.update_input_keycode(map, codes[*input as usize], *input);
+            self.update_input_physical_key(map, codes[*input as usize], *input);
         }
     }
 }

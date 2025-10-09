@@ -4,7 +4,7 @@ use crate::{
     app_state::AppState,
     audio::{AudioManager, BackgroundMusic},
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-    input::input::Input,
+    input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -133,6 +133,9 @@ impl UiState {
                     (None, 2)
                 }
             };
+        }
+        if inputs.menu_back() == InputState::Pressed {
+            return (None, 1);
         }
         (None, 0)
     }
