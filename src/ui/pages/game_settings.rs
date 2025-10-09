@@ -12,8 +12,8 @@ use crate::{
     },
 };
 
-use super::consts::*;
-use super::utils::*;
+use super::super::consts::*;
+use super::super::utils::*;
 
 const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.3, 0.3);
 const PRESET_GRID_COUNT: u8 = 4;
@@ -638,6 +638,9 @@ impl UiState {
             .up = settings.preset as usize;
         self.tick_error(delta);
         self.update_label_text();
+        if inputs.menu_back() == InputState::Pressed {
+            return (None, 1);
+        }
         self.create_return_value(inputs, resources)
     }
 }

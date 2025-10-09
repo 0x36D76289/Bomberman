@@ -17,6 +17,7 @@ pub trait MenuInput {
     fn menu_left(&self) -> InputState;
     fn menu_right(&self) -> InputState;
     fn menu_confirm(&self) -> InputState;
+    fn menu_back(&self) -> InputState;
 }
 
 impl MenuInput for Vec<Input> {
@@ -47,5 +48,8 @@ impl MenuInput for Vec<Input> {
     }
     fn menu_confirm(&self) -> InputState {
         self.get_input(InputName::Bomb)
+    }
+    fn menu_back(&self) -> InputState {
+        self.get_input(InputName::Back)
     }
 }
