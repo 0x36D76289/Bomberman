@@ -1,13 +1,15 @@
-use crate::app_state::{AppState, KeyMap};
+use crate::app_state::AppState;
 use crate::audio::{AudioManager, BackgroundMusic};
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
+use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
 use crate::ui::UiState;
+use crate::ui::utils::GetRatio;
+use glam::Vec2;
 use std::error::Error;
-use winit::event::ElementState;
-use winit::keyboard::PhysicalKey;
+use winit::dpi::PhysicalPosition;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -17,7 +19,8 @@ use winit::{
 
 pub struct App {
     state_stack: Vec<AppState>,
-    keys: KeyMap,
+    mouse_pos: PhysicalPosition<f64>,
+    events: Vec<InputEvent>,
     inputs: Vec<Input>,
     resources: Resources,
     graphics: Graphics,
@@ -31,21 +34,23 @@ impl App {
 
         let resources = Resources::load_resources(&graphics.vulkan);
 
-        let keys = KeyMap::new();
+        let mouse_pos = Default::default();
+        let events = Vec::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
         let gui_state1 = AppState::Ui(UiState::main_menu());
 
         let state_stack = vec![gui_state1];
 
-        let mut audio_manager = AudioManager::new()?;
+        let mut audio_manager = AudioManager::new(&settings)?;
 
         audio_manager.play_background_music(BackgroundMusic::Menu);
 
         Ok(Self {
             state_stack,
-            keys,
             inputs,
+            mouse_pos,
+            events,
             resources,
             graphics,
             settings,
@@ -57,13 +62,12 @@ impl App {
         &self.resources
     }
 
-    fn record_key(&mut self, code: PhysicalKey, state: ElementState) {
-        self.keys.insert(code, state);
-    }
-
     fn update_inputs(&mut self) {
+        if self.inputs.len() != self.settings.binds.len() {
+            self.inputs = vec![Input::held_new(); self.settings.binds.len()]
+        }
         for i in 0..self.settings.binds.len() {
-            self.inputs[i].update_input_player(&self.keys, self.settings.binds[i]);
+            self.inputs[i].update_input_player(&self.events, self.settings.binds[i]);
         }
     }
 
@@ -76,10 +80,14 @@ impl App {
         let res = app_state.tick(
             renderer.get_delta_time(),
             &self.inputs,
-            &self.keys,
+            &self.events,
             &self.resources,
             &mut self.audio_manager,
+            &mut self.settings,
+            renderer.window_size().get_ratio(),
         );
+        // println!("{:#?}", self.events);
+        self.events.clear();
         for _ in 0..res.1 {
             if self.state_stack.pop().is_none() {
                 // TODO: Handle application stop if last state is popped
@@ -125,7 +133,29 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::KeyboardInput { event, .. } => {
-                self.record_key(event.physical_key, event.state)
+                self.events.push(InputEvent::Keyboard {
+                    key: event.physical_key,
+                    down: event.state.is_pressed(),
+                });
+            }
+            WindowEvent::MouseInput {
+                device_id: _,
+                state: _,
+                button,
+            } => {
+                self.events.push(InputEvent::Click {
+                    location: Vec2 {
+                        x: self.mouse_pos.x as f32,
+                        y: self.mouse_pos.y as f32,
+                    },
+                    button,
+                });
+            }
+            WindowEvent::CursorMoved {
+                device_id: _,
+                position,
+            } => {
+                self.mouse_pos = position;
             }
             _ => (),
         }

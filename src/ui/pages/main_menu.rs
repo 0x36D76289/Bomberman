@@ -25,7 +25,7 @@ impl UiState {
 
         let mut continue_button = Button {
             canvas: Canvas {
-                center: Vec2::new(0.0, 0.1),
+                center: Vec2::new(0.0, -0.1),
                 text: Some("Continue".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.2),
@@ -44,7 +44,7 @@ impl UiState {
 
         let new_game_button = Button {
             canvas: Canvas {
-                center: Vec2::new(0.0, 0.3),
+                center: Vec2::new(0.0, 0.1),
                 text: Some("New Game".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.2),
@@ -62,7 +62,7 @@ impl UiState {
 
         let multi_button = Button {
             canvas: Canvas {
-                center: Vec2::new(0.0, 0.5),
+                center: Vec2::new(0.0, 0.3),
                 text: Some("Multiplayer".to_string()),
                 text_color: Some(Vec4::ONE),
                 text_size: Some(1.2),
@@ -70,9 +70,43 @@ impl UiState {
             },
             neighbors: ButtonNeighbors {
                 up: 1,
-                down: 2,
+                down: 3,
                 left: 2,
                 right: 2,
+            },
+            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
+            ..Default::default()
+        };
+        let settings_button = Button {
+            canvas: Canvas {
+                center: Vec2::new(0.0, 0.5),
+                text: Some("Settings".to_string()),
+                text_color: Some(Vec4::ONE),
+                text_size: Some(1.2),
+                ..Default::default()
+            },
+            neighbors: ButtonNeighbors {
+                up: 2,
+                down: 4,
+                left: 3,
+                right: 3,
+            },
+            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
+            ..Default::default()
+        };
+        let quit_button = Button {
+            canvas: Canvas {
+                center: Vec2::new(0.0, 0.7),
+                text: Some("Quit Game".to_string()),
+                text_color: Some(Vec4::ONE),
+                text_size: Some(1.2),
+                ..Default::default()
+            },
+            neighbors: ButtonNeighbors {
+                up: 3,
+                down: 4,
+                left: 4,
+                right: 4,
             },
             selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
             ..Default::default()
@@ -80,19 +114,26 @@ impl UiState {
 
         Self {
             canvases: vec![title],
-            buttons: vec![continue_button, new_game_button, multi_button],
+            buttons: vec![
+                continue_button,
+                new_game_button,
+                multi_button,
+                settings_button,
+                quit_button,
+            ],
             is_transparent: false,
             selected: 0,
             page: UIPage::MainMenu,
         }
     }
-
     pub fn main_menu_tick(
         &mut self,
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
+            println!("selected: {}", self.selected);
+            //TODO: je comprends pas pourquoi on joue Game peu importe le setting
             audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
             return match self.selected {
                 0 => {
@@ -112,13 +153,18 @@ impl UiState {
                     }
                 }
                 1 => match crate::game::game_state::GameState::new_campaign(1, 3) {
+                    // TODO: le pop devrait etre a 0 et le main menu dans pause dois juste pop pas
+                    // creer un nouveau main menu
                     Some(game_state) => (Some(AppState::Game(game_state)), 1),
                     None => {
                         println!("Error: Failed to load campaign level 1 for new game");
                         (None, 0)
                     }
                 },
-                2 => (Some(AppState::Ui(UiState::game_settings(2))), 1),
+                // TODO: get settings player count
+                2 => (Some(AppState::Ui(UiState::game_settings(2))), 0),
+                3 => (Some(AppState::Ui(UiState::settings())), 0),
+                4 => (None, 1),
                 _ => (None, 0),
             };
         }

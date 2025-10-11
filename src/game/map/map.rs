@@ -299,7 +299,10 @@ impl Map {
             width,
             height,
             content,
-            spawns: vec![SpawnPoint::init(player_spawn.x as i32, player_spawn.y as i32)],
+            spawns: vec![SpawnPoint::init(
+                player_spawn.x as i32,
+                player_spawn.y as i32,
+            )],
             floor: Self::create_floor(width as u8, height as u8, resources),
         }
         .fix_objects();

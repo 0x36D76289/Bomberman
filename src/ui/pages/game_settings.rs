@@ -2,7 +2,7 @@ use glam::{Vec2, Vec4, usize};
 
 use crate::{
     app_state::AppState,
-    game::{game_settings::GameSettings, game_state::GameState, map::map_settings::MapSettings, resources::Resources},
+    game::{game_state::GameState, map::map_settings::MapSettings, resources::Resources},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
@@ -12,8 +12,8 @@ use crate::{
     },
 };
 
-use super::consts::*;
-use super::utils::*;
+use super::super::consts::*;
+use super::super::utils::*;
 
 const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.3, 0.3);
 const PRESET_GRID_COUNT: u8 = 4;
@@ -579,7 +579,10 @@ impl UiState {
                 spawns: settings.player_count + settings.bot_count,
                 ..MapSettings::corners()
             },
-            _ => MapSettings { // Arena, Preset3, and Custom all use random generation
+            GameSettingPreset::Arena => return (None, 0),
+            GameSettingPreset::Preset3 => return (None, 0),
+            GameSettingPreset::Custom => MapSettings {
+                // Arena, Preset3, and Custom all use random generation
                 width: settings.width,
                 height: settings.height,
                 cheesiness: settings.cheesiness,
@@ -588,7 +591,7 @@ impl UiState {
             },
         };
 
-        let game_settings = GameSettings {
+        let game_settings = crate::game::game_settings::GameSettings {
             nb_humans: settings.player_count.into(),
             map_settings,
         };
@@ -622,6 +625,9 @@ impl UiState {
             .up = settings.preset as usize;
         self.tick_error(delta);
         self.update_label_text();
+        if inputs.menu_back() == InputState::Pressed {
+            return (None, 1);
+        }
         self.create_return_value(inputs, resources)
     }
 }

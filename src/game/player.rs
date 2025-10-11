@@ -83,7 +83,7 @@ impl Player {
         self.bound(map);
         self.collide_map(map, direction);
         for bomb in bombs {
-            if !bomb.collision_enabled {
+            if bomb.owner_id == self.id && !bomb.collision_enabled {
                 continue;
             }
             if self.resolve_collision_with(bomb.position, BOMB_RADIUS, direction)
@@ -104,10 +104,22 @@ impl Player {
         let target_y = self.position.y as usize;
 
         for bomb in bombs {
-            if bomb.position.x as usize == target_x && bomb.position.y as usize == target_y {
+            if bomb.owner_id == self.id && !bomb.collision_enabled {
+                return None;
+            }
+            if bomb.is_colliding_with(
+                Vec2 {
+                    x: target_x as f32,
+                    y: target_y as f32,
+                },
+                BOMB_RADIUS,
+            ) {
                 return None;
             }
         }
+
+        //TODO:
+        // check position doesn't have another player / enemy
 
         self.bombs_remaining -= 1;
         Some(Bomb::new(

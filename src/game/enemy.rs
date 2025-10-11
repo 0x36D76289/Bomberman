@@ -53,7 +53,13 @@ impl Enemy {
         self.object = None;
     }
 
-    pub fn tick(&mut self, delta: f32, map: &Map, bombs: &[super::bomb::Bomb], other_enemies: &[Enemy]) {
+    pub fn tick(
+        &mut self,
+        delta: f32,
+        map: &Map,
+        bombs: &[super::bomb::Bomb],
+        other_enemies: &[Enemy],
+    ) {
         if !self.alive {
             return;
         }
