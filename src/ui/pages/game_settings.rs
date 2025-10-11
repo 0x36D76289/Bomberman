@@ -570,50 +570,37 @@ impl UiState {
         {
             return (None, 0);
         }
-        match settings.preset {
-            GameSettingPreset::Corners => (
-                Some(AppState::Game(
-                    GameState::default_state(
-                        resources,
-                        crate::game::game_settings::GameSettings {
-                            nb_humans: settings.player_count.into(),
-                            map_settings: MapSettings {
-                                width: settings.width,
-                                height: settings.height,
-                                cheesiness: settings.cheesiness,
-                                spawns: settings.player_count + settings.bot_count,
-                                ..MapSettings::corners()
-                            },
-                        },
-                    )
-                    // TODO: make a game creator that doesn't error
-                    .unwrap(),
-                )),
-                0,
-            ),
-            GameSettingPreset::Arena => (None, 0),
-            GameSettingPreset::Preset3 => (None, 0),
-            GameSettingPreset::Custom => {
-                let state = GameState::default_state(
-                    resources,
-                    crate::game::game_settings::GameSettings {
-                        nb_humans: settings.player_count.into(),
-                        map_settings: MapSettings {
-                            width: settings.width,
-                            height: settings.height,
-                            cheesiness: settings.cheesiness,
-                            spawns: settings.player_count + settings.bot_count,
-                            ..MapSettings::default_cheese()
-                        },
-                    },
-                );
-                if state.is_err() {
-                    self.set_error("map creation fail, lower player count".to_string());
-                    (None, 0)
-                } else {
-                    println!("WE SELECT IN HERE");
-                    (Some(AppState::Game(state.unwrap())), 0)
-                }
+
+        let map_settings = match settings.preset {
+            GameSettingPreset::Corners => MapSettings {
+                width: settings.width,
+                height: settings.height,
+                cheesiness: settings.cheesiness,
+                spawns: settings.player_count + settings.bot_count,
+                ..MapSettings::corners()
+            },
+            GameSettingPreset::Arena => return (None, 0),
+            GameSettingPreset::Preset3 => return (None, 0),
+            GameSettingPreset::Custom => MapSettings {
+                // Arena, Preset3, and Custom all use random generation
+                width: settings.width,
+                height: settings.height,
+                cheesiness: settings.cheesiness,
+                spawns: settings.player_count + settings.bot_count,
+                ..MapSettings::default_cheese()
+            },
+        };
+
+        let game_settings = crate::game::game_settings::GameSettings {
+            nb_humans: settings.player_count.into(),
+            map_settings,
+        };
+
+        match GameState::new_multiplayer(resources, game_settings) {
+            Ok(game_state) => (Some(AppState::Game(game_state)), 1),
+            Err(_) => {
+                self.set_error("Map creation failed. Try reducing player/bot count.".to_string());
+                (None, 0)
             }
         }
     }

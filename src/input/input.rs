@@ -1,14 +1,10 @@
 use glam::Vec2;
-use std::collections::HashMap;
 use winit::{
     event::ElementState,
     keyboard::{KeyCode, PhysicalKey},
 };
 
-use crate::{
-    app_state::KeyMap,
-    input::{input_name::InputName, input_state::InputState},
-};
+use crate::input::{event::InputEvent, input_name::InputName, input_state::InputState};
 
 pub const BIND_LEN: usize = 6;
 pub type Binds = [PhysicalKey; BIND_LEN];
@@ -98,21 +94,39 @@ impl Input {
         }
     }
 
+    // TODO: rename to reflect change, add controller support
     fn update_input_physical_key(
         &mut self,
-        map: &HashMap<PhysicalKey, ElementState>,
+        events: &Vec<InputEvent>,
         key: PhysicalKey,
         input: InputName,
     ) {
-        if let Some(state) = map.get(&key) {
-            self.update_input_component(state.is_pressed(), input);
+        for event in events {
+            match event {
+                InputEvent::Keyboard {
+                    key: event_key,
+                    down,
+                } => {
+                    if key == *event_key {
+                        self.update_input_component(*down, input);
+                        return;
+                    }
+                }
+                InputEvent::Click { .. } => (),
+                InputEvent::ControllerButton {
+                    controller,
+                    button,
+                    down,
+                } => todo!("{controller} {button} {down}"),
+            }
         }
+        self.update_input_component(self.states[input as usize].is_down(), input);
     }
 
     /// Updates all of a player's input by using their keybinds
-    pub fn update_input_player(&mut self, map: &KeyMap, codes: Binds) {
+    pub fn update_input_player(&mut self, events: &Vec<InputEvent>, codes: Binds) {
         for input in InputName::iterator() {
-            self.update_input_physical_key(map, codes[*input as usize], *input);
+            self.update_input_physical_key(events, codes[*input as usize], *input);
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::{LazyLock, Mutex};
+use std::sync::Mutex;
 
 fn settings_path(path: Option<String>) -> String {
     static SETTINGS_PATH: Mutex<String> = Mutex::new(String::new());

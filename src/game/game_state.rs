@@ -1,26 +1,28 @@
-use crate::app_state::{AppState, KeyMap};
-use crate::game::Camera;
+use crate::app_state::AppState;
 use crate::game::bomb::{Bomb, BombState};
+use crate::game::camera::Camera;
+use crate::game::collision::Collision;
+use crate::game::enemy::Enemy;
 use crate::game::game_settings::GameSettings;
-use crate::game::map::map::Map;
+use crate::game::map::map::{LevelData, Map};
 use crate::game::map::map_element::MapElement;
 use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
-use crate::game::resources::Resources;
+use crate::game::resources::{ResourceName, Resources};
 use crate::graphics::object::Object;
+use crate::graphics::renderer::RENDER_RES_RATIO;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
+use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
-use crate::input::input_vec::GetOrDefault;
+use crate::input::input_vec::{GetOrDefault, MenuInput};
 use crate::ui::UiState;
-use crate::{audio::AudioManager, graphics::renderer::RENDER_RES_RATIO};
-use glam::{Vec2, Vec3, Vec4, bool};
-use rand::random_range;
+use crate::{audio::AudioManager, audio::SoundEffect};
+use glam::{Vec2, Vec3, Vec4};
 use std::error::Error;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::vec::Vec;
 use vulkano::{
     command_buffer::{
@@ -34,9 +36,34 @@ use vulkano::{
 };
 use winit::keyboard::{KeyCode, PhysicalKey};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameMode {
+    Multiplayer,
+    Campaign,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CampaignProgress {
+    pub level: u32,
+    pub lives: u32,
+    pub score: u32,
+}
+
+#[derive(Debug, Clone)]
+pub enum GameTickResult {
+    None,
+    GameOver,
+    LevelComplete,
+}
+
 #[derive(Debug, Clone)]
 pub struct GameState {
+    mode: GameMode,
+    campaign_progress: Option<CampaignProgress>,
     players: Vec<Player>,
+    enemies: Vec<Enemy>,
+    exit_pos: Vec2,
+    exit_revealed: bool,
     game_inputs: Vec<Input>,
     nb_humans: u32,
     bombs: Vec<Bomb>,
@@ -47,6 +74,107 @@ pub struct GameState {
 }
 
 impl GameState {
+    pub fn new_multiplayer(
+        resources: &Resources,
+        settings: GameSettings,
+    ) -> Result<Self, Box<dyn Error>> {
+        let Some(map) = MapSettings::new_map(settings.map_settings, resources) else {
+            return Err("Map creation fail".into());
+        };
+        let nb_humans = settings.nb_humans;
+        let players = Self::create_players(&map, &resources, &nb_humans);
+        let game_inputs = vec![Input::default(); players.len()];
+
+        let camera = Transform {
+            translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
+
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.8),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.6),
+        };
+
+        Ok(Self {
+            mode: GameMode::Multiplayer,
+            campaign_progress: None,
+            players,
+            enemies: Vec::new(),
+            exit_pos: Vec2::ZERO,
+            exit_revealed: false,
+            game_inputs,
+            nb_humans,
+            bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
+            map,
+            camera,
+            light,
+        })
+    }
+
+    pub fn new_campaign(level: u32, lives: u32) -> Option<Self> {
+        let resources_to_load_map = unsafe {
+            (*std::ptr::addr_of!(crate::GLOBAL_RESOURCES))
+                .as_ref()
+                .unwrap()
+        };
+
+        let LevelData {
+            map,
+            player_spawn,
+            enemy_spawns,
+            exit_pos,
+        } = Map::from_file(level, resources_to_load_map)?;
+
+        let mut players = Vec::new();
+        players.push(Player::new(
+            0,
+            player_spawn,
+            super::direction::Direction::Down,
+            resources_to_load_map,
+            true,
+        ));
+
+        let mut enemies = Vec::new();
+        for (i, spawn) in enemy_spawns.iter().enumerate() {
+            enemies.push(Enemy::new(i as u32, *spawn, resources_to_load_map));
+        }
+
+        let camera = Transform {
+            translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
+
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.8),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.6),
+        };
+
+        Some(Self {
+            mode: GameMode::Campaign,
+            campaign_progress: Some(CampaignProgress {
+                level,
+                lives,
+                score: 0,
+            }),
+            players,
+            enemies,
+            exit_pos,
+            exit_revealed: false,
+            game_inputs: vec![Input::default(); 1],
+            nb_humans: 1,
+            bombs: Vec::new(),
+            power_ups: Vec::new(),
+            map,
+            camera,
+            light,
+        })
+    }
+
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
@@ -68,100 +196,26 @@ impl GameState {
         players
     }
 
-    //TODO: add get_input_player -> returns Released if p doesn't exist
-    pub fn default_state(
-        resources: &Resources,
-        settings: GameSettings,
-    ) -> Result<Self, Box<dyn Error>> {
-        //HACK: this is not safe, map can fail creation
-        //LOIC: true
-        let Some(map) = Map::new(settings.map_settings, &resources) else {
-            return Err("Map creation fail".into());
-        };
-        let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, &resources, &nb_humans);
-        let game_inputs = vec![Input::default(); players.len()];
-
-        let camera = Transform {
-            translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
-            scale: Vec3::ONE,
-            rotation: Vec3::new(-1.25, 0.0, 0.0),
-        };
-
-        let light = LightInfo {
-            ambient_light_color: Vec4::ONE.with_w(0.8),
-            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
-            directional_light_color: Vec4::ONE.with_w(0.6),
-        };
-
-        Ok(Self {
-            players,
-            game_inputs,
-            nb_humans,
-            bombs: Vec::<Bomb>::new(),
-            power_ups: Vec::<PowerUp>::new(),
-            map,
-            camera,
-            light,
-        })
-    }
-
-    fn recreate(&self, resources: &Resources) -> Self {
-        let map = Map::new(MapSettings::default(), resources).unwrap();
-        let players = Self::create_players(&map, &resources, &self.nb_humans);
-        Self {
-            players,
-            game_inputs: self.game_inputs.clone(),
-            nb_humans: self.nb_humans,
-            bombs: Vec::<Bomb>::new(),
-            power_ups: Vec::<PowerUp>::new(),
-            map,
-            camera: self.camera,
-            light: self.light,
-        }
-    }
-
     pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
-        let map_objects = self
-            .map
-            .iter()
-            .filter_map(|el| match el {
-                MapElement::Empty => None,
-                MapElement::Breakable(obj) => Some(obj),
-                MapElement::Unbreakable(obj) => Some(obj),
-            })
-            .chain(std::iter::once(&self.map.floor));
+        let map_objects = self.map.iter().filter_map(|el| match el {
+            MapElement::Empty => None,
+            MapElement::Breakable(obj) => Some(obj),
+            MapElement::Unbreakable(obj) => Some(obj),
+            MapElement::Exit(obj) => Some(obj),
+        });
 
-        let players_objects = self.players.iter().flat_map(|p| &p.object);
+        let floor_iter = std::iter::once(&self.map.floor);
+        let players_objects = self.players.iter().filter_map(|p| p.object.as_ref());
+        let enemy_objects = self.enemies.iter().filter_map(|e| e.object.as_ref());
         let bomb_objects = self.bombs.iter().flat_map(|b| &b.objects);
         let power_up_objects = self.power_ups.iter().map(|p| &p.object);
 
         map_objects
+            .chain(floor_iter)
             .chain(players_objects)
+            .chain(enemy_objects)
             .chain(bomb_objects)
             .chain(power_up_objects)
-    }
-
-    #[cfg(debug_assertions)]
-    #[allow(unused)]
-    pub fn print(&self) {
-        let mut display = self.map.to_str();
-        for player in &self.players {
-            println!("player pos: {} {}", player.position.x, player.position.y);
-            let y: usize = player.position.y as usize;
-            let x: usize = player.position.x as usize;
-            println!("player pos: {} {}", x, y);
-            let pos: usize = y * (self.map.width + 1) + x;
-            display.replace_range(pos..pos + 1, "+");
-        }
-        for bomb in &self.bombs {
-            let y: usize = bomb.position.y as usize;
-            let x: usize = bomb.position.x as usize;
-            let pos: usize = y * (self.map.width + 1) + x;
-            display.replace_range(pos..pos + 1, "O");
-        }
-
-        print!("{}", display);
     }
 
     fn mp_game_tick(
@@ -175,6 +229,7 @@ impl GameState {
             bomb.tick(
                 delta,
                 &mut self.players,
+                &mut self.enemies,
                 &mut self.map,
                 &mut self.power_ups,
                 resources,
@@ -188,7 +243,6 @@ impl GameState {
             self.bombs[i].clone().chain_react(&mut self.bombs);
         }
         self.bombs.retain(|bomb| !bomb.despawn);
-        //tick powerups
         for powerup in &mut self.power_ups {
             powerup.tick(&mut self.players, audio_manager);
         }
@@ -213,90 +267,124 @@ impl GameState {
                 &mut self.bombs,
             );
         }
-        // uncomment this and comment the previous line to control the camera
-        // self.camera.keyboard_move(&self.game_inputs[0], delta);
     }
 
-    fn restart_inside(&mut self, keys: &KeyMap, resources: &Resources) {
-        static WAS_PRESSED: Mutex<bool> = Mutex::new(false);
-
-        let mut was_pressed = WAS_PRESSED.lock().unwrap();
-        let is_pressed = keys
-            .get(&PhysicalKey::Code(KeyCode::KeyR))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed();
-
-        if is_pressed && !*was_pressed {
-            //HACK: this is the only part that would be kept if this wasn't a silly bind
-            self.map = Map::new(
-                MapSettings {
-                    spawns: random_range(2..=8),
-                    ..MapSettings::default_cheese()
-                },
-                resources,
-            )
-            .unwrap();
-            self.players = Self::create_players(&self.map, resources, &self.nb_humans);
-            self.bombs = Vec::new();
+    fn campaign_tick(
+        &mut self,
+        delta: f32,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+    ) -> GameTickResult {
+        // Player is dead check for lives
+        if !self.players[0].alive {
+            if let Some(progress) = &mut self.campaign_progress {
+                if progress.lives > 0 {
+                    progress.lives -= 1;
+                    // Respawn player
+                    self.players[0].respawn(self.map.spawns[0].position(), resources);
+                } else {
+                    return GameTickResult::GameOver;
+                }
+            }
         }
-        *was_pressed = is_pressed;
+
+        // Tick enemies
+        for i in 0..self.enemies.len() {
+            let (left, right) = self.enemies.split_at_mut(i);
+            if let Some((current, right)) = right.split_first_mut() {
+                let other_enemies: Vec<_> = left.iter().chain(right.iter()).cloned().collect();
+                current.tick(delta, &self.map, &self.bombs, &other_enemies);
+            }
+
+            if self.players[0].alive
+                && self.enemies[i].alive
+                && self.players[0]
+                    .is_colliding_with(self.enemies[i].position, self.enemies[i].get_size())
+            {
+                self.players[0].kill();
+                audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
+            }
+        }
+
+        // Tick bombs and other shared logic
+        self.mp_game_tick(delta, resources, audio_manager);
+
+        self.enemies.retain(|e| e.alive);
+        if self.enemies.is_empty() && !self.exit_revealed {
+            self.exit_revealed = true;
+            println!(
+                "All enemies defeated! Exit revealed at position: {:?}",
+                self.exit_pos
+            );
+            let exit_obj = Object {
+                model: resources.models[&ResourceName::Floor].clone(),
+                texture: None,
+                color: Vec3::new(0.2, 0.8, 0.2),
+                transform: Transform {
+                    translation: Vec3::new(self.exit_pos.x, -0.4, self.exit_pos.y),
+                    ..Default::default()
+                },
+            };
+            let _ = self
+                .map
+                .set_elem_pos(self.exit_pos, MapElement::Exit(exit_obj));
+        }
+
+        if self.exit_revealed {
+            if self.players[0].is_colliding_with(self.exit_pos, 0.8) {
+                println!("Level complete triggered!");
+                return GameTickResult::LevelComplete;
+            }
+        }
+
+        GameTickResult::None
     }
 
     pub fn tick(
         &mut self,
         delta_time: f32,
         inputs: &Vec<Input>,
-        keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        //Pause
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::Escape))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed()
-        {
+        if inputs.menu_back() == InputState::Pressed {
             return (Some(AppState::Ui(UiState::pause())), 0);
         }
 
-        #[cfg(debug_assertions)]
-        self.restart_inside(keys, resources);
-
-        // let state_func = match self.mode {
-        //     Mode::MpGame => Self::mp_game_tick,
-        // };
         self.inputs_to_game_inputs(inputs);
-        self.mp_game_tick(delta_time, resources, audio_manager);
 
-        #[cfg(debug_assertions)]
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyE))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed()
-        {
-            println!("CHEAT CODE ACTIVATED");
-            for player in &mut self.players {
-                player.make_op(resources);
+        let result = match self.mode {
+            GameMode::Multiplayer => {
+                self.mp_game_tick(delta_time, resources, audio_manager);
+                GameTickResult::None
             }
-        }
+            GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
+        };
 
-        #[cfg(debug_assertions)]
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyT))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed()
-        {
-            return (Some(AppState::Game(self.recreate(resources))), 1);
+        match result {
+            GameTickResult::LevelComplete => {
+                if let Some(progress) = &self.campaign_progress {
+                    (
+                        Some(AppState::Ui(UiState::stage_clear(
+                            progress.level,
+                            progress.lives,
+                        ))),
+                        1,
+                    )
+                } else {
+                    (None, 0)
+                }
+            }
+            GameTickResult::GameOver => (Some(AppState::Ui(UiState::game_over())), 1),
+            GameTickResult::None => (None, 0),
         }
-
-        //TODO: return new AppState if needed and number of elements to pop from appstate_stack
-        (None, 0)
     }
 
-    // Put the inputs read into game inputs
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
-            self.game_inputs[i] = input.clone();
+            if i < self.game_inputs.len() {
+                self.game_inputs[i] = input.clone();
+            }
         }
     }
 

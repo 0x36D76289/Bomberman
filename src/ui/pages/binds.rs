@@ -1,14 +1,11 @@
 use glam::Vec2;
-use winit::{
-    keyboard::{KeyCode, PhysicalKey},
-    platform::scancode::PhysicalKeyExtScancode,
-};
+use winit::keyboard::KeyCode;
 
 use crate::{
     app_state::AppState,
     input::{
         event::InputEvent,
-        input::{BIND_LEN, Binds, Input},
+        input::{BIND_LEN, Input},
         input_state::InputState,
         input_vec::MenuInput,
     },

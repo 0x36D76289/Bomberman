@@ -99,18 +99,33 @@ impl Player {
         if self.bombs_remaining == 0 {
             return None;
         }
+
+        let target_x = self.position.x as usize;
+        let target_y = self.position.y as usize;
+
         for bomb in bombs {
             if bomb.owner_id == self.id && !bomb.collision_enabled {
                 return None;
             }
+            if bomb.is_colliding_with(
+                Vec2 {
+                    x: target_x as f32,
+                    y: target_y as f32,
+                },
+                BOMB_RADIUS,
+            ) {
+                return None;
+            }
         }
+
         //TODO:
-        // check position doesn't have another player
+        // check position doesn't have another player / enemy
+
         self.bombs_remaining -= 1;
         Some(Bomb::new(
             self.id,
-            self.position.x as usize,
-            self.position.y as usize,
+            target_x,
+            target_y,
             self.power_level,
             resources,
         ))
@@ -142,6 +157,9 @@ impl Player {
     }
 
     pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
+        if !self.alive {
+            return;
+        }
         let mut motion = self.assist_input(input, map)
             * delta
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
@@ -191,6 +209,16 @@ impl Player {
     pub fn kill(&mut self) {
         self.alive = false;
         self.object = None;
+    }
+
+    pub fn respawn(&mut self, position: Vec2, resources: &Resources) {
+        self.alive = true;
+        self.position = position;
+        self.object = Some(Self::create_object(resources, position, self.direction));
+        self.power_level = 2;
+        self.speed_level = 0;
+        self.bombs_remaining = 1;
+        self.can_kick_bomb = false;
     }
 }
 

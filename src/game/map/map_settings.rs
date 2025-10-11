@@ -1,3 +1,6 @@
+use super::map::Map;
+use crate::game::resources::Resources;
+
 pub enum MapType {
     Corners,
     Random,
@@ -48,5 +51,9 @@ impl MapSettings {
             walls: true,
             attempts: 100,
         }
+    }
+
+    pub fn new_map(settings: Self, resources: &Resources) -> Option<Map> {
+        Map::new(settings, resources)
     }
 }
