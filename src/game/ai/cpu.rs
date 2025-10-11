@@ -1,3 +1,4 @@
+use crate::game::ai::zone::Zone;
 use crate::game::direction::Direction;
 use crate::game::map::map::Map;
 use crate::game::{self, direction};
@@ -15,6 +16,7 @@ const CPU_REACTION_TIME: f32 = 0.9;
 #[derive(Debug, Clone)]
 pub struct CPU {
     pub id: u32,
+    zone: Zone,
     last_input: Input,
     path: Vec<Vec2>,
     state: CPUState,
@@ -45,10 +47,10 @@ pub enum CPUStrategy {
 }
 
 impl CPU {
-    // TODO: Check if id is correct via gamestate
-    pub fn new(id: u32) -> Self {
+    pub fn new(id: u32, players: &[Player], map: &Map) -> Self {
         CPU {
             id,
+            zone: Zone::default().fill_zone(players[id as usize].position, players, map),
             last_input: Input::default(),
             state: CPUState::Idle,
             target: None,
