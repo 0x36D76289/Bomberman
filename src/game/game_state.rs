@@ -401,21 +401,10 @@ impl GameState {
     }
 
     fn update_cpu_inputs(&mut self) {
-        if let Some(mut cpus) = self.cpus.as_mut() {
-            let inputs: Vec<Input> = cpus
-                .iter_mut()
-                .enumerate()
-                .map(|(i, cpu)| {
-                    let player = &self.players[self.nb_humans as usize + i];
-                    cpu.get_input(&self.map, player)
-                })
-                .collect();
-
-            // Appliquer les inputs aux bons indices
-            for (i, input) in inputs.into_iter().enumerate() {
-                self.game_inputs[self.nb_humans as usize + i] = input;
-            }
-        }
+        let mut cpus = self.cpus.clone();
+        cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
+            self.game_inputs[self.nb_humans as usize + i] = cpu.get_input(&self)
+        });
     }
     // Put the inputs read into game inputs
     fn update_human_inputs(&mut self, inputs: &Vec<Input>) {
