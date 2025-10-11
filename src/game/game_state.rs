@@ -1,14 +1,12 @@
-
 use crate::app_state::AppState;
 use crate::game::ai::cpu::CPU;
 use crate::game::camera::Camera;
 
+use crate::game::ai::ai::AI;
+use crate::game::ai::zone;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::collision::Collision;
 use crate::game::enemy::Enemy;
-
-use crate::game::ai::cpu::CPU;
-use crate::game::ai::zone;
 
 use crate::game::game_settings::GameSettings;
 use crate::game::map::map::{LevelData, Map};
@@ -70,9 +68,9 @@ pub struct GameState {
     enemies: Vec<Enemy>,
     exit_pos: Vec2,
     exit_revealed: bool,
-    cpus: Option<Vec<CPU>>,
+    cpus: Vec<CPU>,
     game_inputs: Vec<Input>,
-    nb_humans: u32,
+    nb_humans: usize,
     bombs: Vec<Bomb>,
     power_ups: Vec<PowerUp>,
     map: Map,
@@ -91,9 +89,7 @@ impl GameState {
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
-        let cpus = Some((nb_humans..players.len() as u32)
-            .map(|id| CPU::new(id, &players, &map))
-            .collect());
+        let cpus = (nb_humans..players.len()).map(|id| CPU::new(id)).collect();
 
         let camera = Transform {
             translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
@@ -147,7 +143,7 @@ impl GameState {
             resources_to_load_map,
             true,
         ));
-        let mut cpus = None;
+        let mut cpus = [].to_vec();
         let mut enemies = Vec::new();
         for (i, spawn) in enemy_spawns.iter().enumerate() {
             enemies.push(Enemy::new(i as u32, *spawn, resources_to_load_map));
@@ -187,12 +183,12 @@ impl GameState {
         })
     }
 
-    fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
+    fn create_players(map: &Map, resources: &Resources, nb_humans: &usize) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
-        let mut id: u32 = 0;
+        let mut id: usize = 0;
         for spawn in map.spawns.clone() {
             players.push(Player::new(
-                id,
+                id as u32,
                 Vec2 {
                     x: spawn.x as f32 + 0.5,
                     y: spawn.y as f32 + 0.5,
@@ -262,6 +258,7 @@ impl GameState {
                 continue;
             }
             self.bombs[i].clone().chain_react(&mut self.bombs);
+            AI::update_zone(&mut self.cpus, &self.players, &self.map);
         }
         self.bombs.retain(|bomb| !bomb.despawn);
         for powerup in &mut self.power_ups {
@@ -381,7 +378,7 @@ impl GameState {
         let result = match self.mode {
             GameMode::Multiplayer => {
                 self.update_human_inputs(inputs);
-                self.update_cpu_inputs();
+                // self.update_cpu_inputs();
                 self.mp_game_tick(delta_time, resources, audio_manager);
                 GameTickResult::None
             }
@@ -408,9 +405,8 @@ impl GameState {
     }
 
     fn update_cpu_inputs(&mut self) {
-        let mut cpus = self.cpus.clone();
-        cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
-            self.game_inputs[self.nb_humans as usize + i] = cpu.get_input(&self)
+        self.cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
+            self.game_inputs[self.nb_humans as usize + i] = cpu.get_input(&self.players, &self.map)
         });
     }
     // Put the inputs read into game inputs

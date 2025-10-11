@@ -1,3 +1,4 @@
+use crate::game::ai::entity::Entity;
 use crate::game::collision::Collision;
 use crate::game::map::map::Map;
 use crate::game::player::Player;
@@ -9,21 +10,31 @@ use glam::Vec2;
 /// it contains also a vector of entities
 pub struct Zone {
     pub cells: Vec<Vec2>,
-    pub entities: Vec<EntityType>,
+    pub entities: Vec<Entity>,
 }
 impl Zone {
     /// Explore the different neighbouring cells of start and add them if they're not already there.
-    /// also add to entities the players encountered
-    pub fn fill_zone(mut self, start: Vec2, players: &[Player], map: &Map) -> Self {
-        let players_position: Vec<Vec2> = players.iter().map(Player::get_pos).collect();
-        self.add_cell(start, players, &players_position);
-        self.filling_zone(start, players, &players_position, map);
-        self
+    /// return a vector of the id of every players encountered.
+    pub fn fill_zone(&mut self, start: Vec2, players: &[Player], map: &Map) -> Vec<usize> {
+        log::debug!("{start:?}");
+        if !self.cells.contains(&start) {
+            let players_position: Vec<Vec2> = players.iter().map(Player::get_pos).collect();
+            self.add_cell(start, players, &players_position);
+            self.filling_zone(start, players, &players_position, map);
+            log::debug!("{self:?}");
+            Entity::get_players_from_list(&self.entities)
+        } else {
+            Vec::new()
+        }
     }
 
-    pub fn check_bombs(mut self) {}
+    pub fn check_bombs(&mut self) {
+        todo!("Bonjour")
+    }
 
-    pub fn check_powerup(mut self) {}
+    pub fn check_powerup(&mut self) {
+        todo!("Bonjour")
+    }
     //
     fn filling_zone(
         &mut self,
@@ -46,7 +57,10 @@ impl Zone {
     fn add_cell(&mut self, cell: Vec2, players: &[Player], players_position: &[Vec2]) {
         self.cells.push(cell);
         if let Some(player_id) = players_position.iter().position(|pos| *pos == cell) {
-            self.entities.push(EntityType::Player(player_id as i32));
+            let new_player = Entity::new(EntityType::Player(player_id as usize));
+            if self.entities.iter().all(|entity| *entity != new_player) {
+                self.entities.push(new_player);
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::game::ai::zone::Zone;
 use crate::game::direction::Direction;
 use crate::game::map::map::Map;
@@ -15,8 +17,8 @@ const CPU_REACTION_TIME: f32 = 0.9;
 //
 #[derive(Debug, Clone)]
 pub struct CPU {
-    pub id: u32,
-    zone: Zone,
+    pub id: usize,
+    pub zone: Arc<Mutex<Zone>>,
     last_input: Input,
     path: Vec<Vec2>,
     state: CPUState,
@@ -47,10 +49,10 @@ pub enum CPUStrategy {
 }
 
 impl CPU {
-    pub fn new(id: u32, players: &[Player], map: &Map) -> Self {
+    pub fn new(id: usize) -> Self {
         CPU {
             id,
-            zone: Zone::default().fill_zone(players[id as usize].position, players, map),
+            zone: Arc::new(Zone::default().into()),
             last_input: Input::default(),
             state: CPUState::Idle,
             target: None,
@@ -59,9 +61,17 @@ impl CPU {
         }
     }
 
-    pub fn get_input(&mut self, state: &GameState) -> Input {
-        let map: &Map = state.get_map();
-        let player: &Player = state.get_player(self.id).unwrap();
+    pub fn update_zone(&mut self, id: usize, players: &[Player], map: &Map) -> Vec<usize> {
+        if let Ok(mut zone) = self.zone.lock() {
+            zone.fill_zone(players[id].position.grid(), players, map)
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn get_input(&mut self, players: &[Player], map: &Map) -> Input {
+        let player = &players[self.id];
+
         match self.state {
             CPUState::Moving => {
                 if let Some(input) = self.travel(map, player) {

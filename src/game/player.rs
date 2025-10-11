@@ -1,5 +1,6 @@
 use crate::{
     game::{
+        ai::cpu::CPU,
         bomb::{BOMB_RADIUS, Bomb, BombState},
         collision::Collision,
         map::{map::Map, map_element::MapElement},
@@ -25,9 +26,9 @@ pub struct Player {
     pub power_level: u8,
     pub speed_level: u8,
     pub bombs_remaining: u32,
-    pub is_human: bool,
     pub can_kick_bomb: bool,
     pub object: Option<Object>,
+    pub is_human: bool,
 }
 
 impl Player {
