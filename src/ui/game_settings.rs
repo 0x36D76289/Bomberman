@@ -1,18 +1,13 @@
 use glam::{Vec2, Vec4, usize};
 
 use crate::{
-    app_state::AppState,
-    game::{
-        game_settings::GameSettings, game_state::GameState, map::map_settings::MapSettings,
-        resources::Resources,
-    },
+    game::map::map_settings::MapSettings,
     graphics::StateRenderInfo,
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -80,8 +75,19 @@ pub struct UIGameSettings {
     opacity: f32,
 }
 
+impl PartialEq for UIGameSettings {
+    fn eq(&self, other: &Self) -> bool {
+        self.preset == other.preset
+            && self.width == other.width
+            && self.height == other.height
+            && self.cheesiness == other.cheesiness
+            && self.player_count == other.player_count
+            && self.bot_count == other.bot_count
+    }
+}
+
 impl UIGameSettings {
-    fn corners(player_count: u8) -> Self {
+    pub fn corners(player_count: u8) -> Self {
         let mut bot_count = 4;
 
         if player_count > bot_count {
@@ -430,9 +436,7 @@ impl UiState {
         Self {
             canvases,
             buttons,
-            is_transparent: false,
             selected: 0,
-            page: UIPage::GameSettings(settings),
             render_info: StateRenderInfo {
                 drawn_first: true,
                 ..Default::default()
@@ -440,10 +444,7 @@ impl UiState {
         }
     }
 
-    fn update_label_text(&mut self) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    fn update_label_text(&mut self, settings: &mut UIGameSettings) {
         self.buttons[GameSettingButtons::LabelWidth as usize]
             .canvas
             .text = Some(settings.width.to_string());
@@ -458,15 +459,16 @@ impl UiState {
             .text = Some(settings.bot_count.to_string());
     }
 
-    fn update_setting_values(&mut self, inputs: &Vec<Input>) -> Option<String> {
+    fn update_setting_values(
+        &mut self,
+        inputs: &Vec<Input>,
+        settings: &mut UIGameSettings,
+    ) -> Option<String> {
         if self.selected < GameSettingButtons::SettingWidth as usize
             || self.selected > GameSettingButtons::SettingBotCount as usize
         {
             return None;
         }
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return None;
-        };
 
         let modif = -((inputs.menu_left() == InputState::Pressed) as i16)
             + ((inputs.menu_right() == InputState::Pressed) as i16);
@@ -530,10 +532,7 @@ impl UiState {
         return None;
     }
 
-    fn tick_error(&mut self, delta: f32) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    fn tick_error(&mut self, delta: f32, settings: &mut UIGameSettings) {
         settings.opacity = (settings.opacity - delta).max(0.0);
         if let Some(label) = self.canvases.last_mut() {
             if let Some(color) = &mut label.text_color {
@@ -542,10 +541,7 @@ impl UiState {
         }
     }
 
-    fn set_error(&mut self, error_message: String) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    pub fn set_error(&mut self, error_message: String, settings: &mut UIGameSettings) {
         settings.opacity = ERROR_VISIBILITY_TIME;
         if let Some(label) = self.canvases.last_mut() {
             if let Some(text) = &mut label.text {
@@ -554,7 +550,7 @@ impl UiState {
         }
     }
 
-    fn update_preset(&mut self, inputs: &Vec<Input>) {
+    fn update_preset(&mut self, inputs: &Vec<Input>, settings: &mut UIGameSettings) {
         if self.selected > GameSettingButtons::PresetCustom as usize {
             return;
         }
@@ -562,9 +558,6 @@ impl UiState {
             return;
         }
 
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
         if self.selected == GameSettingPreset::Corners as usize {
             *settings = UIGameSettings {
                 opacity: settings.opacity,
@@ -585,56 +578,33 @@ impl UiState {
         }
     }
 
-    fn create_return_value(
-        &mut self,
-        inputs: &Vec<Input>,
-        resources: &Resources,
-    ) -> (Option<AppState>, u8) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return (None, 0);
-        };
+    fn create_return_value(&mut self, inputs: &Vec<Input>) -> bool {
         if self.selected != GameSettingButtons::Start as usize
             || inputs.menu_confirm() != InputState::Pressed
         {
-            return (None, 0);
+            return false;
         }
 
-        let map_settings = settings.into_map_settings();
-
-        let game_settings = GameSettings {
-            nb_humans: settings.player_count.into(),
-            map_settings,
-        };
-
-        match GameState::new_multiplayer(resources, game_settings) {
-            Ok(game_state) => (Some(AppState::game(game_state)), 1),
-            Err(_) => {
-                self.set_error("Map creation failed. Try reducing player/bot count.".to_string());
-                (None, 0)
-            }
-        }
+        true
     }
 
     pub fn game_settings_tick(
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
-        resources: &Resources,
-    ) -> (Option<AppState>, u8) {
+        settings: &mut UIGameSettings,
+    ) -> bool {
         self.button_inputs(inputs);
-        if let Some(err_msg) = self.update_setting_values(inputs) {
-            self.set_error(err_msg);
+        if let Some(err_msg) = self.update_setting_values(inputs, settings) {
+            self.set_error(err_msg, settings);
         }
-        self.update_preset(inputs);
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return (None, 0);
-        };
+        self.update_preset(inputs, settings);
         // Makes up on Width select current preset
         self.buttons[GameSettingButtons::SettingWidth as usize]
             .neighbors
             .up = settings.preset as usize;
-        self.tick_error(delta);
-        self.update_label_text();
-        self.create_return_value(inputs, resources)
+        self.tick_error(delta, settings);
+        self.update_label_text(settings);
+        self.create_return_value(inputs)
     }
 }
