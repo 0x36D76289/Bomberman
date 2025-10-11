@@ -14,7 +14,6 @@ use crate::graphics::object::Object;
 use crate::graphics::renderer::RENDER_RES_RATIO;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
-use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::{GetOrDefault, MenuInput};
@@ -34,7 +33,6 @@ use vulkano::{
     format::Format,
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
-use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {

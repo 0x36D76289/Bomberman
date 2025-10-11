@@ -1,8 +1,5 @@
 use glam::Vec2;
-use winit::{
-    event::ElementState,
-    keyboard::{KeyCode, PhysicalKey},
-};
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::input::{event::InputEvent, input_name::InputName, input_state::InputState};
 
