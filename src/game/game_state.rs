@@ -5,6 +5,7 @@ use crate::game::camera::Camera;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::collision::Collision;
 use crate::game::enemy::Enemy;
+use crate::game::cpu::CPU;
 use crate::game::game_settings::GameSettings;
 use crate::game::map::map::{LevelData, Map};
 use crate::game::map::map_element::MapElement;
@@ -65,7 +66,7 @@ pub struct GameState {
     enemies: Vec<Enemy>,
     exit_pos: Vec2,
     exit_revealed: bool,
-    cpus: Option<Vec<AI>>,
+    cpus: Option<Vec<CPU>>,
     game_inputs: Vec<Input>,
     nb_humans: u32,
     bombs: Vec<Bomb>,
@@ -86,7 +87,7 @@ impl GameState {
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
-        let cpus = Some((nb_humans..players.len() as u32).map(AI::new).collect());
+        let cpus = Some((nb_humans..players.len() as u32).map(CPU::new).collect());
 
         let camera = Transform {
             translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
