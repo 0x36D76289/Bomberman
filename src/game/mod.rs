@@ -1,5 +1,3 @@
-// game/mod.rs
-
 pub mod bomb;
 pub mod camera;
 pub mod collision;
@@ -11,5 +9,3 @@ pub mod map;
 pub mod player;
 pub mod powerup;
 pub mod resources;
-
-pub use camera::Camera;

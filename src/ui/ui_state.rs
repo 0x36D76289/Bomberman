@@ -1,5 +1,5 @@
 use crate::{
-    app_state::{AppState, KeyMap},
+    app_state::AppState,
     audio::AudioManager,
     game::resources::{ResourceName, Resources},
     graphics::{GuiPush, Renderer, Vulkan},
@@ -19,14 +19,24 @@ use vulkano::{
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
 
-/// What UI is in use
 #[derive(Debug, Copy, Clone)]
 pub enum UIPage {
     MainMenu,
     Pause,
     GameSettings(UIGameSettings),
-    Settings { selected_player: usize },
-    Binds { player: usize, waiting: isize },
+    Settings {
+        selected_player: usize,
+    },
+    Binds {
+        player: usize,
+        waiting: isize,
+    },
+    GameOver,
+    StageClear {
+        timer: f32,
+        next_level: u32,
+        lives: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +66,7 @@ impl UiState {
 
     /// Returns true if confirm button is used
     pub fn button_inputs(&mut self, inputs: &Vec<Input>) -> bool {
-        if self.buttons.len() != 0 {
+        if !self.buttons.is_empty() {
             if inputs.menu_up() == InputState::Pressed {
                 self.select_button(self.buttons[self.selected].neighbors.up);
             }
@@ -78,18 +88,19 @@ impl UiState {
         delta: f32,
         inputs: &Vec<Input>,
         events: &Vec<InputEvent>,
-        keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
         settings: &mut Settings,
         ratio: f32,
     ) -> (Option<AppState>, u8) {
         match self.page {
-            UIPage::MainMenu => self.main_menu_tick(keys, audio_manager),
+            UIPage::MainMenu => self.main_menu_tick(inputs, audio_manager),
             UIPage::Pause => self.pause_tick(inputs, resources, audio_manager),
             UIPage::GameSettings(_) => self.game_settings_tick(delta, inputs, resources),
             UIPage::Settings { .. } => self.settings_tick(inputs, settings, ratio),
             UIPage::Binds { .. } => self.binds_tick(inputs, events, settings),
+            UIPage::GameOver => self.game_over_tick(inputs, audio_manager),
+            UIPage::StageClear { .. } => self.stage_clear_tick(delta),
         }
     }
 
