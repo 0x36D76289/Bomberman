@@ -1,9 +1,12 @@
 use crate::game::direction::Direction;
+use crate::game::map::map::Map;
 use crate::game::{self, direction};
 use crate::game::{game_state::GameState, player::Player};
 use crate::input::input::Input;
 use crate::input::input_name::InputName;
+use crate::utils::vec2::{ApproxEq, Grid};
 use glam::{Vec2, Vec3};
+use rand::seq::IndexedRandom;
 
 const AI_DECISION_TIMER: f32 = 0.1;
 const AI_REACTION_TIME: f32 = 0.9;
@@ -54,10 +57,10 @@ impl AI {
         }
     }
 
-    pub fn get_input(&mut self, game_state: &GameState) -> Input {
+    pub fn get_input(&mut self, map: &Map, player: &Player) -> Input {
         match self.state {
             AIState::Moving => {
-                if let Some(input) = self.travel(game_state) {
+                if let Some(input) = self.travel(map, player) {
                     input
                 } else {
                     self.state = AIState::Idle;
@@ -65,21 +68,22 @@ impl AI {
                 }
             }
             AIState::Idle => {
-                let position = game_state.get_player(self.id).unwrap().position;
-                let neighbours = game_state.get_map().clone().get_neighbours(position);
-                println!("{:?}", neighbours);
+                let position = player.position;
+                let neighbours = map.get_neighbours(position.grid());
+                self.path = vec![*neighbours.choose(&mut rand::rng()).unwrap(); 1];
+                self.state = AIState::Moving;
                 self.last_input
             } /* TODO: This is obviously a placeholder */
             _ => self.do_nothing(),
         }
     }
 
-    fn travel(&mut self, game_state: &GameState) -> Option<Input> {
-        let start: &Vec2 = &game_state.get_player(self.id).unwrap().position;
+    fn travel(&mut self, map: &Map, player: &Player) -> Option<Input> {
+        let start: &Vec2 = &player.position;
         let goal: &Vec2 = self.path.first()?;
-        if start == goal {
+        if start.approx_eq(goal) {
             self.path.remove(0);
-            return self.travel(game_state);
+            return self.travel(map, player);
         }
         let direction: Direction = Direction::get_direction(start, goal);
         self.set_input(InputName::direction_to_input(direction));

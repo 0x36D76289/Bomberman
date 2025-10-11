@@ -232,10 +232,10 @@ impl Map {
     }
 
     /// Return neighbouring empty cells
-    pub fn get_neighbours(self, position: Vec2) -> Vec<Vec2> {
+    pub fn get_neighbours(&self, position: Vec2) -> Vec<Vec2> {
         Direction::iterator()
             .map(|dir| position + dir.to_vec2())
-            .filter(|neighbour_pos| self.get_elem_pos(*neighbour_pos) == &MapElement::Empty)
+            .filter(|neighbour_pos| *self.get_elem_pos(*neighbour_pos) == MapElement::Empty)
             .collect()
     }
 
