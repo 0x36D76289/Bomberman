@@ -1,4 +1,4 @@
-use crate::app_state::{AppState, KeyMap};
+use crate::app_state::AppState;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::camera::Camera;
 use crate::game::collision::Collision;
@@ -16,7 +16,7 @@ use crate::graphics::transform::Transform;
 use crate::graphics::{GamePush, GlobalUbo, LightInfo, Renderer, Vulkan};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
-use crate::input::input_vec::GetOrDefault;
+use crate::input::input_vec::{GetOrDefault, MenuInput};
 use crate::ui::UiState;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
@@ -33,7 +33,6 @@ use vulkano::{
     format::Format,
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
 };
-use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -343,15 +342,10 @@ impl GameState {
         &mut self,
         delta_time: f32,
         inputs: &Vec<Input>,
-        keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::Escape))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed()
-        {
+        if inputs.menu_back() == InputState::Pressed {
             return (Some(AppState::Ui(UiState::pause())), 0);
         }
 

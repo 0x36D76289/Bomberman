@@ -1,4 +1,4 @@
-use glam::Vec4;
+use glam::{Vec2, Vec4};
 
 use crate::{
     graphics::object::TextureIndex,
@@ -49,5 +49,14 @@ impl Button {
         } else {
             [Some(self.canvas.clone()), None]
         }
+    }
+
+    pub fn with_neighbors(mut self, neighbors: ButtonNeighbors) -> Self {
+        self.neighbors = neighbors;
+        self
+    }
+    pub fn with_pos(mut self, pos: Vec2) -> Self {
+        self.canvas.center = pos;
+        self
     }
 }

@@ -2,6 +2,8 @@ use anyhow::Result;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use std::collections::HashMap;
 
+use crate::settings::settings::Settings;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SoundEffect {
     BombExplosion,
@@ -35,7 +37,7 @@ pub struct AudioManager {
 }
 
 impl AudioManager {
-    pub fn new() -> Result<Self> {
+    pub fn new(settings: &Settings) -> Result<Self> {
         let (stream, stream_handle) = OutputStream::try_default()?;
         let sfx_sink = Sink::try_new(&stream_handle)?;
         let music_sink = Sink::try_new(&stream_handle)?;
@@ -49,13 +51,19 @@ impl AudioManager {
             background_music: HashMap::new(),
             master_volume: 1.0,
             sfx_volume: 0.7,
-            music_volume: 0.5,
+            music_volume: 1.0,
             music_enabled: true,
             sfx_enabled: true,
         };
 
+        audio_manager.set_volume(settings);
         audio_manager.load_assets()?;
         Ok(audio_manager)
+    }
+
+    pub fn set_volume(&mut self, settings: &Settings) {
+        self.music_volume = settings.volume_music;
+        self.sfx_volume = settings.volume_sfx;
     }
 
     fn load_assets(&mut self) -> Result<()> {
