@@ -5,45 +5,92 @@ use winit::{event::ElementState, keyboard::PhysicalKey};
 use crate::{
     audio::AudioManager,
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-    graphics::{StateRenderInfo, ui_state},
     input::input::Input,
-    ui::{UiState, game_settings::UIGameSettings, ui_state::UIPage},
+    ui::{UiState, game_settings::UIGameSettings, stage_clear::STAGE_CLEAR_DURATION},
 };
 
 pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
+    state: AppStateEnum,
     pub game: Option<GameState>,
     pub ui: Option<UiState>,
+}
+
+#[derive(Debug, Clone)]
+pub enum AppStateEnum {
+    Game,
+    MainMenu,
+    Pause,
+    GameSettings(UIGameSettings),
+    GameOver,
+    StageClear {
+        timer: f32,
+        next_level: u32,
+        lives: u32,
+    },
+}
+
+impl Default for AppStateEnum {
+    fn default() -> Self {
+        AppStateEnum::MainMenu
+    }
 }
 
 impl AppState {
     pub fn game(game_state: GameState) -> Self {
         Self {
+            state: AppStateEnum::Game,
             game: Some(game_state),
             ..Default::default()
         }
     }
 
-    pub fn ui(ui_state: UiState) -> Self {
+    pub fn main_menu() -> Self {
         Self {
-            ui: Some(ui_state),
-            ..Default::default()
+            state: AppStateEnum::MainMenu,
+            game: None,
+            ui: Some(UiState::main_menu()),
         }
     }
 
-    pub fn with_game(self, game_state: GameState) -> Self {
+    pub fn pause() -> Self {
         Self {
-            game: Some(game_state),
-            ..self
+            state: AppStateEnum::Pause,
+            game: None,
+            ui: Some(UiState::pause()),
         }
     }
 
-    pub fn with_ui(self, ui_state: UiState) -> Self {
+    pub fn game_settings(resources: &Resources, player_count: u8) -> Self {
         Self {
-            ui: Some(ui_state),
-            ..self
+            state: AppStateEnum::GameSettings(UIGameSettings::corners(player_count)),
+            game: Some(GameState::new_settings_preview(
+                GameSettings::default(),
+                resources,
+            )),
+            ui: Some(UiState::game_settings(player_count)),
+        }
+    }
+
+    pub fn game_over() -> Self {
+        Self {
+            state: AppStateEnum::GameOver,
+            game: None,
+            ui: Some(UiState::game_over()),
+        }
+    }
+
+    pub fn stage_clear(level: u32, lives: u32) -> Self {
+        Self {
+            state: AppStateEnum::StageClear {
+                timer: STAGE_CLEAR_DURATION,
+                next_level: level + 1,
+                lives: lives,
+            },
+            game: None,
+            ui: Some(UiState::stage_clear(level, lives)),
         }
     }
 
@@ -55,54 +102,84 @@ impl AppState {
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        let (ret_state1, ret_pop1) = self.tick_game(delta, inputs, keys, resources, audio_manager);
-        let (ret_state2, ret_pop2) = self.tick_ui(delta, inputs, keys, resources, audio_manager);
-        (ret_state1.or(ret_state2), ret_pop1.max(ret_pop2))
-    }
-
-    fn tick_game(
-        &mut self,
-        delta: f32,
-        inputs: &Vec<Input>,
-        keys: &KeyMap,
-        resources: &Resources,
-        audio_manager: &mut AudioManager,
-    ) -> (Option<AppState>, u8) {
-        match &mut self.game {
-            Some(game_state) => game_state.tick(delta, inputs, keys, resources, audio_manager),
-            None => (None, 0),
-        }
-    }
-
-    fn tick_ui(
-        &mut self,
-        delta: f32,
-        inputs: &Vec<Input>,
-        keys: &KeyMap,
-        resources: &Resources,
-        audio_manager: &mut AudioManager,
-    ) -> (Option<AppState>, u8) {
-        match &mut self.ui {
-            None => (None, 0),
-            Some(ui_state) => {
-                let ret = ui_state.tick(delta, inputs, keys, resources, audio_manager);
-                if let UIPage::GameSettings(game_settings) = &ui_state.page {
-                    let game_state = self.game.take().unwrap_or(GameState::new_settings_preview(
-                        GameSettings::default(),
-                        resources,
-                    ));
-                    self.game = Some(game_state.update_from_ui_settings(game_settings, resources));
-                }
-                ret
+        match &mut self.state {
+            AppStateEnum::Game => {
+                self.game
+                    .as_mut()
+                    .unwrap()
+                    .tick(delta, inputs, keys, resources, audio_manager)
             }
+            AppStateEnum::MainMenu => {
+                self.ui
+                    .as_mut()
+                    .unwrap()
+                    .main_menu_tick(inputs, audio_manager, resources)
+            }
+            AppStateEnum::GameSettings(ui_game_settings) => {
+                let (game, ui) = match (self.game.as_mut(), self.ui.as_mut()) {
+                    (Some(game), Some(ui)) => (game, ui),
+                    _ => panic!(
+                        "Tried to tick game settings but app state doesnt contain a gamestate or a uistate"
+                    ),
+                };
+                let old_settings = ui_game_settings.clone();
+                let ret = ui.game_settings_tick(delta, inputs, ui_game_settings);
+                if old_settings != *ui_game_settings {
+                    let err = game.update_from_ui_settings(&ui_game_settings, resources);
+                    if err.is_err() {
+                        ui.set_error(
+                            "Map creation failed, try ajusting settings".to_string(),
+                            ui_game_settings,
+                        );
+                    }
+                }
+                if ret {
+                    (
+                        Some(AppState::game(
+                            GameState::new_multiplayer_from_map(
+                                resources,
+                                GameSettings::default(),
+                                game.get_map().clone(),
+                            )
+                            .unwrap(),
+                        )),
+                        1,
+                    )
+                } else {
+                    (None, 0)
+                }
+            }
+            AppStateEnum::Pause => {
+                self.ui
+                    .as_mut()
+                    .unwrap()
+                    .pause_tick(inputs, resources, audio_manager)
+            }
+            AppStateEnum::GameOver => self
+                .ui
+                .as_mut()
+                .unwrap()
+                .game_over_tick(inputs, audio_manager),
+            AppStateEnum::StageClear {
+                timer,
+                next_level,
+                lives,
+            } => self
+                .ui
+                .as_mut()
+                .unwrap()
+                .stage_clear_tick(delta, timer, next_level, lives),
         }
     }
 
     pub fn is_transparent(&self) -> bool {
-        self.game.is_none()
-            && match &self.ui {
-                Some(ui_state) => ui_state.is_transparent(),
-                None => true,
-            }
+        match self.state {
+            AppStateEnum::Game => false,
+            AppStateEnum::Pause => true,
+            AppStateEnum::GameOver => true,
+            AppStateEnum::MainMenu => false,
+            AppStateEnum::GameSettings(_) => false,
+            AppStateEnum::StageClear { .. } => true,
+        }
     }
 }

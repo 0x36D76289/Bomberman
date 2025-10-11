@@ -16,7 +16,6 @@ use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::GetOrDefault;
-use crate::ui::UiState;
 use crate::ui::game_settings::UIGameSettings;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
@@ -179,12 +178,58 @@ impl GameState {
     pub fn new_settings_preview(settings: GameSettings, resources: &Resources) -> Self {
         Self {
             render_info: StateRenderInfo {
-                top_left_coord: [-1.0, -0.5],
-                bottom_right_coord: [0.0, 0.5],
+                top_left_coord: [-1.0, -0.3],
+                bottom_right_coord: [0.0, 0.7],
                 drawn_first: false,
             },
+            players: Vec::new(),
+            enemies: Vec::new(),
             ..GameState::new_multiplayer(resources, settings).unwrap()
         }
+    }
+
+    pub fn new_multiplayer_from_map(
+        resources: &Resources,
+        settings: GameSettings,
+        map: Map,
+    ) -> Result<Self, Box<dyn Error>> {
+        let nb_humans = settings.nb_humans;
+        let players = Self::create_players(&map, &resources, &nb_humans);
+        let game_inputs = vec![Input::default(); players.len()];
+
+        let camera = Transform {
+            translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
+            scale: Vec3::ONE,
+            rotation: Vec3::new(-1.25, 0.0, 0.0),
+        };
+
+        let light = LightInfo {
+            ambient_light_color: Vec4::ONE.with_w(0.8),
+            direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+            directional_light_color: Vec4::ONE.with_w(0.6),
+        };
+
+        let render_info = StateRenderInfo {
+            drawn_first: true,
+            ..Default::default()
+        };
+
+        Ok(Self {
+            mode: GameMode::Multiplayer,
+            campaign_progress: None,
+            players,
+            enemies: Vec::new(),
+            exit_pos: Vec2::ZERO,
+            exit_revealed: false,
+            game_inputs,
+            nb_humans,
+            bombs: Vec::<Bomb>::new(),
+            power_ups: Vec::<PowerUp>::new(),
+            map,
+            camera,
+            light,
+            render_info,
+        })
     }
 
     fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
@@ -359,7 +404,7 @@ impl GameState {
             .unwrap_or(&winit::event::ElementState::Released)
             .is_pressed()
         {
-            return (Some(AppState::ui(UiState::pause())), 0);
+            return (Some(AppState::pause()), 0);
         }
 
         self.inputs_to_game_inputs(inputs);
@@ -376,17 +421,14 @@ impl GameState {
             GameTickResult::LevelComplete => {
                 if let Some(progress) = &self.campaign_progress {
                     (
-                        Some(AppState::ui(UiState::stage_clear(
-                            progress.level,
-                            progress.lives,
-                        ))),
+                        Some(AppState::stage_clear(progress.level, progress.lives)),
                         1,
                     )
                 } else {
                     (None, 0)
                 }
             }
-            GameTickResult::GameOver => (Some(AppState::ui(UiState::game_over())), 1),
+            GameTickResult::GameOver => (Some(AppState::game_over()), 1),
             GameTickResult::None => (None, 0),
         }
     }
@@ -425,21 +467,25 @@ impl GameState {
         }
     }
 
-    pub fn update_from_ui_settings(self, settings: &UIGameSettings, resources: &Resources) -> Self {
-        let map = &self.map;
-        // println!("map.height = {} settings.height = {} map.width = {} settings.width = {}", map.height, )
-        if map.height - 2 == settings.height as usize && map.width - 2 == settings.width as usize {
-            return self;
-        }
-
+    pub fn update_from_ui_settings(
+        &mut self,
+        settings: &UIGameSettings,
+        resources: &Resources,
+    ) -> Result<(), Box<dyn Error>> {
         let map_settings = settings.into_map_settings();
 
-        let game_settings = GameSettings {
-            nb_humans: settings.player_count.into(),
-            map_settings,
-        };
-
-        GameState::new_settings_preview(game_settings, resources)
+        match Map::new(map_settings, resources) {
+            Some(map) => {
+                self.camera = Transform {
+                    translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
+                    scale: Vec3::ONE,
+                    rotation: Vec3::new(-1.25, 0.0, 0.0),
+                };
+                self.map = map;
+                Ok(())
+            }
+            None => Err("Map creation failed".into()),
+        }
     }
 
     pub fn get_player(&self, id: u32) -> Option<&Player> {

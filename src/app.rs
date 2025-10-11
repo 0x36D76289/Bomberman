@@ -4,7 +4,6 @@ use crate::game::resources::Resources;
 use crate::graphics::Graphics;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
-use crate::ui::UiState;
 use std::error::Error;
 use winit::event::ElementState;
 use winit::keyboard::PhysicalKey;
@@ -34,7 +33,7 @@ impl App {
         let keys = KeyMap::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        let gui_state1 = AppState::ui(UiState::main_menu());
+        let gui_state1 = AppState::main_menu();
 
         let state_stack = vec![gui_state1];
 
@@ -91,15 +90,14 @@ impl App {
     }
 
     fn render(&mut self) {
-        self.graphics.renderer.render_states(
-            &self.graphics.vulkan,
-            &self.state_stack,
-            &self.resources,
-        );
-        self.graphics.renderer.update_time();
-        self.graphics.renderer.update_title(&format!(
+        let renderer = &mut self.graphics.renderer;
+
+        renderer.update_settings(&self.graphics.vulkan, &self.settings);
+        renderer.render_states(&self.graphics.vulkan, &self.state_stack, &self.resources);
+        renderer.update_time();
+        renderer.update_title(&format!(
             "Bomberman!! fps: {:.0}",
-            self.graphics.renderer.rcx().time_info.avg_fps
+            renderer.rcx().time_info.avg_fps
         ));
     }
 }
@@ -111,7 +109,7 @@ impl ApplicationHandler for App {
         let vulkan = &self.graphics.vulkan;
 
         if !renderer.is_initialized() {
-            renderer.init_render_context(event_loop, vulkan);
+            renderer.init_render_context(event_loop, vulkan, &self.settings);
             renderer.create_pipelines(vulkan);
         }
     }
@@ -120,7 +118,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::RedrawRequested => {
                 self.update_state();
-                self.render()
+                self.render();
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),

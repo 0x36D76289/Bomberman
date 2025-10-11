@@ -3,12 +3,12 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     audio::AudioManager,
+    game::resources::Resources,
     input::input::Input,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -62,9 +62,7 @@ impl UiState {
         Self {
             canvases: vec![title],
             buttons: vec![campaign_button, multi_button],
-            is_transparent: false,
             selected: 0,
-            page: UIPage::MainMenu,
             render_info: Default::default(),
         }
     }
@@ -73,6 +71,7 @@ impl UiState {
         &mut self,
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
+        resources: &Resources,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
@@ -89,7 +88,7 @@ impl UiState {
                 }
                 1 => {
                     // Multiplayer
-                    (Some(AppState::ui(UiState::game_settings(2))), 1)
+                    (Some(AppState::game_settings(resources, 2)), 1)
                 }
                 _ => (None, 0),
             };

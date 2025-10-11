@@ -8,9 +8,7 @@ use vulkano::{
 
 use crate::{
     game::{game_state::GameState, resources::Resources},
-    graphics::{
-        GamePush, PostProcessPush, Renderer, StateRenderInfo, Vulkan, renderer::resolution,
-    },
+    graphics::{GamePush, PostProcessPush, Renderer, StateRenderInfo, Vulkan},
 };
 
 impl Renderer {
@@ -41,7 +39,7 @@ impl Renderer {
         };
 
         let window_size: [u32; 2] = rcx.swapchain.image_extent();
-        let game_resolution = resolution(window_size, &self.game_resolution);
+        let game_resolution = rcx.game_resolution.resolution(window_size);
 
         let global_ubo = {
             let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;

@@ -2,6 +2,7 @@ use crate::{
     app_state::AppState,
     game::resources::Resources,
     graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
+    settings::settings::Settings,
 };
 use std::{sync::Arc, time::Instant};
 use vulkano::{
@@ -36,7 +37,10 @@ use vulkano::{
     },
     sync::{self, GpuFuture},
 };
-use winit::{event_loop::ActiveEventLoop, window::Window};
+use winit::{
+    event_loop::ActiveEventLoop,
+    window::{Fullscreen, Window},
+};
 
 pub struct Renderer {
     pub rcx: Option<RenderContext>,
@@ -46,7 +50,6 @@ pub struct Renderer {
     pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
     pub text_renderer: TextRenderer,
     pub sampler: Arc<Sampler>,
-    pub game_resolution: Resolution,
 }
 
 pub struct RenderContext {
@@ -58,13 +61,23 @@ pub struct RenderContext {
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub time_info: TimeInfo,
+    pub game_resolution: Resolution,
+    pub fullscreen: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Resolution {
     Full,
     Custom(u32, u32),
-    DividedBy(u32),
+}
+
+impl Resolution {
+    pub fn resolution(&self, window_size: [u32; 2]) -> [u32; 2] {
+        match self {
+            Resolution::Full => window_size,
+            Resolution::Custom(width, height) => [*width, *height],
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +99,7 @@ impl Default for StateRenderInfo {
 }
 
 impl Renderer {
-    pub fn new(vulkan: &Vulkan, game_resolution: Resolution) -> Self {
+    pub fn new(vulkan: &Vulkan) -> Self {
         let text_renderer = TextRenderer::new();
 
         let sampler = Sampler::new(
@@ -109,22 +122,28 @@ impl Renderer {
             command_buffer: None,
             text_renderer,
             sampler,
-            game_resolution,
         }
     }
 
-    pub fn init_render_context(&mut self, event_loop: &ActiveEventLoop, vulkan: &Vulkan) {
+    pub fn init_render_context(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        vulkan: &Vulkan,
+        settings: &Settings,
+    ) {
         let window = Arc::new(
             event_loop
                 .create_window(Window::default_attributes().with_title("Bomberman!"))
                 .unwrap(),
         );
 
+        set_fullscreen(settings.fullscreen, &window);
+
         let surface = Surface::from_window(vulkan.instance.clone(), window.clone())
             .expect("Could not create surface");
 
         let window_size: [u32; 2] = window.inner_size().into();
-        let game_resolution = resolution(window_size, &self.game_resolution);
+        let game_resolution = Resolution::Custom(settings.resolution.0, settings.resolution.1);
 
         // Create the swapchain which holds a queue of images that are waiting to be presented on the screen
         let (swapchain, images) = {
@@ -172,7 +191,7 @@ impl Renderer {
 
         let (color_image, depth_image) = create_images(
             vulkan,
-            game_resolution,
+            game_resolution.resolution(window_size),
             images[0].format(),
             Format::D16_UNORM,
         );
@@ -202,6 +221,8 @@ impl Renderer {
             recreate_swapchain,
             previous_frame_end,
             time_info,
+            game_resolution,
+            fullscreen: settings.fullscreen,
         })
     }
 
@@ -414,9 +435,12 @@ impl Renderer {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
-        let game_resolution = resolution(window_size.into(), &self.game_resolution);
-
         if window_size.width == 0 || window_size.height == 0 {
+            return;
+        }
+
+        let states_to_render = states_to_render(states);
+        if states_to_render.is_empty() {
             return;
         }
 
@@ -432,12 +456,6 @@ impl Renderer {
                 .expect("failed to recreate swapchain");
 
             rcx.swapchain = new_swapchain;
-            (rcx.color_image, rcx.depth_image) = create_images(
-                vulkan,
-                game_resolution,
-                rcx.images[0].format(),
-                Format::D16_UNORM,
-            );
             rcx.images = new_images
                 .iter()
                 .map(|image| ImageView::new_default(image.clone()).unwrap())
@@ -468,18 +486,8 @@ impl Renderer {
             .unwrap(),
         );
 
-        let transparent_count = states
-            .iter()
-            .rev()
-            .take_while(|s| s.is_transparent())
-            .count();
-        let states_to_skip = if states.len() > 0 {
-            (states.len() - 1).saturating_sub(transparent_count)
-        } else {
-            0
-        };
         let mut is_first = true;
-        for state in states.iter().skip(states_to_skip) {
+        for state in states {
             self.render_state(vulkan, resources, state, image_index, is_first);
             if is_first {
                 is_first = false
@@ -527,6 +535,27 @@ impl Renderer {
                 println!("failed to flush future: {e}");
                 rcx.previous_frame_end = Some(sync::now(vulkan.device.clone()).boxed());
             }
+        }
+    }
+
+    pub fn update_settings(&mut self, vulkan: &Vulkan, settings: &Settings) {
+        let rcx = self.rcx.as_mut().unwrap();
+
+        let settings_resolution = Resolution::Custom(settings.resolution.0, settings.resolution.1);
+        if rcx.game_resolution != settings_resolution {
+            rcx.game_resolution = settings_resolution;
+            (rcx.color_image, rcx.depth_image) = create_images(
+                vulkan,
+                rcx.game_resolution
+                    .resolution(rcx.window.inner_size().into()),
+                rcx.images[0].format(),
+                Format::D16_UNORM,
+            );
+        }
+
+        if rcx.fullscreen != settings.fullscreen {
+            rcx.fullscreen = settings.fullscreen;
+            set_fullscreen(rcx.fullscreen, &rcx.window);
         }
     }
 
@@ -593,11 +622,35 @@ fn create_images(
     (color_image, depth_image)
 }
 
-pub fn resolution(window_size: [u32; 2], resolution: &Resolution) -> [u32; 2] {
-    match resolution {
-        Resolution::Full => window_size,
-        Resolution::Custom(width, height) => [*width, *height],
-        Resolution::DividedBy(devisor) => [window_size[0] / devisor, window_size[1] / devisor],
+fn states_to_render(states: &[AppState]) -> Vec<&AppState> {
+    let transparent_count = states
+        .iter()
+        .rev()
+        .take_while(|s| s.is_transparent())
+        .count();
+    let states_to_skip = if states.len() > 0 {
+        (states.len() - 1).saturating_sub(transparent_count)
+    } else {
+        0
+    };
+    states.iter().skip(states_to_skip).collect()
+}
+
+fn set_fullscreen(fullscreen: bool, window: &Window) {
+    if let Some(current_monitor) = window.current_monitor() {
+        if fullscreen {
+            #[cfg(target_os = "macos")]
+            window.set_fullscreen(Some(Fullscreen::Borderless(Some(current_monitor))));
+
+            #[cfg(not(target_os = "macos"))]
+            if let Some(video_mode) = current_monitor.video_modes().next() {
+                window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)));
+            } else {
+                window.set_fullscreen(Some(Fullscreen::Borderless(Some(current_monitor))));
+            }
+        } else {
+            window.set_fullscreen(None);
+        }
     }
 }
 
