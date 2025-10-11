@@ -15,8 +15,8 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use crate::settings::{path::init_settings_path, settings::Settings};
 
 pub static mut GLOBAL_RESOURCES: Option<Resources> = None;
-
 fn main() {
+    env_logger::init();
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);
 
