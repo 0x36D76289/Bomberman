@@ -40,7 +40,7 @@ impl PartialOrd for PathNode {
 pub struct AI {}
 
 impl AI {
-    pub fn update_zone(cpus: &mut [CPU], players: &[Player], map: &Map) {
+    pub fn update_zone(start: Vec2, cpus: &mut [CPU], players: &[Player], map: &Map) {
         let mut treated_cpu: Vec<usize> = Vec::new();
 
         for i in 0..cpus.len() {
@@ -48,7 +48,7 @@ impl AI {
                 continue;
             }
 
-            let players_in_zone = cpus[i].update_zone(cpus[i].id, players, map);
+            let players_in_zone = cpus[i].update_zone(start, players, map);
             let updated_zone: Arc<Mutex<Zone>> = Arc::clone(&cpus[i].zone);
             treated_cpu.push(cpus[i].id);
 

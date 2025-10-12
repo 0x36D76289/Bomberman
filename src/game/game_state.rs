@@ -89,8 +89,10 @@ impl GameState {
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, &resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
-        let cpus = (nb_humans..players.len()).map(|id| CPU::new(id)).collect();
-
+        let mut cpus: Vec<CPU> = (nb_humans..players.len()).map(|id| CPU::new(id)).collect();
+        for cpu in &mut cpus {
+            cpu.update_zone(players[cpu.id].position, &players, &map);
+        }
         let camera = Transform {
             translation: Vec3::new(map.width as f32 / 2.0, -1.0, map.height as f32 / 2.0),
             scale: Vec3::ONE,
@@ -258,7 +260,12 @@ impl GameState {
                 continue;
             }
             self.bombs[i].clone().chain_react(&mut self.bombs);
-            AI::update_zone(&mut self.cpus, &self.players, &self.map);
+            AI::update_zone(
+                self.bombs[i].position,
+                &mut self.cpus,
+                &self.players,
+                &self.map,
+            );
         }
         self.bombs.retain(|bomb| !bomb.despawn);
         for powerup in &mut self.power_ups {
@@ -406,7 +413,8 @@ impl GameState {
 
     fn update_cpu_inputs(&mut self) {
         self.cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
-            self.game_inputs[self.nb_humans as usize + i] = cpu.get_input(&self.players, &self.map)
+            self.game_inputs[self.nb_humans as usize + i] =
+                cpu.get_input(&self.power_ups, &self.players, &self.map)
         });
     }
     // Put the inputs read into game inputs

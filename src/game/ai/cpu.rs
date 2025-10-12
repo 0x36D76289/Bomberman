@@ -4,12 +4,14 @@ use crate::game::ai::ai::AI;
 use crate::game::ai::zone::Zone;
 use crate::game::direction::Direction;
 use crate::game::map::map::Map;
+use crate::game::powerup::PowerUp;
 use crate::game::{self, direction};
 use crate::game::{game_state::GameState, player::Player};
 use crate::input::input::Input;
 use crate::input::input_name::InputName;
 use crate::utils::vec2::{ApproxEq, Grid};
 use glam::{Vec2, Vec3};
+use log::logger;
 use rand::seq::IndexedRandom;
 
 const CPU_DECISION_TIMER: f32 = 0.1;
@@ -62,15 +64,16 @@ impl CPU {
         }
     }
 
-    pub fn update_zone(&mut self, id: usize, players: &[Player], map: &Map) -> Vec<usize> {
+    pub fn update_zone(&mut self, pos: Vec2, players: &[Player], map: &Map) -> Vec<usize> {
+        log::debug!("I'm cpu {} and i'm updating my zone!", self.id);
         if let Ok(mut zone) = self.zone.lock() {
-            zone.fill_zone(players[id].position.grid(), players, map)
+            zone.fill_zone(pos.grid(), players, map)
         } else {
             Vec::new()
         }
     }
 
-    pub fn get_input(&mut self, players: &[Player], map: &Map) -> Input {
+    pub fn get_input(&mut self, powerups: &[PowerUp], players: &[Player], map: &Map) -> Input {
         let player = &players[self.id];
 
         match self.state {
@@ -87,8 +90,11 @@ impl CPU {
                 }
             }
             CPUState::Idle => {
-                if let Ok(zone) = self.zone.lock() {
-                    if !zone.cells.is_empty() {
+                if let Ok(mut zone) = self.zone.lock() {
+                    if let Some(powerup_pos) = zone.check_powerup(powerups) {
+                        log::debug!("I'm going to the powerup !");
+                        self.target = Some(powerup_pos);
+                    } else if !zone.cells.is_empty() {
                         if let Some(random_target) = zone.cells.choose(&mut rand::rng()) {
                             if random_target.grid() != player.position.grid() {
                                 self.target = Some(*random_target);
@@ -96,7 +102,6 @@ impl CPU {
                         }
                     }
                 }
-
                 if let Some(target) = self.target {
                     if let Some(path) = AI::find_path(player.position.grid(), target, map) {
                         self.path = path;
