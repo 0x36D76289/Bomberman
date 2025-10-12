@@ -246,12 +246,18 @@ impl GameState {
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
+        let player_poses = self
+            .players
+            .iter()
+            .filter(|player| player.alive)
+            .map(|player| (player.id, player.position))
+            .collect::<Vec<_>>();
         for (i, player) in self.players.iter_mut().enumerate() {
             if !player.alive {
                 continue;
             }
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
-                && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
+                && let Some(bomb) = player.create_bomb(&resources, &self.bombs, &player_poses)
             {
                 audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)
