@@ -4,7 +4,7 @@ use crate::{
     app_state::AppState,
     audio::{AudioManager, BackgroundMusic},
     game::{game_state::GameState, resources::Resources},
-    input::input::Input,
+    input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -121,15 +121,18 @@ impl UiState {
                             "Error: Failed to load campaign level 1 for restart. Returning to menu."
                         );
                         audio_manager.play_background_music(BackgroundMusic::Menu);
-                        (Some(AppState::main_menu()), 2)
+                        (None, 2)
                     }
                 }
                 _ => {
                     // Menu
                     audio_manager.play_background_music(BackgroundMusic::Menu);
-                    (Some(AppState::main_menu()), 2)
+                    (None, 2)
                 }
             };
+        }
+        if inputs.menu_back() == InputState::Pressed {
+            return (None, 1);
         }
         (None, 0)
     }

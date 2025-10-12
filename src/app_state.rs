@@ -5,15 +5,16 @@ use winit::{event::ElementState, keyboard::PhysicalKey};
 use crate::{
     audio::AudioManager,
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
-    input::input::Input,
-    ui::{UiState, game_settings::UIGameSettings, stage_clear::STAGE_CLEAR_DURATION},
+    input::{event::InputEvent, input::Input},
+    settings::settings::Settings,
+    ui::{UiState, pages::game_settings::UIGameSettings, pages::stage_clear::STAGE_CLEAR_DURATION},
 };
 
 pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
-    state: AppStateEnum,
+    pub state: AppStateEnum,
     pub game: Option<GameState>,
     pub ui: Option<UiState>,
 }
@@ -24,6 +25,13 @@ pub enum AppStateEnum {
     MainMenu,
     Pause,
     GameSettings(UIGameSettings),
+    Settings {
+        selected_player: usize,
+    },
+    Binds {
+        player: usize,
+        waiting: isize,
+    },
     GameOver,
     StageClear {
         timer: f32,
@@ -74,6 +82,25 @@ impl AppState {
         }
     }
 
+    pub fn settings() -> Self {
+        Self {
+            state: AppStateEnum::Settings { selected_player: 0 },
+            game: None,
+            ui: Some(UiState::settings()),
+        }
+    }
+
+    pub fn binds(player: usize, ratio: f32) -> Self {
+        Self {
+            state: AppStateEnum::Binds {
+                player,
+                waiting: -1,
+            },
+            game: None,
+            ui: Some(UiState::binds(player, ratio)),
+        }
+    }
+
     pub fn game_over() -> Self {
         Self {
             state: AppStateEnum::GameOver,
@@ -98,16 +125,18 @@ impl AppState {
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
-        keys: &KeyMap,
+        events: &Vec<InputEvent>,
         resources: &Resources,
         audio_manager: &mut AudioManager,
+        settings: &mut Settings,
+        ratio: f32,
     ) -> (Option<AppState>, u8) {
         match &mut self.state {
             AppStateEnum::Game => {
                 self.game
                     .as_mut()
                     .unwrap()
-                    .tick(delta, inputs, keys, resources, audio_manager)
+                    .tick(delta, inputs, resources, audio_manager)
             }
             AppStateEnum::MainMenu => {
                 self.ui
@@ -123,32 +152,49 @@ impl AppState {
                     ),
                 };
                 let old_settings = ui_game_settings.clone();
-                let ret = ui.game_settings_tick(delta, inputs, ui_game_settings);
-                if old_settings != *ui_game_settings {
-                    let err = game.update_from_ui_settings(&ui_game_settings, resources);
-                    if err.is_err() {
-                        ui.set_error(
-                            "Map creation failed, try ajusting settings".to_string(),
-                            ui_game_settings,
-                        );
+                match ui.game_settings_tick(delta, inputs, ui_game_settings) {
+                    None => {
+                        if old_settings != *ui_game_settings {
+                            let err = game.update_from_ui_settings(&ui_game_settings, resources);
+                            if err.is_err() {
+                                ui.set_error(
+                                    "Map creation failed, try ajusting settings".to_string(),
+                                    ui_game_settings,
+                                );
+                            }
+                        }
+                        (None, 0)
+                    }
+                    Some(enter_pressed) => {
+                        if enter_pressed {
+                            (
+                                Some(AppState::game(
+                                    GameState::new_multiplayer_from_map(
+                                        resources,
+                                        GameSettings::default(),
+                                        game.get_map().clone(),
+                                    )
+                                    .unwrap(),
+                                )),
+                                1,
+                            )
+                        } else {
+                            (None, 1)
+                        }
                     }
                 }
-                if ret {
-                    (
-                        Some(AppState::game(
-                            GameState::new_multiplayer_from_map(
-                                resources,
-                                GameSettings::default(),
-                                game.get_map().clone(),
-                            )
-                            .unwrap(),
-                        )),
-                        1,
-                    )
-                } else {
-                    (None, 0)
-                }
             }
+            AppStateEnum::Settings { selected_player } => {
+                self.ui
+                    .as_mut()
+                    .unwrap()
+                    .settings_tick(inputs, settings, selected_player, ratio)
+            }
+            AppStateEnum::Binds { player, waiting } => self
+                .ui
+                .as_mut()
+                .unwrap()
+                .binds_tick(inputs, events, settings, player, waiting),
             AppStateEnum::Pause => {
                 self.ui
                     .as_mut()
@@ -179,6 +225,8 @@ impl AppState {
             AppStateEnum::GameOver => true,
             AppStateEnum::MainMenu => false,
             AppStateEnum::GameSettings(_) => false,
+            AppStateEnum::Binds { .. } => false,
+            AppStateEnum::Settings { .. } => false,
             AppStateEnum::StageClear { .. } => true,
         }
     }

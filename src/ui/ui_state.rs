@@ -4,19 +4,6 @@ use crate::{
     ui::{button::Button, canvas::Canvas},
 };
 
-// #[derive(Debug, Copy, Clone)]
-// pub enum UIPage {
-//     MainMenu,
-//     Pause,
-//     GameSettings(UIGameSettings),
-//     GameOver,
-//     StageClear {
-//         timer: f32,
-//         next_level: u32,
-//         lives: u32,
-//     },
-// }
-
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub canvases: Vec<Canvas>,

@@ -487,7 +487,7 @@ impl Renderer {
         );
 
         let mut is_first = true;
-        for state in states {
+        for state in states_to_render {
             self.render_state(vulkan, resources, state, image_index, is_first);
             if is_first {
                 is_first = false

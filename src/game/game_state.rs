@@ -1,4 +1,4 @@
-use crate::app_state::{AppState, KeyMap};
+use crate::app_state::AppState;
 use crate::game::bomb::{Bomb, BombState};
 use crate::game::camera::Camera;
 use crate::game::collision::Collision;
@@ -15,13 +15,12 @@ use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
-use crate::input::input_vec::GetOrDefault;
-use crate::ui::game_settings::UIGameSettings;
+use crate::input::input_vec::{GetOrDefault, MenuInput};
+use crate::ui::pages::game_settings::UIGameSettings;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
 use std::error::Error;
 use std::vec::Vec;
-use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -346,11 +345,17 @@ impl GameState {
         }
 
         // Tick enemies
-        for enemy in &mut self.enemies {
-            enemy.tick(delta, &self.map, &self.bombs);
+        for i in 0..self.enemies.len() {
+            let (left, right) = self.enemies.split_at_mut(i);
+            if let Some((current, right)) = right.split_first_mut() {
+                let other_enemies: Vec<_> = left.iter().chain(right.iter()).cloned().collect();
+                current.tick(delta, &self.map, &self.bombs, &other_enemies);
+            }
+
             if self.players[0].alive
-                && enemy.alive
-                && self.players[0].is_colliding_with(enemy.position, enemy.get_size())
+                && self.enemies[i].alive
+                && self.players[0]
+                    .is_colliding_with(self.enemies[i].position, self.enemies[i].get_size())
             {
                 self.players[0].kill();
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
@@ -395,15 +400,10 @@ impl GameState {
         &mut self,
         delta_time: f32,
         inputs: &Vec<Input>,
-        keys: &KeyMap,
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> (Option<AppState>, u8) {
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::Escape))
-            .unwrap_or(&winit::event::ElementState::Released)
-            .is_pressed()
-        {
+        if inputs.menu_back() == InputState::Pressed {
             return (Some(AppState::pause()), 0);
         }
 
