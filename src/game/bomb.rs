@@ -306,6 +306,9 @@ impl Bomb {
                 return self.stop_slide(map);
             }
             for player in players {
+                if !player.alive {
+                    continue;
+                }
                 if self.resolve_collision_with(player.position, player.get_size(), direction) {
                     return self.stop_slide(map);
                 }
