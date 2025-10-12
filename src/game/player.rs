@@ -165,10 +165,12 @@ impl Player {
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
         let mut dist: f32;
+        // INFO: The right thing to do would be find the distance to the nearest block center...
+        // but I'll just iterate 0.2 at a time because performance is plenty
         while motion.x != 0.0 || motion.y != 0.0 {
             // X tick
             if motion.x != 0.0 {
-                dist = motion.x.abs().min(1.0);
+                dist = motion.x.abs().min(0.2);
                 if motion.x > 0.0 {
                     self.direction = Direction::Right;
                     motion.x -= dist;
@@ -181,7 +183,7 @@ impl Player {
                 self.handle_collisions(map, self.direction, bombs);
             }
             if motion.y != 0.0 {
-                dist = motion.y.abs().min(1.0);
+                dist = motion.y.abs().min(0.2);
                 if motion.y > 0.0 {
                     self.direction = Direction::Down;
                     motion.y -= dist;
