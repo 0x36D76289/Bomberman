@@ -11,8 +11,8 @@ use crate::{
     },
 };
 
-use super::consts::*;
-use super::utils::*;
+use super::super::consts::*;
+use super::super::utils::*;
 
 const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.3, 0.3);
 const PRESET_GRID_COUNT: u8 = 4;
@@ -578,14 +578,14 @@ impl UiState {
         }
     }
 
-    fn create_return_value(&mut self, inputs: &Vec<Input>) -> bool {
+    fn create_return_value(&mut self, inputs: &Vec<Input>) -> Option<bool> {
         if self.selected != GameSettingButtons::Start as usize
             || inputs.menu_confirm() != InputState::Pressed
         {
-            return false;
+            None
+        } else {
+            Some(true)
         }
-
-        true
     }
 
     pub fn game_settings_tick(
@@ -593,7 +593,7 @@ impl UiState {
         delta: f32,
         inputs: &Vec<Input>,
         settings: &mut UIGameSettings,
-    ) -> bool {
+    ) -> Option<bool> {
         self.button_inputs(inputs);
         if let Some(err_msg) = self.update_setting_values(inputs, settings) {
             self.set_error(err_msg, settings);
@@ -605,6 +605,9 @@ impl UiState {
             .up = settings.preset as usize;
         self.tick_error(delta, settings);
         self.update_label_text(settings);
+        if inputs.menu_back() == InputState::Pressed {
+            return Some(false);
+        }
         self.create_return_value(inputs)
     }
 }
