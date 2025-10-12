@@ -223,8 +223,16 @@ impl GameState {
         audio_manager: &mut AudioManager,
     ) {
         // tick bombs
-        for bomb in &mut self.bombs {
-            bomb.tick(
+        for i in 0..self.bombs.len() {
+            let bombs_pos = self
+                .bombs
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != i)
+                .map(|(_, bomb)| bomb.position)
+                .collect::<Vec<_>>();
+
+            self.bombs[i].tick(
                 delta,
                 &mut self.players,
                 &mut self.enemies,
@@ -232,6 +240,7 @@ impl GameState {
                 &mut self.power_ups,
                 resources,
                 audio_manager,
+                &bombs_pos,
             );
         }
         for i in 0..self.bombs.len() {
