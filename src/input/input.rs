@@ -98,6 +98,8 @@ impl Input {
         key: PhysicalKey,
         input: InputName,
     ) {
+        let mut state = self.states[input as usize].is_down();
+
         for event in events {
             match event {
                 InputEvent::Keyboard {
@@ -105,8 +107,7 @@ impl Input {
                     down,
                 } => {
                     if key == *event_key {
-                        self.update_input_component(*down, input);
-                        return;
+                        state = *down
                     }
                 }
                 InputEvent::Click { .. } => (),
@@ -117,7 +118,7 @@ impl Input {
                 } => todo!("{controller} {button} {down}"),
             }
         }
-        self.update_input_component(self.states[input as usize].is_down(), input);
+        self.update_input_component(state, input);
     }
 
     /// Updates all of a player's input by using their keybinds
