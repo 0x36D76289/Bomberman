@@ -99,9 +99,8 @@ impl Player {
         &mut self,
         resources: &Resources,
         bombs: &Vec<Bomb>,
-        player_positions: &Vec<(u32, Vec2)>,
+        player_positions: &[(u32, Vec2)],
     ) -> Option<Bomb> {
-        println!("attempting with {} remaining", self.bombs_remaining);
         if self.bombs_remaining == 0 {
             return None;
         }

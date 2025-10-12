@@ -291,7 +291,14 @@ impl Bomb {
         self.state = BombState::Planted;
     }
 
-    fn slide(&mut self, direction: Direction, delta: f32, map: &Map, players: &[Player]) {
+    fn slide(
+        &mut self,
+        direction: Direction,
+        delta: f32,
+        map: &Map,
+        players: &[Player],
+        bombs_pos: &[Vec2],
+    ) {
         let mut motion = direction.to_vec2() * delta * BOMB_SLIDE_SPEED;
 
         let mut dist: Vec2;
@@ -313,6 +320,11 @@ impl Bomb {
                     return self.stop_slide(map);
                 }
             }
+            for pos in bombs_pos {
+                if self.resolve_collision_with(*pos, BOMB_RADIUS, direction) {
+                    return self.stop_slide(map);
+                }
+            }
 
             motion -= dist;
         }
@@ -328,11 +340,12 @@ impl Bomb {
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
         audio_manager: &mut AudioManager,
+        bombs_pos: &[Vec2],
     ) {
         match self.state {
             BombState::Planted => self.live_bomb(delta, map, power_ups, resources, audio_manager),
             BombState::Sliding(direction) => {
-                self.slide(direction, delta, map, players);
+                self.slide(direction, delta, map, players, &bombs_pos);
                 self.live_bomb(delta, map, power_ups, resources, audio_manager);
             }
             BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
