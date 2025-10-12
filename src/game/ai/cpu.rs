@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use crate::game::ai::ai::AI;
 use crate::game::ai::zone::Zone;
 use crate::game::direction::Direction;
 use crate::game::map::map::Map;
@@ -74,7 +75,11 @@ impl CPU {
 
         match self.state {
             CPUState::Moving => {
-                if let Some(input) = self.travel(map, player) {
+                if self.path.is_empty() {
+                    self.state = CPUState::Idle;
+                    self.target = None;
+                    self.do_nothing()
+                } else if let Some(input) = self.travel(map, player) {
                     input
                 } else {
                     self.state = CPUState::Idle;
@@ -82,28 +87,44 @@ impl CPU {
                 }
             }
             CPUState::Idle => {
-                let position = player.position;
-                let neighbours = map.get_neighbours(position.grid());
-                self.path = vec![*neighbours.choose(&mut rand::rng()).unwrap(); 1];
-                self.state = CPUState::Moving;
-                self.last_input
-            } /* TODO: This is obviously a placeholder */
+                if let Ok(zone) = self.zone.lock() {
+                    if !zone.cells.is_empty() {
+                        if let Some(random_target) = zone.cells.choose(&mut rand::rng()) {
+                            if random_target.grid() != player.position.grid() {
+                                self.target = Some(*random_target);
+                            }
+                        }
+                    }
+                }
+
+                if let Some(target) = self.target {
+                    if let Some(path) = AI::find_path(player.position.grid(), target, map) {
+                        self.path = path;
+                        self.state = CPUState::Moving;
+                    } else {
+                        self.target = None;
+                    }
+                }
+
+                self.last_input.clone()
+            }
             _ => self.do_nothing(),
         }
     }
 
     fn travel(&mut self, map: &Map, player: &Player) -> Option<Input> {
-        let start: &Vec2 = &player.position;
+        let start: Vec2 = player.position.grid();
         let goal: &Vec2 = self.path.first()?;
+
         if start.approx_eq(goal) {
             self.path.remove(0);
             return self.travel(map, player);
         }
-        let direction: Direction = Direction::get_direction(start, goal);
-        self.set_input(InputName::direction_to_input(direction));
-        Some(self.last_input)
-    }
 
+        let direction: Direction = Direction::get_direction(&player.position, goal);
+        self.set_input(InputName::direction_to_input(direction));
+        Some(self.last_input.clone())
+    }
     fn do_nothing(&mut self) -> Input {
         self.last_input.release_all();
         self.last_input

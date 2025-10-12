@@ -374,11 +374,11 @@ impl GameState {
         if inputs.menu_back() == InputState::Pressed {
             return (Some(AppState::Ui(UiState::pause())), 0);
         }
+        self.update_human_inputs(inputs);
 
         let result = match self.mode {
             GameMode::Multiplayer => {
-                self.update_human_inputs(inputs);
-                // self.update_cpu_inputs();
+                self.update_cpu_inputs();
                 self.mp_game_tick(delta_time, resources, audio_manager);
                 GameTickResult::None
             }
