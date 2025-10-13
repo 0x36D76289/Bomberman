@@ -1,9 +1,9 @@
 use glam::Vec2;
-use winit::keyboard::KeyCode;
 
 use crate::{
     app_state::AppState,
     input::{
+        controller::{create_bind, is_bindable_action},
         event::InputEvent,
         input::{BIND_LEN, Input},
         input_state::InputState,
@@ -224,14 +224,7 @@ impl UiState {
 
         if self.selected < BIND_LEN {
             let bind = settings.binds[player][self.selected];
-            let text = if bind == KeyCode::F35 {
-                "Unbound".to_string()
-            } else {
-                let ret = format!("{:?}", bind);
-                let ret = ret.split_at("Code(".len()).1;
-                ret.split_at(ret.len() - 1).0.to_string()
-            };
-            self.buttons[self.selected].canvas.text = Some(text);
+            self.buttons[self.selected].canvas.text = Some(format!("{bind}"));
         }
         if waiting >= 0 {
             self.buttons[waiting as usize].canvas.text = Some("...".to_string());
@@ -269,20 +262,11 @@ impl UiState {
         };
 
         for event in events {
-            match event {
-                InputEvent::Keyboard { key, down } => {
-                    if !down {
-                        return;
-                    }
-                    settings.binds[*player][*waiting as usize] = *key;
-                    settings.save();
-                    *waiting = -1;
-                    return;
-                }
-                InputEvent::Click { .. } => (),
-                InputEvent::ControllerButton { .. } => {
-                    todo!("CONTROLLER EVENT DETECTED WEEWOOWEEWOO");
-                }
+            if is_bindable_action(event) {
+                settings.binds[*player][*waiting as usize] = create_bind(event);
+                settings.save();
+                *waiting = -1;
+                return;
             }
         }
     }

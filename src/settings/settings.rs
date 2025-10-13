@@ -5,6 +5,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::{
     input::{
+        event::InputEvent,
         input::{Binds, default_binds},
         input_name::InputName,
     },
@@ -32,18 +33,20 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         let mut p1_binds: Binds = default_binds();
-        p1_binds[InputName::Up as usize] = PhysicalKey::Code(KeyCode::KeyW);
-        p1_binds[InputName::Down as usize] = PhysicalKey::Code(KeyCode::KeyS);
-        p1_binds[InputName::Left as usize] = PhysicalKey::Code(KeyCode::KeyA);
-        p1_binds[InputName::Right as usize] = PhysicalKey::Code(KeyCode::KeyD);
-        p1_binds[InputName::Bomb as usize] = PhysicalKey::Code(KeyCode::Space);
+        p1_binds[InputName::Up as usize] = InputEvent::from_keycode(KeyCode::KeyW);
+        p1_binds[InputName::Down as usize] = InputEvent::from_keycode(KeyCode::KeyS);
+        p1_binds[InputName::Left as usize] = InputEvent::from_keycode(KeyCode::KeyA);
+        p1_binds[InputName::Right as usize] = InputEvent::from_keycode(KeyCode::KeyD);
+        p1_binds[InputName::Bomb as usize] = InputEvent::from_keycode(KeyCode::Space);
+        p1_binds[InputName::Back as usize] = InputEvent::from_keycode(KeyCode::Escape);
 
         let mut p2_binds: Binds = default_binds();
-        p2_binds[InputName::Up as usize] = PhysicalKey::Code(KeyCode::ArrowUp);
-        p2_binds[InputName::Down as usize] = PhysicalKey::Code(KeyCode::ArrowDown);
-        p2_binds[InputName::Left as usize] = PhysicalKey::Code(KeyCode::ArrowLeft);
-        p2_binds[InputName::Right as usize] = PhysicalKey::Code(KeyCode::ArrowRight);
-        p2_binds[InputName::Bomb as usize] = PhysicalKey::Code(KeyCode::ShiftRight);
+        p2_binds[InputName::Up as usize] = InputEvent::from_keycode(KeyCode::ArrowUp);
+        p2_binds[InputName::Down as usize] = InputEvent::from_keycode(KeyCode::ArrowDown);
+        p2_binds[InputName::Left as usize] = InputEvent::from_keycode(KeyCode::ArrowLeft);
+        p2_binds[InputName::Right as usize] = InputEvent::from_keycode(KeyCode::ArrowRight);
+        p2_binds[InputName::Bomb as usize] = InputEvent::from_keycode(KeyCode::ShiftRight);
+        p2_binds[InputName::Back as usize] = InputEvent::from_keycode(KeyCode::Numpad0);
 
         Self {
             resolution: (800, 600),
