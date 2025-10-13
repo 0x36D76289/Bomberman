@@ -1,7 +1,7 @@
 use std::fs::OpenOptions;
 
 use serde::{Deserialize, Serialize};
-use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::keyboard::KeyCode;
 
 use crate::{
     input::{
