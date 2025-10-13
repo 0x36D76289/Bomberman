@@ -2,7 +2,6 @@ use crate::app_state::AppState;
 use crate::audio::{AudioManager, BackgroundMusic};
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
-use crate::input::controller::is_bindable_action;
 use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;

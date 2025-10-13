@@ -1,5 +1,4 @@
 use glam::Vec2;
-use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::input::{
     controller::input_events_compare, event::InputEvent, input_name::InputName,
