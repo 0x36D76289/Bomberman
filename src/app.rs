@@ -2,11 +2,13 @@ use crate::app_state::AppState;
 use crate::audio::{AudioManager, BackgroundMusic};
 use crate::game::resources::Resources;
 use crate::graphics::Graphics;
+use crate::input::controller::is_bindable_action;
 use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
 use crate::ui::UiState;
 use crate::ui::utils::GetRatio;
+use gilrs::Gilrs;
 use glam::Vec2;
 use std::error::Error;
 use winit::dpi::PhysicalPosition;
@@ -26,11 +28,13 @@ pub struct App {
     graphics: Graphics,
     settings: Settings,
     audio_manager: AudioManager,
+    gilrs: Gilrs,
 }
 
 impl App {
     pub fn init(settings: Settings, event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
+        let gilrs = Gilrs::new()?;
 
         let resources = Resources::load_resources(&graphics.vulkan);
 
@@ -55,6 +59,7 @@ impl App {
             graphics,
             settings,
             audio_manager,
+            gilrs,
         })
     }
 
@@ -86,7 +91,7 @@ impl App {
             &mut self.settings,
             renderer.window_size().get_ratio(),
         );
-        // println!("{:#?}", self.events);
+        println!("{:#?}", self.events);
         self.events.clear();
         for _ in 0..res.1 {
             if self.state_stack.pop().is_none() {
@@ -108,6 +113,14 @@ impl App {
             self.graphics.renderer.rcx().time_info.avg_fps
         ));
     }
+    fn register_controller_inputs(&mut self) {
+        while let Some(event) = self.gilrs.next_event() {
+            self.events.push(InputEvent::ControllerInput {
+                controller: event.id,
+                event: event.event,
+            });
+        }
+    }
 }
 
 impl ApplicationHandler for App {
@@ -127,12 +140,16 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
+                self.register_controller_inputs();
                 self.update_state();
                 self.render()
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::KeyboardInput { event, .. } => {
+                if event.repeat {
+                    return;
+                }
                 self.events.push(InputEvent::Keyboard {
                     key: event.physical_key,
                     down: event.state.is_pressed(),
