@@ -9,6 +9,7 @@ pub const SELECTED_BUTTON_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
 pub const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
 pub const SELECTED_TEXT_COLOR: Vec4 = Vec4::ONE;
 pub const ERROR_MESSAGE_COLOR: Vec4 = Vec4::new(0.37, 0.0, 0.0, 1.0);
+pub const HIGHLIGHTED_TEXT_COLOR: Vec4 = Vec4::new(0.5, 0.5, 0.0, 1.0);
 
 // Sizes
 pub const OUTLINE_WIDTH: f32 = 0.05;

@@ -15,9 +15,8 @@ use crate::{
 use super::super::consts::*;
 use super::super::utils::*;
 
-const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.3, 0.3);
-const PRESET_GRID_COUNT: u8 = 4;
-const PRESET_GRID_START_INDEX: u8 = 0;
+const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.4, 0.3);
+const PRESET_SPACING: f32 = 0.05;
 
 const PRESET_VERTICAL_HEIGHT: f32 = -0.65;
 
@@ -55,7 +54,7 @@ fn create_outlined_button(
 enum GameSettingPreset {
     Corners,
     Arena,
-    Preset3,
+    Teams,
     Custom,
 }
 
@@ -115,22 +114,14 @@ impl UIGameSettings {
             opacity: 0.0,
         }
     }
-    fn preset3(player_count: u8) -> Self {
-        let mut bot_count = 56;
-
-        if player_count > bot_count {
-            bot_count = 0;
-        } else {
-            bot_count -= player_count;
-        }
-
+    fn teams(player_count: u8) -> Self {
         Self {
-            preset: GameSettingPreset::Arena,
-            width: 37,
+            preset: GameSettingPreset::Teams,
+            width: 21,
             height: 21,
-            cheesiness: 0,
+            cheesiness: 10,
             player_count,
-            bot_count,
+            bot_count: 0,
             opacity: 0.0,
         }
     }
@@ -139,7 +130,7 @@ impl UIGameSettings {
 enum GameSettingButtons {
     PresetCorners,
     PresetArena,
-    Preset3,
+    PresetTeams,
     PresetCustom,
     SettingWidth,
     SettingHeight,
@@ -171,7 +162,7 @@ impl UiState {
         // Corners
         create_outlined_button(
             Vec2 {
-                x: spread(PRESET_GRID_COUNT, PRESET_GRID_START_INDEX + 0),
+                x: -PRESET_SPACING * 1.5 - PRESET_BUTTON_SIZE.x * 1.5,
                 y: PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
@@ -189,7 +180,7 @@ impl UiState {
         // PresetArena
         create_outlined_button(
             Vec2 {
-                x: spread(PRESET_GRID_COUNT, PRESET_GRID_START_INDEX + 1),
+                x: -PRESET_SPACING * 0.5 - PRESET_BUTTON_SIZE.x * 0.5,
                 y: PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
@@ -197,40 +188,40 @@ impl UiState {
                 up: GameSettingButtons::PresetArena as usize,
                 down: GameSettingButtons::SettingWidth as usize,
                 left: GameSettingButtons::PresetCorners as usize,
-                right: GameSettingButtons::Preset3 as usize,
+                right: GameSettingButtons::PresetTeams as usize,
             },
             &mut buttons,
             "Arena",
         );
 
-        // Preset3
+        // PresetTeams
         create_outlined_button(
             Vec2 {
-                x: spread(PRESET_GRID_COUNT, PRESET_GRID_START_INDEX + 2),
+                x: PRESET_SPACING * 0.5 + PRESET_BUTTON_SIZE.x * 0.5,
                 y: PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
             ButtonNeighbors {
-                up: GameSettingButtons::Preset3 as usize,
+                up: GameSettingButtons::PresetTeams as usize,
                 down: GameSettingButtons::SettingWidth as usize,
                 left: GameSettingButtons::PresetArena as usize,
                 right: GameSettingButtons::PresetCustom as usize,
             },
             &mut buttons,
-            "Preset 3",
+            "2v2v2v2",
         );
 
         // Custom
         create_outlined_button(
             Vec2 {
-                x: spread(PRESET_GRID_COUNT, PRESET_GRID_START_INDEX + 3),
+                x: PRESET_SPACING * 1.5 + PRESET_BUTTON_SIZE.x * 1.5,
                 y: PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
             ButtonNeighbors {
                 up: GameSettingButtons::PresetCustom as usize,
                 down: GameSettingButtons::SettingWidth as usize,
-                left: GameSettingButtons::Preset3 as usize,
+                left: GameSettingButtons::PresetTeams as usize,
                 right: GameSettingButtons::PresetCustom as usize,
             },
             &mut buttons,
@@ -413,7 +404,7 @@ impl UiState {
     }
 
     fn update_label_text(&mut self) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
+        let UIPage::GameSettings(settings) = self.page else {
             return;
         };
         self.buttons[GameSettingButtons::LabelWidth as usize]
@@ -428,6 +419,16 @@ impl UiState {
         self.buttons[GameSettingButtons::LabelBotCount as usize]
             .canvas
             .text = Some(settings.bot_count.to_string());
+
+        for i in
+            GameSettingButtons::PresetCorners as usize..=GameSettingButtons::PresetCustom as usize
+        {
+            self.buttons[i].canvas.text_color = if settings.preset as usize == i {
+                Some(HIGHLIGHTED_TEXT_COLOR)
+            } else {
+                Some(TEXT_COLOR)
+            }
+        }
     }
 
     fn update_setting_values(&mut self, inputs: &Vec<Input>) -> Option<String> {
@@ -547,10 +548,10 @@ impl UiState {
                 opacity: settings.opacity,
                 ..UIGameSettings::arena(settings.player_count)
             }
-        } else if self.selected == GameSettingPreset::Preset3 as usize {
+        } else if self.selected == GameSettingPreset::Teams as usize {
             *settings = UIGameSettings {
                 opacity: settings.opacity,
-                ..UIGameSettings::preset3(settings.player_count)
+                ..UIGameSettings::teams(settings.player_count)
             }
         } else if self.selected == GameSettingPreset::Custom as usize {
             settings.preset = GameSettingPreset::Custom;
@@ -580,9 +581,9 @@ impl UiState {
                 ..MapSettings::corners()
             },
             GameSettingPreset::Arena => return (None, 0),
-            GameSettingPreset::Preset3 => return (None, 0),
+            GameSettingPreset::Teams => return (None, 0),
             GameSettingPreset::Custom => MapSettings {
-                // Arena, Preset3, and Custom all use random generation
+                // Arena, Teams, and Custom all use random generation
                 width: settings.width,
                 height: settings.height,
                 cheesiness: settings.cheesiness,
