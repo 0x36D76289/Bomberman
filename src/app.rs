@@ -90,7 +90,7 @@ impl App {
             &mut self.settings,
             renderer.window_size().get_ratio(),
         );
-        println!("{:#?}", self.events);
+        // println!("{:#?}", self.events);
         self.events.clear();
         for _ in 0..res.1 {
             if self.state_stack.pop().is_none() {

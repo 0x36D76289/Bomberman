@@ -94,7 +94,7 @@ impl Input {
     }
 
     // TODO: rename to reflect change, add controller support
-    fn update_input_physical_key(
+    fn update_input_component_from_events(
         &mut self,
         events: &Vec<InputEvent>,
         bind: &InputEvent,
@@ -113,7 +113,7 @@ impl Input {
     /// Updates all of a player's input by using their keybinds
     pub fn update_input_player(&mut self, events: &Vec<InputEvent>, codes: Binds) {
         for input in InputName::iterator() {
-            self.update_input_physical_key(events, &codes[*input as usize], *input);
+            self.update_input_component_from_events(events, &codes[*input as usize], *input);
         }
     }
 }
