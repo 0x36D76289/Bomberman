@@ -12,7 +12,7 @@ use vulkano::{
     format::Format,
     image::{
         Image, ImageCreateInfo, ImageType, ImageUsage,
-        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+        sampler::{Filter, Sampler, SamplerCreateInfo},
         view::ImageView,
     },
     memory::allocator::AllocationCreateInfo,
@@ -49,7 +49,8 @@ pub struct Renderer {
     pub post_process_pipeline: Option<Arc<GraphicsPipeline>>,
     pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
     pub text_renderer: TextRenderer,
-    pub sampler: Arc<Sampler>,
+    pub ui_sampler: Arc<Sampler>,
+    pub game_sampler: Arc<Sampler>,
 }
 
 pub struct RenderContext {
@@ -102,13 +103,21 @@ impl Renderer {
     pub fn new(vulkan: &Vulkan) -> Self {
         let text_renderer = TextRenderer::new();
 
-        let sampler = Sampler::new(
+        let ui_sampler = Sampler::new(
             vulkan.device.clone(),
             SamplerCreateInfo {
                 mag_filter: Filter::Nearest,
                 min_filter: Filter::Nearest,
-                address_mode: [SamplerAddressMode::ClampToBorder; 3],
-                border_color: BorderColor::FloatOpaqueWhite,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let game_sampler = Sampler::new(
+            vulkan.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Linear,
+                min_filter: Filter::Linear,
                 ..Default::default()
             },
         )
@@ -121,7 +130,8 @@ impl Renderer {
             post_process_pipeline: None,
             command_buffer: None,
             text_renderer,
-            sampler,
+            ui_sampler,
+            game_sampler,
         }
     }
 
@@ -276,7 +286,7 @@ impl Renderer {
                 .unwrap()
                 .entry_point("main")
                 .unwrap();
-            let vertex_input_state = VertexInputState::new();
+            let vertex_input_state = GuiVertex::per_vertex().definition(&vertex_shader).unwrap();
             Some(self.create_pipeline(
                 vulkan,
                 vertex_shader,
@@ -538,9 +548,11 @@ impl Renderer {
         }
     }
 
+    /// update renderer from game settings
     pub fn update_settings(&mut self, vulkan: &Vulkan, settings: &Settings) {
         let rcx = self.rcx.as_mut().unwrap();
 
+        // update game resolution
         let settings_resolution = Resolution::Custom(settings.resolution.0, settings.resolution.1);
         if rcx.game_resolution != settings_resolution {
             rcx.game_resolution = settings_resolution;
@@ -553,9 +565,37 @@ impl Renderer {
             );
         }
 
+        // update fullscreen
         if rcx.fullscreen != settings.fullscreen {
             rcx.fullscreen = settings.fullscreen;
             set_fullscreen(rcx.fullscreen, &rcx.window);
+        }
+
+        // update fitlering
+        match (settings.filtering, self.game_sampler.mag_filter()) {
+            (true, Filter::Nearest) => {
+                self.game_sampler = Sampler::new(
+                    vulkan.device.clone(),
+                    SamplerCreateInfo {
+                        mag_filter: Filter::Linear,
+                        min_filter: Filter::Linear,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            }
+            (false, Filter::Linear) => {
+                self.game_sampler = Sampler::new(
+                    vulkan.device.clone(),
+                    SamplerCreateInfo {
+                        mag_filter: Filter::Nearest,
+                        min_filter: Filter::Nearest,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            }
+            _ => (),
         }
     }
 
@@ -639,15 +679,7 @@ fn states_to_render(states: &[AppState]) -> Vec<&AppState> {
 fn set_fullscreen(fullscreen: bool, window: &Window) {
     if let Some(current_monitor) = window.current_monitor() {
         if fullscreen {
-            #[cfg(target_os = "macos")]
             window.set_fullscreen(Some(Fullscreen::Borderless(Some(current_monitor))));
-
-            #[cfg(not(target_os = "macos"))]
-            if let Some(video_mode) = current_monitor.video_modes().next() {
-                window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)));
-            } else {
-                window.set_fullscreen(Some(Fullscreen::Borderless(Some(current_monitor))));
-            }
         } else {
             window.set_fullscreen(None);
         }

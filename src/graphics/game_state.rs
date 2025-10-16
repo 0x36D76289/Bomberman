@@ -1,14 +1,16 @@
 use vulkano::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{RenderingAttachmentInfo, RenderingInfo, SubpassContents},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
     format::ClearValue,
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
     pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
 };
 
 use crate::{
     game::{game_state::GameState, resources::Resources},
-    graphics::{GamePush, PostProcessPush, Renderer, StateRenderInfo, Vulkan},
+    graphics::{GamePush, GuiVertex, Renderer, StateRenderInfo, Vulkan},
 };
 
 impl Renderer {
@@ -97,7 +99,7 @@ impl Renderer {
                 resources.textures.len() as u32,
                 [
                     WriteDescriptorSet::buffer(0, uniform_buffer),
-                    WriteDescriptorSet::sampler(1, self.sampler.clone()),
+                    WriteDescriptorSet::sampler(1, self.game_sampler.clone()),
                     WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
                 ],
                 [],
@@ -200,7 +202,7 @@ impl Renderer {
             [WriteDescriptorSet::image_view_sampler(
                 0,
                 rcx.color_image.clone(),
-                self.sampler.clone(),
+                self.game_sampler.clone(),
             )],
             [],
         )
@@ -215,26 +217,54 @@ impl Renderer {
             )
             .unwrap();
 
-        let push_constant = {
+        let vertex_buffer = {
             let top_left = render_info.top_left_coord;
             let bottom_right = render_info.bottom_right_coord;
             let top_right = [bottom_right[0], top_left[1]];
             let bottom_left = [top_left[0], bottom_right[1]];
 
             let positions: [[f32; 2]; 6] = [
-                top_left,
                 top_right,
+                top_left,
                 bottom_left,
                 bottom_left,
                 bottom_right,
                 top_right,
             ];
 
-            PostProcessPush { positions }
+            let uv: [[f32; 2]; 6] = [
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [0.0, 1.0],
+                [0.0, 1.0],
+                [1.0, 1.0],
+                [1.0, 0.0],
+            ];
+
+            let mut vertices = Vec::new();
+            for (position, uv) in positions.into_iter().zip(uv) {
+                let vertex = GuiVertex { position, uv };
+                vertices.push(vertex);
+            }
+
+            Buffer::from_iter(
+                vulkan.memory_allocator.clone(),
+                BufferCreateInfo {
+                    usage: BufferUsage::VERTEX_BUFFER,
+                    ..Default::default()
+                },
+                AllocationCreateInfo {
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    ..Default::default()
+                },
+                vertices,
+            )
+            .unwrap()
         };
 
         command_buffer
-            .push_constants(pipeline.layout().clone(), 0, push_constant)
+            .bind_vertex_buffers(0, vertex_buffer)
             .unwrap();
 
         unsafe {

@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-
-use winit::{event::ElementState, keyboard::PhysicalKey};
-
 use crate::{
     audio::AudioManager,
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
@@ -9,8 +5,6 @@ use crate::{
     settings::settings::Settings,
     ui::{UiState, pages::game_settings::UIGameSettings, pages::stage_clear::STAGE_CLEAR_DURATION},
 };
-
-pub type KeyMap = HashMap<PhysicalKey, ElementState>;
 
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
