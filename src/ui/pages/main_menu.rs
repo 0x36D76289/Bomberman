@@ -3,13 +3,13 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     audio::AudioManager,
+    game::{game_state::GameState, resources::Resources},
     input::input::Input,
     settings::save::SaveState,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -121,15 +121,15 @@ impl UiState {
                 settings_button,
                 quit_button,
             ],
-            is_transparent: false,
             selected: 0,
-            page: UIPage::MainMenu,
+            render_info: Default::default(),
         }
     }
     pub fn main_menu_tick(
         &mut self,
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
+        resources: &Resources,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             println!("selected: {}", self.selected);
@@ -138,32 +138,31 @@ impl UiState {
             return match self.selected {
                 0 => {
                     let save = SaveState::load();
-                    match crate::game::game_state::GameState::new_campaign(save.level, save.lives) {
-                        Some(game_state) => (Some(AppState::Game(game_state)), 1),
+                    match GameState::new_campaign(save.level, save.lives) {
+                        Some(game_state) => (Some(AppState::game(game_state)), 0),
                         None => {
                             println!("Error: Failed to load saved campaign level {}", save.level);
                             (
-                                Some(AppState::Game(
-                                    crate::game::game_state::GameState::new_campaign(1, 3)
+                                Some(AppState::game(
+                                    GameState::new_campaign(1, 3)
                                         .expect("Could not load level 1 as fallback"),
                                 )),
-                                1,
+                                0,
                             )
                         }
                     }
                 }
-                1 => match crate::game::game_state::GameState::new_campaign(1, 3) {
-                    // TODO: le pop devrait etre a 0 et le main menu dans pause dois juste pop pas
+                1 => match GameState::new_campaign(1, 3) {
                     // creer un nouveau main menu
-                    Some(game_state) => (Some(AppState::Game(game_state)), 1),
+                    Some(game_state) => (Some(AppState::game(game_state)), 0),
                     None => {
                         println!("Error: Failed to load campaign level 1 for new game");
                         (None, 0)
                     }
                 },
                 // TODO: get settings player count
-                2 => (Some(AppState::Ui(UiState::game_settings(2))), 0),
-                3 => (Some(AppState::Ui(UiState::settings())), 0),
+                2 => (Some(AppState::game_settings(resources, 2)), 0),
+                3 => (Some(AppState::settings()), 0),
                 4 => (None, 1),
                 _ => (None, 0),
             };

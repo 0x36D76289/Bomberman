@@ -4,10 +4,10 @@ use crate::{
     app_state::AppState,
     game::game_state::GameState,
     settings::save::SaveState,
-    ui::{UiState, canvas::Canvas, ui_state::UIPage},
+    ui::{UiState, canvas::Canvas},
 };
 
-const STAGE_CLEAR_DURATION: f32 = 2.0;
+pub const STAGE_CLEAR_DURATION: f32 = 2.0;
 
 impl UiState {
     pub fn stage_clear(level: u32, lives: u32) -> Self {
@@ -38,34 +38,30 @@ impl UiState {
         Self {
             canvases: vec![shadow, title],
             buttons: Vec::new(),
-            is_transparent: true,
             selected: 0,
-            page: UIPage::StageClear {
-                timer: STAGE_CLEAR_DURATION,
-                next_level: level + 1,
-                lives,
-            },
+            render_info: Default::default(),
         }
     }
 
-    pub fn stage_clear_tick(&mut self, delta: f32) -> (Option<AppState>, u8) {
-        if let UIPage::StageClear {
-            timer,
-            next_level,
-            lives,
-        } = &mut self.page
-        {
-            *timer -= delta;
-            if *timer <= 0.0 {
-                let next_game_state = GameState::new_campaign(*next_level, *lives);
-                if let Some(game_state) = next_game_state {
-                    return (Some(AppState::Game(game_state)), 1);
-                } else {
-                    println!("No more levels found. Returning to main menu.");
-                    return (Some(AppState::Ui(UiState::main_menu())), 1);
+    pub fn stage_clear_tick(
+        &mut self,
+        delta: f32,
+        timer: &mut f32,
+        next_level: &mut u32,
+        lives: &mut u32,
+    ) -> (Option<AppState>, u8) {
+        *timer -= delta;
+        if *timer <= 0.0 {
+            let next_game_state = GameState::new_campaign(*next_level, *lives);
+            let app_state = {
+                match next_game_state {
+                    Some(game_state) => AppState::game(game_state),
+                    None => AppState::main_menu(),
                 }
-            }
+            };
+            return (Some(app_state), 1);
         }
+
         (None, 0)
     }
 }

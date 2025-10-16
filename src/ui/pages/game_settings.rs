@@ -1,14 +1,13 @@
 use glam::{Vec2, Vec4, usize};
 
 use crate::{
-    app_state::AppState,
-    game::{game_state::GameState, map::map_settings::MapSettings, resources::Resources},
+    game::map::map_settings::MapSettings,
+    graphics::StateRenderInfo,
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -21,7 +20,7 @@ const PRESET_GRID_START_INDEX: u8 = 0;
 
 const PRESET_VERTICAL_HEIGHT: f32 = -0.65;
 
-const SETTINGS_SIZE: Vec2 = Vec2::new(1.0, 0.2);
+const SETTINGS_SIZE: Vec2 = Vec2::new(0.9, 0.2);
 const SETTING_GRID_COUNT: u8 = 8;
 const SETTING_GRID_START_INDEX: u8 = 2;
 
@@ -63,21 +62,32 @@ enum GameSettingPreset {
 pub struct UIGameSettings {
     preset: GameSettingPreset,
     /// map width
-    width: u8,
+    pub width: u8,
     /// map height
-    height: u8,
+    pub height: u8,
     /// percentage of removable blocks that are missing at round start
-    cheesiness: u8,
+    pub cheesiness: u8,
     /// amount of human players
-    player_count: u8,
+    pub player_count: u8,
     /// amount of ai players
-    bot_count: u8,
+    pub bot_count: u8,
     /// alpha channel of error message multiplied by ERROR_VISIBILITY_TIME
     opacity: f32,
 }
 
+impl PartialEq for UIGameSettings {
+    fn eq(&self, other: &Self) -> bool {
+        self.preset == other.preset
+            && self.width == other.width
+            && self.height == other.height
+            && self.cheesiness == other.cheesiness
+            && self.player_count == other.player_count
+            && self.bot_count == other.bot_count
+    }
+}
+
 impl UIGameSettings {
-    fn corners(player_count: u8) -> Self {
+    pub fn corners(player_count: u8) -> Self {
         let mut bot_count = 4;
 
         if player_count > bot_count {
@@ -132,6 +142,26 @@ impl UIGameSettings {
             player_count,
             bot_count,
             opacity: 0.0,
+        }
+    }
+
+    pub fn into_map_settings(&self) -> MapSettings {
+        match self.preset {
+            GameSettingPreset::Corners => MapSettings {
+                width: self.width,
+                height: self.height,
+                cheesiness: self.cheesiness,
+                spawns: self.player_count + self.bot_count,
+                ..MapSettings::corners()
+            },
+            _ => MapSettings {
+                // Arena, Preset3, and Custom all use random generation
+                width: self.width,
+                height: self.height,
+                cheesiness: self.cheesiness,
+                spawns: self.player_count + self.bot_count,
+                ..MapSettings::default_cheese()
+            },
         }
     }
 }
@@ -240,7 +270,7 @@ impl UiState {
         // width
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 0),
             },
             SETTINGS_SIZE,
@@ -257,7 +287,7 @@ impl UiState {
         // height
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 1),
             },
             SETTINGS_SIZE,
@@ -274,7 +304,7 @@ impl UiState {
         // cheese
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 2),
             },
             SETTINGS_SIZE,
@@ -291,7 +321,7 @@ impl UiState {
         // bot count
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 3),
             },
             SETTINGS_SIZE,
@@ -308,7 +338,7 @@ impl UiState {
         // Start
         create_outlined_button(
             Vec2 {
-                x: 0.0,
+                x: 0.5,
                 y: -PRESET_VERTICAL_HEIGHT,
             },
             PRESET_BUTTON_SIZE,
@@ -327,7 +357,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 0),
                 },
                 width: 0.0,
@@ -344,7 +374,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 1),
                 },
                 width: 0.0,
@@ -361,7 +391,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 2),
                 },
                 width: 0.0,
@@ -378,7 +408,7 @@ impl UiState {
         buttons.push(Button {
             canvas: Canvas {
                 center: Vec2 {
-                    x: 0.4,
+                    x: 0.85,
                     y: spread(SETTING_GRID_COUNT, SETTING_GRID_START_INDEX + 3),
                 },
                 width: 0.0,
@@ -406,16 +436,15 @@ impl UiState {
         Self {
             canvases,
             buttons,
-            is_transparent: false,
             selected: 0,
-            page: UIPage::GameSettings(settings),
+            render_info: StateRenderInfo {
+                drawn_first: true,
+                ..Default::default()
+            },
         }
     }
 
-    fn update_label_text(&mut self) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    fn update_label_text(&mut self, settings: &mut UIGameSettings) {
         self.buttons[GameSettingButtons::LabelWidth as usize]
             .canvas
             .text = Some(settings.width.to_string());
@@ -430,15 +459,16 @@ impl UiState {
             .text = Some(settings.bot_count.to_string());
     }
 
-    fn update_setting_values(&mut self, inputs: &Vec<Input>) -> Option<String> {
+    fn update_setting_values(
+        &mut self,
+        inputs: &Vec<Input>,
+        settings: &mut UIGameSettings,
+    ) -> Option<String> {
         if self.selected < GameSettingButtons::SettingWidth as usize
             || self.selected > GameSettingButtons::SettingBotCount as usize
         {
             return None;
         }
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return None;
-        };
 
         let modif = -((inputs.menu_left() == InputState::Pressed) as i16)
             + ((inputs.menu_right() == InputState::Pressed) as i16);
@@ -502,10 +532,7 @@ impl UiState {
         return None;
     }
 
-    fn tick_error(&mut self, delta: f32) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    fn tick_error(&mut self, delta: f32, settings: &mut UIGameSettings) {
         settings.opacity = (settings.opacity - delta).max(0.0);
         if let Some(label) = self.canvases.last_mut() {
             if let Some(color) = &mut label.text_color {
@@ -514,10 +541,7 @@ impl UiState {
         }
     }
 
-    fn set_error(&mut self, error_message: String) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
+    pub fn set_error(&mut self, error_message: String, settings: &mut UIGameSettings) {
         settings.opacity = ERROR_VISIBILITY_TIME;
         if let Some(label) = self.canvases.last_mut() {
             if let Some(text) = &mut label.text {
@@ -526,7 +550,7 @@ impl UiState {
         }
     }
 
-    fn update_preset(&mut self, inputs: &Vec<Input>) {
+    fn update_preset(&mut self, inputs: &Vec<Input>, settings: &mut UIGameSettings) {
         if self.selected > GameSettingButtons::PresetCustom as usize {
             return;
         }
@@ -534,9 +558,6 @@ impl UiState {
             return;
         }
 
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return;
-        };
         if self.selected == GameSettingPreset::Corners as usize {
             *settings = UIGameSettings {
                 opacity: settings.opacity,
@@ -557,51 +578,13 @@ impl UiState {
         }
     }
 
-    fn create_return_value(
-        &mut self,
-        inputs: &Vec<Input>,
-        resources: &Resources,
-    ) -> (Option<AppState>, u8) {
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return (None, 0);
-        };
+    fn create_return_value(&mut self, inputs: &Vec<Input>) -> Option<bool> {
         if self.selected != GameSettingButtons::Start as usize
             || inputs.menu_confirm() != InputState::Pressed
         {
-            return (None, 0);
-        }
-
-        let map_settings = match settings.preset {
-            GameSettingPreset::Corners => MapSettings {
-                width: settings.width,
-                height: settings.height,
-                cheesiness: settings.cheesiness,
-                spawns: settings.player_count + settings.bot_count,
-                ..MapSettings::corners()
-            },
-            GameSettingPreset::Arena => return (None, 0),
-            GameSettingPreset::Preset3 => return (None, 0),
-            GameSettingPreset::Custom => MapSettings {
-                // Arena, Preset3, and Custom all use random generation
-                width: settings.width,
-                height: settings.height,
-                cheesiness: settings.cheesiness,
-                spawns: settings.player_count + settings.bot_count,
-                ..MapSettings::default_cheese()
-            },
-        };
-
-        let game_settings = crate::game::game_settings::GameSettings {
-            nb_humans: settings.player_count.into(),
-            map_settings,
-        };
-
-        match GameState::new_multiplayer(resources, game_settings) {
-            Ok(game_state) => (Some(AppState::Game(game_state)), 1),
-            Err(_) => {
-                self.set_error("Map creation failed. Try reducing player/bot count.".to_string());
-                (None, 0)
-            }
+            None
+        } else {
+            Some(true)
         }
     }
 
@@ -609,25 +592,22 @@ impl UiState {
         &mut self,
         delta: f32,
         inputs: &Vec<Input>,
-        resources: &Resources,
-    ) -> (Option<AppState>, u8) {
+        settings: &mut UIGameSettings,
+    ) -> Option<bool> {
         self.button_inputs(inputs);
-        if let Some(err_msg) = self.update_setting_values(inputs) {
-            self.set_error(err_msg);
+        if let Some(err_msg) = self.update_setting_values(inputs, settings) {
+            self.set_error(err_msg, settings);
         }
-        self.update_preset(inputs);
-        let UIPage::GameSettings(settings) = &mut self.page else {
-            return (None, 0);
-        };
+        self.update_preset(inputs, settings);
         // Makes up on Width select current preset
         self.buttons[GameSettingButtons::SettingWidth as usize]
             .neighbors
             .up = settings.preset as usize;
-        self.tick_error(delta);
-        self.update_label_text();
+        self.tick_error(delta, settings);
+        self.update_label_text(settings);
         if inputs.menu_back() == InputState::Pressed {
-            return (None, 1);
+            return Some(false);
         }
-        self.create_return_value(inputs, resources)
+        self.create_return_value(inputs)
     }
 }

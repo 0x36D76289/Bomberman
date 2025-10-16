@@ -49,7 +49,7 @@ impl AudioManager {
             music_sink,
             sound_effects: HashMap::new(),
             background_music: HashMap::new(),
-            master_volume: 1.0,
+            master_volume: 0.0,
             sfx_volume: 0.7,
             music_volume: 1.0,
             music_enabled: true,

@@ -25,7 +25,6 @@ layout(push_constant) uniform GamePush {
     int tex_index;
 } push;
 
-
 void main() {
     vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
     gl_Position = ubo.projection * ubo.view * position_world;
