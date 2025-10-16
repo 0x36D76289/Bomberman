@@ -1,3 +1,4 @@
+pub mod controller;
 pub mod event;
 pub mod input;
 pub mod input_name;

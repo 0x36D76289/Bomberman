@@ -95,7 +95,12 @@ impl Player {
         }
     }
 
-    pub fn create_bomb(&mut self, resources: &Resources, bombs: &Vec<Bomb>) -> Option<Bomb> {
+    pub fn create_bomb(
+        &mut self,
+        resources: &Resources,
+        bombs: &Vec<Bomb>,
+        player_positions: &[(u32, Vec2)],
+    ) -> Option<Bomb> {
         if self.bombs_remaining == 0 {
             return None;
         }
@@ -103,17 +108,28 @@ impl Player {
         let target_x = self.position.x as usize;
         let target_y = self.position.y as usize;
 
+        let ret_bomb = Bomb::new(self.id, target_x, target_y, self.power_level, resources);
+
         for bomb in bombs {
             if bomb.owner_id == self.id && !bomb.collision_enabled {
                 return None;
             }
             if bomb.is_colliding_with(
                 Vec2 {
-                    x: target_x as f32,
-                    y: target_y as f32,
+                    x: ret_bomb.position.x as f32,
+                    y: ret_bomb.position.y as f32,
                 },
                 BOMB_RADIUS,
             ) {
+                return None;
+            }
+        }
+
+        for (id, pos) in player_positions {
+            if *id == self.id {
+                continue;
+            }
+            if ret_bomb.is_colliding_with(pos.clone(), PLAYER_RADIUS) {
                 return None;
             }
         }
@@ -122,13 +138,7 @@ impl Player {
         // check position doesn't have another player / enemy
 
         self.bombs_remaining -= 1;
-        Some(Bomb::new(
-            self.id,
-            target_x,
-            target_y,
-            self.power_level,
-            resources,
-        ))
+        Some(ret_bomb)
     }
 
     fn assist_input(&self, input: Input, map: &Map) -> Vec2 {
@@ -165,10 +175,12 @@ impl Player {
             * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
 
         let mut dist: f32;
+        // INFO: The right thing to do would be find the distance to the nearest block center...
+        // but I'll just iterate 0.2 at a time because performance is plenty
         while motion.x != 0.0 || motion.y != 0.0 {
             // X tick
             if motion.x != 0.0 {
-                dist = motion.x.abs().min(1.0);
+                dist = motion.x.abs().min(0.2);
                 if motion.x > 0.0 {
                     self.direction = Direction::Right;
                     motion.x -= dist;
@@ -181,7 +193,7 @@ impl Player {
                 self.handle_collisions(map, self.direction, bombs);
             }
             if motion.y != 0.0 {
-                dist = motion.y.abs().min(1.0);
+                dist = motion.y.abs().min(0.2);
                 if motion.y > 0.0 {
                     self.direction = Direction::Down;
                     motion.y -= dist;
