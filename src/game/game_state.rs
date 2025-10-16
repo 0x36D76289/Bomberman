@@ -281,8 +281,16 @@ impl GameState {
         audio_manager: &mut AudioManager,
     ) {
         // tick bombs
-        for bomb in &mut self.bombs {
-            bomb.tick(
+        for i in 0..self.bombs.len() {
+            let bombs_pos = self
+                .bombs
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != i)
+                .map(|(_, bomb)| bomb.position)
+                .collect::<Vec<_>>();
+
+            self.bombs[i].tick(
                 delta,
                 &mut self.players,
                 &mut self.enemies,
@@ -290,6 +298,7 @@ impl GameState {
                 &mut self.power_ups,
                 resources,
                 audio_manager,
+                &bombs_pos,
             );
         }
         for i in 0..self.bombs.len() {
@@ -304,12 +313,18 @@ impl GameState {
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
+        let player_poses = self
+            .players
+            .iter()
+            .filter(|player| player.alive)
+            .map(|player| (player.id, player.position))
+            .collect::<Vec<_>>();
         for (i, player) in self.players.iter_mut().enumerate() {
             if !player.alive {
                 continue;
             }
             if self.game_inputs.get_or_default(i).bomb() == InputState::Pressed
-                && let Some(bomb) = player.create_bomb(&resources, &self.bombs)
+                && let Some(bomb) = player.create_bomb(&resources, &self.bombs, &player_poses)
             {
                 audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
                 self.bombs.push(bomb)

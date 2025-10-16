@@ -1,13 +1,15 @@
 use glam::Vec2;
-use winit::keyboard::{KeyCode, PhysicalKey};
 
-use crate::input::{event::InputEvent, input_name::InputName, input_state::InputState};
+use crate::input::{
+    controller::input_events_compare, event::InputEvent, input_name::InputName,
+    input_state::InputState,
+};
 
 pub const BIND_LEN: usize = 6;
-pub type Binds = [PhysicalKey; BIND_LEN];
+pub type Binds = [InputEvent; BIND_LEN];
 
 pub fn default_binds() -> Binds {
-    [PhysicalKey::Code(KeyCode::F35); BIND_LEN]
+    [InputEvent::unbound(); BIND_LEN]
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,38 +94,26 @@ impl Input {
     }
 
     // TODO: rename to reflect change, add controller support
-    fn update_input_physical_key(
+    fn update_input_component_from_events(
         &mut self,
         events: &Vec<InputEvent>,
-        key: PhysicalKey,
+        bind: &InputEvent,
         input: InputName,
     ) {
+        let mut state = self.states[input as usize].is_down();
+
         for event in events {
-            match event {
-                InputEvent::Keyboard {
-                    key: event_key,
-                    down,
-                } => {
-                    if key == *event_key {
-                        self.update_input_component(*down, input);
-                        return;
-                    }
-                }
-                InputEvent::Click { .. } => (),
-                InputEvent::ControllerButton {
-                    controller,
-                    button,
-                    down,
-                } => todo!("{controller} {button} {down}"),
+            if let Some(value) = input_events_compare(event, bind) {
+                state = value;
             }
         }
-        self.update_input_component(self.states[input as usize].is_down(), input);
+        self.update_input_component(state, input);
     }
 
     /// Updates all of a player's input by using their keybinds
     pub fn update_input_player(&mut self, events: &Vec<InputEvent>, codes: Binds) {
         for input in InputName::iterator() {
-            self.update_input_physical_key(events, codes[*input as usize], *input);
+            self.update_input_component_from_events(events, &codes[*input as usize], *input);
         }
     }
 }
