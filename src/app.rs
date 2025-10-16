@@ -95,11 +95,6 @@ impl App {
         if let Some(new_state) = res.0 {
             self.state_stack.push(new_state);
         }
-        print!("[");
-        for state in self.state_stack.iter() {
-            print!("{:?} ", state.state);
-        }
-        println!("]");
     }
 
     fn render(&mut self) {

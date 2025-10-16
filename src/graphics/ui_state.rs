@@ -77,7 +77,7 @@ impl Renderer {
             layout.clone(),
             resources.textures.len() as u32,
             [
-                WriteDescriptorSet::sampler(0, self.sampler.clone()),
+                WriteDescriptorSet::sampler(0, self.ui_sampler.clone()),
                 WriteDescriptorSet::image_view_array(1, 0, resources.textures.clone()),
             ],
             [],

@@ -29,6 +29,15 @@ pub struct Canvas {
     pub text_size: Option<f32>,
 }
 
+const VERTEX_UV: [[f32; 2]; 6] = [
+    [1.0, 0.0],
+    [0.0, 0.0],
+    [0.0, 1.0],
+    [0.0, 1.0],
+    [1.0, 1.0],
+    [1.0, 0.0],
+];
+
 impl Canvas {
     fn vertex_positions(&self) -> [Vec2; 6] {
         let half_width = self.width / 2.0;
@@ -56,10 +65,10 @@ impl Canvas {
     ) -> Subbuffer<[GuiVertex]> {
         let mut vertices = Vec::new();
 
-        for position in self.vertex_positions() {
+        for (position, uv) in self.vertex_positions().into_iter().zip(VERTEX_UV) {
             let vertex = GuiVertex {
                 position: position.into(),
-                uv: Vec2::ZERO.into(),
+                uv,
             };
             vertices.push(vertex);
         }
