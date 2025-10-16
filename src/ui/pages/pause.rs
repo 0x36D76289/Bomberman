@@ -9,7 +9,6 @@ use crate::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -98,9 +97,8 @@ impl UiState {
         Self {
             canvases: vec![shadow],
             buttons: vec![resume, restart, menu],
-            is_transparent: true,
             selected: 0,
-            page: UIPage::Pause,
+            render_info: Default::default(),
         }
     }
 
@@ -117,19 +115,19 @@ impl UiState {
                     // Restart
                     audio_manager.play_background_music(BackgroundMusic::Game);
                     if let Some(game_state) = GameState::new_campaign(1, 3) {
-                        (Some(AppState::Game(game_state)), 2)
+                        (Some(AppState::game(game_state)), 2)
                     } else {
                         println!(
                             "Error: Failed to load campaign level 1 for restart. Returning to menu."
                         );
                         audio_manager.play_background_music(BackgroundMusic::Menu);
-                        (Some(AppState::Ui(UiState::main_menu())), 2)
+                        (None, 2)
                     }
                 }
                 _ => {
                     // Menu
                     audio_manager.play_background_music(BackgroundMusic::Menu);
-                    (Some(AppState::Ui(UiState::main_menu())), 2)
+                    (None, 2)
                 }
             };
         }

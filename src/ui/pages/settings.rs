@@ -16,7 +16,6 @@ use crate::{
             BACKGROUND_COLOR, BUTTON_COLOR, OUTLINE_COLOR, SELECTED_BUTTON_COLOR,
             SELECTED_TEXT_COLOR, TEXT_COLOR, TEXT_SIZE,
         },
-        ui_state::UIPage,
         utils::spread,
     },
 };
@@ -103,9 +102,8 @@ impl UiState {
         Self {
             canvases,
             buttons,
-            is_transparent: false,
             selected: 0,
-            page: UIPage::Settings { selected_player: 0 },
+            render_info: Default::default(),
         }
     }
 
@@ -272,6 +270,7 @@ impl UiState {
     fn update_binds(
         &mut self,
         settings: &mut Settings,
+        selected_player: &mut usize,
         direction: i8,
         open: bool,
         ratio: f32,
@@ -282,13 +281,7 @@ impl UiState {
             return None;
         }
 
-        let num: &mut usize = {
-            let page = &mut self.page;
-            match page {
-                UIPage::Settings { selected_player } => selected_player,
-                _ => return None,
-            }
-        };
+        let num = selected_player;
 
         let existing_count = settings.binds.len();
         *num =
@@ -304,7 +297,7 @@ impl UiState {
                 settings.binds.push(default_binds());
                 settings.save();
             }
-            return Some((Some(AppState::Ui(UiState::binds(*num, ratio))), 0));
+            return Some((Some(AppState::binds(*num, ratio)), 0));
         }
         // if input create binds page with player count arg
         // binds has keys, inputs, events, settings?
@@ -315,6 +308,7 @@ impl UiState {
         &mut self,
         inputs: &Vec<Input>,
         settings: &mut Settings,
+        selected_player: &mut usize,
         ratio: f32,
     ) -> (Option<AppState>, u8) {
         self.button_inputs(inputs);
@@ -336,6 +330,7 @@ impl UiState {
         self.update_sfx_volume(settings, direction);
         if let Some(ret) = self.update_binds(
             settings,
+            selected_player,
             direction,
             inputs.menu_confirm() == InputState::Pressed,
             ratio,

@@ -1,5 +1,4 @@
-// pub mod entity_render_system;
-// pub mod ui_render_system;
+pub mod game_state;
 pub mod init;
 pub mod light;
 pub mod model;
@@ -8,11 +7,12 @@ pub mod renderer;
 pub mod text;
 pub mod texture;
 pub mod transform;
+pub mod ui_state;
 
 pub use {
     light::LightInfo,
     model::Model,
-    renderer::{Renderer, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
+    renderer::{Renderer, StateRenderInfo, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
     text::TextRenderer,
     texture::load_texture,
 };
@@ -111,6 +111,19 @@ impl Hash for GameVertex {
             .chain(self.uv.iter())
         {
             v.to_bits().hash(state);
+        }
+    }
+}
+
+impl Default for GlobalUbo {
+    fn default() -> Self {
+        GlobalUbo {
+            projection: Default::default(),
+            view: Default::default(),
+            inverse_view: Default::default(),
+            ambient_light_color: Default::default(),
+            direction_to_light: Default::default(),
+            directional_light_color: Default::default(),
         }
     }
 }

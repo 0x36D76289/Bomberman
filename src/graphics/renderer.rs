@@ -2,56 +2,55 @@ use crate::{
     app_state::AppState,
     game::resources::Resources,
     graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
+    settings::settings::Settings,
 };
 use std::{sync::Arc, time::Instant};
 use vulkano::{
     Validated, VulkanError,
-    command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
-        RenderingAttachmentInfo, RenderingInfo, SubpassContents,
-    },
-    descriptor_set::{DescriptorSet, WriteDescriptorSet, layout::DescriptorBindingFlags},
-    format::{ClearValue, Format},
+    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer},
+    descriptor_set::layout::DescriptorBindingFlags,
+    format::Format,
     image::{
         Image, ImageCreateInfo, ImageType, ImageUsage,
-        sampler::{BorderColor, Filter, Sampler, SamplerAddressMode, SamplerCreateInfo},
+        sampler::{Filter, Sampler, SamplerCreateInfo},
         view::ImageView,
     },
     memory::allocator::AllocationCreateInfo,
     pipeline::{
-        DynamicState, GraphicsPipeline, Pipeline, PipelineBindPoint, PipelineLayout,
-        PipelineShaderStageCreateInfo,
+        DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
             GraphicsPipelineCreateInfo,
             color_blend::{AttachmentBlend, ColorBlendAttachmentState, ColorBlendState},
-            depth_stencil::{DepthState, DepthStencilState},
+            depth_stencil::{CompareOp, DepthState, DepthStencilState},
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
             rasterization::RasterizationState,
             subpass::{PipelineRenderingCreateInfo, PipelineSubpassType},
             vertex_input::{Vertex, VertexDefinition, VertexInputState},
-            viewport::Viewport,
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
     },
-    render_pass::{AttachmentLoadOp, AttachmentStoreOp},
+    shader::EntryPoint,
     swapchain::{
-        ColorSpace, PresentMode, Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
-        acquire_next_image,
+        ColorSpace, PresentMode, Surface, Swapchain, SwapchainAcquireFuture, SwapchainCreateInfo,
+        SwapchainPresentInfo, acquire_next_image,
     },
     sync::{self, GpuFuture},
 };
-use winit::{event_loop::ActiveEventLoop, window::Window};
-
-pub const RENDER_RES_RATIO: [u32; 2] = [1, 1];
+use winit::{
+    event_loop::ActiveEventLoop,
+    window::{Fullscreen, Window},
+};
 
 pub struct Renderer {
-    rcx: Option<RenderContext>,
+    pub rcx: Option<RenderContext>,
     pub game_pipeline: Option<Arc<GraphicsPipeline>>,
     pub gui_pipeline: Option<Arc<GraphicsPipeline>>,
-    pub pixelate_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub post_process_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
     pub text_renderer: TextRenderer,
-    pub sampler: Arc<Sampler>,
+    pub ui_sampler: Arc<Sampler>,
+    pub game_sampler: Arc<Sampler>,
 }
 
 pub struct RenderContext {
@@ -63,19 +62,62 @@ pub struct RenderContext {
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
     pub time_info: TimeInfo,
+    pub game_resolution: Resolution,
+    pub fullscreen: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Resolution {
+    Full,
+    Custom(u32, u32),
+}
+
+impl Resolution {
+    pub fn resolution(&self, window_size: [u32; 2]) -> [u32; 2] {
+        match self {
+            Resolution::Full => window_size,
+            Resolution::Custom(width, height) => [*width, *height],
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Represents how a state is rendered
+pub struct StateRenderInfo {
+    pub top_left_coord: [f32; 2],
+    pub bottom_right_coord: [f32; 2],
+    pub drawn_first: bool,
+}
+
+impl Default for StateRenderInfo {
+    fn default() -> Self {
+        Self {
+            top_left_coord: [-1.0, -1.0],
+            bottom_right_coord: [1.0, 1.0],
+            drawn_first: false,
+        }
+    }
 }
 
 impl Renderer {
     pub fn new(vulkan: &Vulkan) -> Self {
         let text_renderer = TextRenderer::new();
 
-        let sampler = Sampler::new(
+        let ui_sampler = Sampler::new(
             vulkan.device.clone(),
             SamplerCreateInfo {
                 mag_filter: Filter::Nearest,
                 min_filter: Filter::Nearest,
-                address_mode: [SamplerAddressMode::ClampToBorder; 3],
-                border_color: BorderColor::FloatOpaqueWhite,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let game_sampler = Sampler::new(
+            vulkan.device.clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Linear,
+                min_filter: Filter::Linear,
                 ..Default::default()
             },
         )
@@ -85,27 +127,33 @@ impl Renderer {
             rcx: None,
             game_pipeline: None,
             gui_pipeline: None,
-            pixelate_pipeline: None,
+            post_process_pipeline: None,
+            command_buffer: None,
             text_renderer,
-            sampler,
+            ui_sampler,
+            game_sampler,
         }
     }
 
-    pub fn init_render_context(&mut self, event_loop: &ActiveEventLoop, vulkan: &Vulkan) {
+    pub fn init_render_context(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        vulkan: &Vulkan,
+        settings: &Settings,
+    ) {
         let window = Arc::new(
             event_loop
                 .create_window(Window::default_attributes().with_title("Bomberman!"))
                 .unwrap(),
         );
 
+        set_fullscreen(settings.fullscreen, &window);
+
         let surface = Surface::from_window(vulkan.instance.clone(), window.clone())
             .expect("Could not create surface");
 
         let window_size: [u32; 2] = window.inner_size().into();
-        let game_resolution = [
-            window_size[0] / RENDER_RES_RATIO[0],
-            window_size[1] / RENDER_RES_RATIO[1],
-        ];
+        let game_resolution = Resolution::Custom(settings.resolution.0, settings.resolution.1);
 
         // Create the swapchain which holds a queue of images that are waiting to be presented on the screen
         let (swapchain, images) = {
@@ -151,36 +199,13 @@ impl Renderer {
             .unwrap()
         };
 
-        let color_image = ImageView::new_default(
-            Image::new(
-                vulkan.memory_allocator.clone(),
-                ImageCreateInfo {
-                    image_type: ImageType::Dim2d,
-                    format: images[0].format(),
-                    extent: [game_resolution[0], game_resolution[1], 1],
-                    usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED,
-                    ..Default::default()
-                },
-                AllocationCreateInfo::default(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        let depth_image = ImageView::new_default(
-            Image::new(
-                vulkan.memory_allocator.clone(),
-                ImageCreateInfo {
-                    image_type: ImageType::Dim2d,
-                    format: Format::D32_SFLOAT,
-                    extent: [game_resolution[0], game_resolution[1], 1],
-                    usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
-                    ..Default::default()
-                },
-                AllocationCreateInfo::default(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
+        let (color_image, depth_image) = create_images(
+            vulkan,
+            game_resolution.resolution(window_size),
+            images[0].format(),
+            Format::D16_UNORM,
+        );
+
         let images = images
             .iter()
             .map(|image| ImageView::new_default(image.clone()).unwrap())
@@ -206,34 +231,104 @@ impl Renderer {
             recreate_swapchain,
             previous_frame_end,
             time_info,
+            game_resolution,
+            fullscreen: settings.fullscreen,
         })
     }
 
-    pub fn create_game_pipeline(&mut self, vulkan: &Vulkan) {
-        let vertex_shader = game_vs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-        let fragment_shader = game_fs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
+    pub fn create_pipelines(&mut self, vulkan: &Vulkan) {
+        self.game_pipeline = {
+            let vertex_shader = game_vs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = game_fs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let vertex_input_state = GameVertex::per_vertex().definition(&vertex_shader).unwrap();
+            Some(self.create_pipeline(
+                vulkan,
+                vertex_shader,
+                Some(fragment_shader),
+                vertex_input_state,
+                true,
+                true,
+                Some(2),
+            ))
+        };
+        self.gui_pipeline = {
+            let vertex_shader = gui_vs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = gui_fs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let vertex_input_state = GuiVertex::per_vertex().definition(&vertex_shader).unwrap();
+            Some(self.create_pipeline(
+                vulkan,
+                vertex_shader,
+                Some(fragment_shader),
+                vertex_input_state,
+                true,
+                false,
+                Some(1),
+            ))
+        };
+        self.post_process_pipeline = {
+            let vertex_shader = postprocess_vs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = postprocess_fs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let vertex_input_state = GuiVertex::per_vertex().definition(&vertex_shader).unwrap();
+            Some(self.create_pipeline(
+                vulkan,
+                vertex_shader,
+                Some(fragment_shader),
+                vertex_input_state,
+                true,
+                false,
+                None,
+            ))
+        };
+    }
 
-        let vertex_input_state = GameVertex::per_vertex().definition(&vertex_shader).unwrap();
-        let stages = [
-            PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
-            PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
-        ];
+    fn create_pipeline(
+        &self,
+        vulkan: &Vulkan,
+        vertex_shader: EntryPoint,
+        fragment_shader: Option<EntryPoint>,
+        vertex_input_state: VertexInputState,
+        has_color_attachment: bool,
+        has_depth_attachment: bool,
+        variable_descriptor_count: Option<u32>,
+    ) -> Arc<GraphicsPipeline> {
+        let stages = match fragment_shader {
+            Some(fragment_shader) => vec![
+                PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
+                PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
+            ],
+            None => vec![PipelineShaderStageCreateInfo::new(vertex_shader.clone())],
+        };
+
         let layout = {
             let mut layout_create_info =
                 PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
 
-            let binding = layout_create_info.set_layouts[0]
-                .bindings
-                .get_mut(&2)
-                .unwrap();
-            binding.binding_flags |= DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT;
-            binding.descriptor_count = 100;
+            if let Some(index) = variable_descriptor_count {
+                let binding = layout_create_info.set_layouts[0]
+                    .bindings
+                    .get_mut(&index)
+                    .unwrap();
+                binding.binding_flags |= DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT;
+                binding.descriptor_count = 100;
+            }
 
             PipelineLayout::new(
                 vulkan.device.clone(),
@@ -244,170 +339,50 @@ impl Renderer {
             .unwrap()
         };
 
-        let format = self.rcx().swapchain.image_format();
+        let mut pipeline_rendering_info = PipelineRenderingCreateInfo::default();
+        let mut depth_stencil_state = None;
+        let mut color_blend_state = None;
 
-        let pipeline_rendering_info = PipelineRenderingCreateInfo {
-            color_attachment_formats: vec![Some(format)],
-            depth_attachment_format: Some(Format::D32_SFLOAT),
-            ..Default::default()
-        };
-
-        self.game_pipeline = Some(
-            GraphicsPipeline::new(
-                vulkan.device.clone(),
-                None,
-                GraphicsPipelineCreateInfo {
-                    stages: stages.into_iter().collect(),
-                    vertex_input_state: Some(vertex_input_state),
-                    viewport_state: Some(Default::default()),
-                    color_blend_state: Some(ColorBlendState::with_attachment_states(
-                        1,
-                        ColorBlendAttachmentState::default(),
-                    )),
-                    input_assembly_state: Some(InputAssemblyState::default()),
-                    rasterization_state: Some(RasterizationState::default()),
-                    depth_stencil_state: Some(DepthStencilState {
-                        depth: Some(DepthState::simple()),
-                        ..Default::default()
-                    }),
-                    multisample_state: Some(MultisampleState::default()),
-                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                    subpass: Some(PipelineSubpassType::BeginRendering(pipeline_rendering_info)),
-                    ..GraphicsPipelineCreateInfo::layout(layout)
+        if has_color_attachment {
+            let format = self.rcx().swapchain.image_format();
+            pipeline_rendering_info.color_attachment_formats = vec![Some(format)];
+            color_blend_state = Some(ColorBlendState::with_attachment_states(
+                1,
+                ColorBlendAttachmentState {
+                    blend: Some(AttachmentBlend::alpha()),
+                    ..Default::default()
                 },
-            )
-            .unwrap(),
-        );
-    }
+            ));
+        }
+        if has_depth_attachment {
+            pipeline_rendering_info.depth_attachment_format = Some(Format::D16_UNORM);
+            depth_stencil_state = Some(DepthStencilState {
+                depth: Some(DepthState {
+                    write_enable: true,
+                    compare_op: CompareOp::Less,
+                }),
+                ..Default::default()
+            });
+        }
 
-    pub fn create_gui_pipeline(&mut self, vulkan: &Vulkan) {
-        let vertex_shader = gui_vs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-        let fragment_shader = gui_fs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-
-        let vertex_input_state = GuiVertex::per_vertex().definition(&vertex_shader).unwrap();
-        let stages = [
-            PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
-            PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
-        ];
-        let layout = {
-            let mut layout_create_info =
-                PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
-
-            let binding = layout_create_info.set_layouts[0]
-                .bindings
-                .get_mut(&1)
-                .unwrap();
-            binding.binding_flags |= DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT;
-            binding.descriptor_count = 100;
-
-            PipelineLayout::new(
-                vulkan.device.clone(),
-                layout_create_info
-                    .into_pipeline_layout_create_info(vulkan.device.clone())
-                    .unwrap(),
-            )
-            .unwrap()
-        };
-
-        let format = self.rcx().swapchain.image_format();
-
-        let pipeline_rendering_info = PipelineRenderingCreateInfo {
-            color_attachment_formats: vec![Some(format)],
-            ..Default::default()
-        };
-
-        self.gui_pipeline = Some(
-            GraphicsPipeline::new(
-                vulkan.device.clone(),
-                None,
-                GraphicsPipelineCreateInfo {
-                    stages: stages.into_iter().collect(),
-                    vertex_input_state: Some(vertex_input_state),
-                    viewport_state: Some(Default::default()),
-                    color_blend_state: Some(ColorBlendState::with_attachment_states(
-                        1,
-                        ColorBlendAttachmentState {
-                            blend: Some(AttachmentBlend::alpha()),
-                            ..Default::default()
-                        },
-                    )),
-                    input_assembly_state: Some(InputAssemblyState::default()),
-                    rasterization_state: Some(RasterizationState::default()),
-                    multisample_state: Some(MultisampleState::default()),
-                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                    subpass: Some(PipelineSubpassType::BeginRendering(pipeline_rendering_info)),
-                    ..GraphicsPipelineCreateInfo::layout(layout)
-                },
-            )
-            .unwrap(),
-        );
-    }
-
-    pub fn create_postprocess_pipeline(&mut self, vulkan: &Vulkan) {
-        let vertex_shader = postprocess_vs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-        let fragment_shader = postprocess_fs::load(vulkan.device.clone())
-            .unwrap()
-            .entry_point("main")
-            .unwrap();
-
-        let vertex_input_state = VertexInputState::new();
-        let stages = [
-            PipelineShaderStageCreateInfo::new(vertex_shader.clone()),
-            PipelineShaderStageCreateInfo::new(fragment_shader.clone()),
-        ];
-        let layout = {
-            let layout_create_info = PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
-
-            PipelineLayout::new(
-                vulkan.device.clone(),
-                layout_create_info
-                    .into_pipeline_layout_create_info(vulkan.device.clone())
-                    .unwrap(),
-            )
-            .unwrap()
-        };
-
-        let format = self.rcx().swapchain.image_format();
-
-        let pipeline_rendering_info = PipelineRenderingCreateInfo {
-            color_attachment_formats: vec![Some(format)],
-            ..Default::default()
-        };
-
-        self.pixelate_pipeline = Some(
-            GraphicsPipeline::new(
-                vulkan.device.clone(),
-                None,
-                GraphicsPipelineCreateInfo {
-                    stages: stages.into_iter().collect(),
-                    vertex_input_state: Some(vertex_input_state),
-                    viewport_state: Some(Default::default()),
-                    color_blend_state: Some(ColorBlendState::with_attachment_states(
-                        1,
-                        ColorBlendAttachmentState {
-                            blend: Some(AttachmentBlend::alpha()),
-                            ..Default::default()
-                        },
-                    )),
-                    input_assembly_state: Some(InputAssemblyState::default()),
-                    rasterization_state: Some(RasterizationState::default()),
-                    multisample_state: Some(MultisampleState::default()),
-                    dynamic_state: [DynamicState::Viewport].into_iter().collect(),
-                    subpass: Some(PipelineSubpassType::BeginRendering(pipeline_rendering_info)),
-                    ..GraphicsPipelineCreateInfo::layout(layout)
-                },
-            )
-            .unwrap(),
-        );
+        GraphicsPipeline::new(
+            vulkan.device.clone(),
+            None,
+            GraphicsPipelineCreateInfo {
+                stages: stages.into_iter().collect(),
+                vertex_input_state: Some(vertex_input_state),
+                viewport_state: Some(Default::default()),
+                color_blend_state,
+                input_assembly_state: Some(InputAssemblyState::default()),
+                rasterization_state: Some(RasterizationState::default()),
+                depth_stencil_state,
+                multisample_state: Some(MultisampleState::default()),
+                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
+                subpass: Some(PipelineSubpassType::BeginRendering(pipeline_rendering_info)),
+                ..GraphicsPipelineCreateInfo::layout(layout)
+            },
+        )
+        .unwrap()
     }
 
     pub fn rcx(&self) -> &RenderContext {
@@ -418,7 +393,7 @@ impl Renderer {
         self.rcx.is_some()
             && self.game_pipeline.is_some()
             && self.gui_pipeline.is_some()
-            && self.pixelate_pipeline.is_some()
+            && self.post_process_pipeline.is_some()
     }
 
     pub fn get_delta_time(&self) -> f32 {
@@ -439,146 +414,43 @@ impl Renderer {
     }
 
     pub fn render_state(
-        &self,
+        &mut self,
         vulkan: &Vulkan,
-        primary_cb: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        state: &AppState,
         resources: &Resources,
+        state: &AppState,
         image_index: u32,
         is_first: bool,
     ) {
-        let rcx = self.rcx.as_ref().unwrap();
-
-        let pass_info = match state {
-            AppState::Game(_) => {
-                let mut color_attachment =
-                    RenderingAttachmentInfo::image_view(rcx.color_image.clone());
-                color_attachment.store_op = AttachmentStoreOp::Store;
-                color_attachment.load_op = AttachmentLoadOp::Load;
-                if is_first {
-                    color_attachment.load_op = AttachmentLoadOp::Clear;
-                    color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-                }
-                let mut depth_attachment =
-                    RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
-                depth_attachment.load_op = AttachmentLoadOp::Clear;
-                depth_attachment.clear_value = Some(ClearValue::DepthStencil((1.0, 0)));
-                RenderingInfo {
-                    color_attachments: vec![Some(color_attachment)],
-                    depth_attachment: Some(depth_attachment),
-                    layer_count: 1,
-                    contents: SubpassContents::SecondaryCommandBuffers,
-                    ..Default::default()
+        match (&state.game, &state.ui) {
+            (Some(game_state), Some(ui_state)) => {
+                if ui_state.render_info.drawn_first && !game_state.render_info.drawn_first {
+                    self.render_ui(vulkan, resources, ui_state, image_index, is_first);
+                    self.render_game(vulkan, resources, game_state, image_index, false)
+                } else {
+                    self.render_game(vulkan, resources, game_state, image_index, is_first);
+                    self.render_ui(vulkan, resources, ui_state, image_index, false);
                 }
             }
-            AppState::Ui(_) => {
-                let mut color_attachment =
-                    RenderingAttachmentInfo::image_view(rcx.images[image_index as usize].clone());
-                color_attachment.store_op = AttachmentStoreOp::Store;
-                color_attachment.load_op = AttachmentLoadOp::Load;
-                if is_first {
-                    color_attachment.load_op = AttachmentLoadOp::Clear;
-                    color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-                }
-                RenderingInfo {
-                    color_attachments: vec![Some(color_attachment)],
-                    layer_count: 1,
-                    contents: SubpassContents::SecondaryCommandBuffers,
-                    ..Default::default()
-                }
+            (Some(game_state), None) => {
+                self.render_game(vulkan, resources, game_state, image_index, is_first)
             }
-        };
-
-        primary_cb.begin_rendering(pass_info).unwrap();
-
-        let secondary_cb = state.render(self, vulkan, resources);
-
-        primary_cb.execute_commands(secondary_cb).unwrap();
-
-        primary_cb.end_rendering().unwrap();
-
-        if let AppState::Game(_) = state {
-            self.render_upscale_quad(vulkan, primary_cb, image_index);
+            (None, Some(ui_state)) => {
+                self.render_ui(vulkan, resources, ui_state, image_index, is_first)
+            }
+            (None, None) => (),
         }
     }
 
-    pub fn render_upscale_quad(
-        &self,
-        vulkan: &Vulkan,
-        primary_cb: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        image_index: u32,
-    ) {
-        let rcx = self.rcx.as_ref().unwrap();
-        let pipeline = self.pixelate_pipeline.as_ref().unwrap().clone();
-
-        let mut color_attachment =
-            RenderingAttachmentInfo::image_view(rcx.images[image_index as usize].clone());
-        color_attachment.load_op = AttachmentLoadOp::Clear;
-        color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-        color_attachment.store_op = AttachmentStoreOp::Store;
-
-        let pass_info = RenderingInfo {
-            color_attachments: vec![Some(color_attachment)],
-            layer_count: 1,
-            contents: SubpassContents::Inline,
-            ..Default::default()
-        };
-
-        primary_cb.begin_rendering(pass_info).unwrap();
-        primary_cb
-            .bind_pipeline_graphics(pipeline.clone())
-            .unwrap()
-            .set_viewport(
-                0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: self.rcx().window.inner_size().into(),
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
-            )
-            .unwrap();
-
-        let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new(
-            vulkan.descriptor_set_allocator.clone(),
-            layout.clone(),
-            [WriteDescriptorSet::image_view_sampler(
-                0,
-                rcx.color_image.clone(),
-                self.sampler.clone(),
-            )],
-            [],
-        )
-        .unwrap();
-
-        primary_cb
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .unwrap();
-
-        unsafe {
-            primary_cb.draw(3, 1, 0, 0).unwrap();
-        }
-
-        primary_cb.end_rendering().unwrap();
-    }
-
-    pub fn render(&mut self, vulkan: &Vulkan, states: &[AppState], resources: &Resources) {
+    pub fn render_states(&mut self, vulkan: &Vulkan, states: &[AppState], resources: &Resources) {
         let rcx = self.rcx.as_mut().unwrap();
 
         let window_size = rcx.window.inner_size();
-        let game_resolution = [
-            window_size.width / RENDER_RES_RATIO[0],
-            window_size.height / RENDER_RES_RATIO[1],
-        ];
-
         if window_size.width == 0 || window_size.height == 0 {
+            return;
+        }
+
+        let states_to_render = states_to_render(states);
+        if states_to_render.is_empty() {
             return;
         }
 
@@ -594,37 +466,6 @@ impl Renderer {
                 .expect("failed to recreate swapchain");
 
             rcx.swapchain = new_swapchain;
-            rcx.color_image = ImageView::new_default(
-                Image::new(
-                    vulkan.memory_allocator.clone(),
-                    ImageCreateInfo {
-                        image_type: ImageType::Dim2d,
-                        format: rcx.images[0].format(),
-                        extent: [game_resolution[0], game_resolution[1], 1],
-                        usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED,
-                        ..Default::default()
-                    },
-                    AllocationCreateInfo::default(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
-            rcx.depth_image = ImageView::new_default(
-                Image::new(
-                    vulkan.memory_allocator.clone(),
-                    ImageCreateInfo {
-                        image_type: ImageType::Dim2d,
-                        format: Format::D32_SFLOAT,
-                        extent: [game_resolution[0], game_resolution[1], 1],
-                        usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT
-                            | ImageUsage::TRANSIENT_ATTACHMENT,
-                        ..Default::default()
-                    },
-                    AllocationCreateInfo::default(),
-                )
-                .unwrap(),
-            )
-            .unwrap();
             rcx.images = new_images
                 .iter()
                 .map(|image| ImageView::new_default(image.clone()).unwrap())
@@ -646,41 +487,39 @@ impl Renderer {
             rcx.recreate_swapchain = true;
         }
 
-        let mut primary_cb = AutoCommandBufferBuilder::primary(
-            vulkan.command_buffer_allocator.clone(),
-            vulkan.queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .unwrap();
+        self.command_buffer = Some(
+            AutoCommandBufferBuilder::primary(
+                vulkan.command_buffer_allocator.clone(),
+                vulkan.queue.queue_family_index(),
+                CommandBufferUsage::OneTimeSubmit,
+            )
+            .unwrap(),
+        );
 
-        let transparent_count = states
-            .iter()
-            .rev()
-            .take_while(|s| s.is_transparent())
-            .count();
-        let states_to_skip = if states.len() > 0 {
-            (states.len() - 1).saturating_sub(transparent_count)
-        } else {
-            0
-        };
         let mut is_first = true;
-        for state in states.iter().skip(states_to_skip) {
-            self.render_state(
-                vulkan,
-                &mut primary_cb,
-                state,
-                resources,
-                image_index,
-                is_first,
-            );
+        for state in states_to_render {
+            self.render_state(vulkan, resources, state, image_index, is_first);
             if is_first {
                 is_first = false
             }
         }
 
-        let rcx = self.rcx.as_mut().unwrap();
+        self.execute_command_buffer(vulkan, acquire_future, image_index);
+    }
 
-        let command_buffer = primary_cb.build().unwrap();
+    fn execute_command_buffer(
+        &mut self,
+        vulkan: &Vulkan,
+        acquire_future: SwapchainAcquireFuture,
+        image_index: u32,
+    ) {
+        let (command_buffer, rcx) = match (self.command_buffer.take(), self.rcx.as_mut()) {
+            (Some(command_buffer), Some(rcx)) => (command_buffer, rcx),
+            (None, _) => panic!("Tried to execute the command buffer but its state is None"),
+            (_, None) => panic!("Render context is not initialized"),
+        };
+
+        let command_buffer = command_buffer.build().unwrap();
         let future = rcx
             .previous_frame_end
             .take()
@@ -709,6 +548,57 @@ impl Renderer {
         }
     }
 
+    /// update renderer from game settings
+    pub fn update_settings(&mut self, vulkan: &Vulkan, settings: &Settings) {
+        let rcx = self.rcx.as_mut().unwrap();
+
+        // update game resolution
+        let settings_resolution = Resolution::Custom(settings.resolution.0, settings.resolution.1);
+        if rcx.game_resolution != settings_resolution {
+            rcx.game_resolution = settings_resolution;
+            (rcx.color_image, rcx.depth_image) = create_images(
+                vulkan,
+                rcx.game_resolution
+                    .resolution(rcx.window.inner_size().into()),
+                rcx.images[0].format(),
+                Format::D16_UNORM,
+            );
+        }
+
+        // update fullscreen
+        if rcx.fullscreen != settings.fullscreen {
+            rcx.fullscreen = settings.fullscreen;
+            set_fullscreen(rcx.fullscreen, &rcx.window);
+        }
+
+        // update fitlering
+        match (settings.filtering, self.game_sampler.mag_filter()) {
+            (true, Filter::Nearest) => {
+                self.game_sampler = Sampler::new(
+                    vulkan.device.clone(),
+                    SamplerCreateInfo {
+                        mag_filter: Filter::Linear,
+                        min_filter: Filter::Linear,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            }
+            (false, Filter::Linear) => {
+                self.game_sampler = Sampler::new(
+                    vulkan.device.clone(),
+                    SamplerCreateInfo {
+                        mag_filter: Filter::Nearest,
+                        min_filter: Filter::Nearest,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+            }
+            _ => (),
+        }
+    }
+
     pub fn update_time(&mut self) {
         let time_info = &mut self.rcx.as_mut().unwrap().time_info;
 
@@ -732,17 +622,81 @@ impl Renderer {
     }
 }
 
+fn create_images(
+    vulkan: &Vulkan,
+    resolution: [u32; 2],
+    color_format: Format,
+    depth_format: Format,
+) -> (Arc<ImageView>, Arc<ImageView>) {
+    let color_image = ImageView::new_default(
+        Image::new(
+            vulkan.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: color_format,
+                extent: [resolution[0], resolution[1], 1],
+                usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::SAMPLED,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let depth_image = ImageView::new_default(
+        Image::new(
+            vulkan.memory_allocator.clone(),
+            ImageCreateInfo {
+                image_type: ImageType::Dim2d,
+                format: depth_format,
+                extent: [resolution[0], resolution[1], 1],
+                usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    (color_image, depth_image)
+}
+
+fn states_to_render(states: &[AppState]) -> Vec<&AppState> {
+    let transparent_count = states
+        .iter()
+        .rev()
+        .take_while(|s| s.is_transparent())
+        .count();
+    let states_to_skip = if states.len() > 0 {
+        (states.len() - 1).saturating_sub(transparent_count)
+    } else {
+        0
+    };
+    states.iter().skip(states_to_skip).collect()
+}
+
+fn set_fullscreen(fullscreen: bool, window: &Window) {
+    if let Some(current_monitor) = window.current_monitor() {
+        if fullscreen {
+            window.set_fullscreen(Some(Fullscreen::Borderless(Some(current_monitor))));
+        } else {
+            window.set_fullscreen(None);
+        }
+    }
+}
+
 pub mod game_vs {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "src/shaders/game_object.vert"
+        path: "src/shaders/game.vert"
     }
 }
 
 pub mod game_fs {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "src/shaders/game_object.frag"
+        path: "src/shaders/game.frag"
     }
 }
 
