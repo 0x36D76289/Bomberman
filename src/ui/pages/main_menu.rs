@@ -132,38 +132,22 @@ impl UiState {
         resources: &Resources,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
-            println!("selected: {}", self.selected);
-            //TODO: je comprends pas pourquoi on joue Game peu importe le setting
-            audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
             return match self.selected {
-                0 => {
+                0 => { // Continue
                     let save = SaveState::load();
+                    audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
                     match GameState::new_campaign(save.level, save.lives) {
-                        Some(game_state) => (Some(AppState::game(game_state)), 0),
+                        Some(game_state) => (Some(AppState::game(game_state)), 1),
                         None => {
-                            println!("Error: Failed to load saved campaign level {}", save.level);
-                            (
-                                Some(AppState::game(
-                                    GameState::new_campaign(1, 3)
-                                        .expect("Could not load level 1 as fallback"),
-                                )),
-                                0,
-                            )
+                            println!("Error: Failed to load saved game. Starting new game selection.");
+                            (Some(AppState::level_select()), 1)
                         }
                     }
                 }
-                1 => match GameState::new_campaign(1, 3) {
-                    // creer un nouveau main menu
-                    Some(game_state) => (Some(AppState::game(game_state)), 0),
-                    None => {
-                        println!("Error: Failed to load campaign level 1 for new game");
-                        (None, 0)
-                    }
-                },
-                // TODO: get settings player count
+                1 => (Some(AppState::level_select()), 1),
                 2 => (Some(AppState::game_settings(resources, 2)), 0),
                 3 => (Some(AppState::settings()), 0),
-                4 => (None, 1),
+                4 => (None, 1), // Quit
                 _ => (None, 0),
             };
         }

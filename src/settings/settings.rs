@@ -1,4 +1,5 @@
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use winit::keyboard::KeyCode;
@@ -62,21 +63,30 @@ impl Default for Settings {
 
 impl Settings {
     pub fn save(&self) {
+        let path_str = get_settings_path();
+        let path = Path::new(&path_str);
+
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                if let Err(e) = fs::create_dir_all(parent) {
+                    println!("Error creating settings directory: {}", e);
+                    return;
+                }
+            }
+        }
+
         let settings_file = OpenOptions::new()
-            .read(true)
             .write(true)
             .create(true)
             .truncate(true)
-            .open(get_settings_path());
-        if settings_file.is_err() {
-            println!("save: failed to open {}", get_settings_path());
-            return;
-        }
+            .open(path);
 
-        let settings_file = settings_file.unwrap();
-
-        if serde_cbor::to_writer(settings_file, self).is_err() {
-            println!("save: couldn't write settings to {}", get_settings_path());
+        if let Ok(file) = settings_file {
+            if let Err(e) = serde_cbor::to_writer(file, self) {
+                println!("save: couldn't write settings to {}: {}", path_str, e);
+            }
+        } else {
+            println!("save: failed to open {}", path_str);
         }
     }
 
