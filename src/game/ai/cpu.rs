@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::game::ai::ai::AI;
 use crate::game::ai::zone::Zone;
+use crate::game::bomb::Bomb;
 use crate::game::direction::Direction;
 use crate::game::map::map::Map;
 use crate::game::powerup::PowerUp;
@@ -16,7 +17,7 @@ use rand::seq::IndexedRandom;
 
 const CPU_DECISION_TIMER: f32 = 0.1;
 const CPU_REACTION_TIME: f32 = 0.9;
-
+const CPU_DISTANCE_PWUP: i32 = 5;
 //
 #[derive(Debug, Clone)]
 pub struct CPU {
@@ -73,7 +74,13 @@ impl CPU {
         }
     }
 
-    pub fn get_input(&mut self, powerups: &[PowerUp], players: &[Player], map: &Map) -> Input {
+    pub fn get_input(
+        &mut self,
+        bombs: &[Bomb],
+        powerups: &[PowerUp],
+        players: &[Player],
+        map: &Map,
+    ) -> Input {
         let player = &players[self.id];
 
         match self.state {
@@ -91,9 +98,12 @@ impl CPU {
             }
             CPUState::Idle => {
                 if let Ok(mut zone) = self.zone.lock() {
-                    if let Some(powerup_pos) = zone.check_powerup(powerups) {
+                    if let Some(powerup_pos) = zone.closest_powerup(player.position, powerups) {
                         log::debug!("I'm going to the powerup !");
                         self.target = Some(powerup_pos);
+                    } else if let Some(player_pos) = zone.closest_player(player.position, players) {
+                        log::debug!("I'm going to the player !");
+                        self.target = Some(player_pos);
                     } else if !zone.cells.is_empty() {
                         if let Some(random_target) = zone.cells.choose(&mut rand::rng()) {
                             if random_target.grid() != player.position.grid() {
@@ -110,8 +120,7 @@ impl CPU {
                         self.target = None;
                     }
                 }
-
-                self.last_input.clone()
+                return self.last_input.clone();
             }
             _ => self.do_nothing(),
         }

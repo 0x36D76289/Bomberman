@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::game::ai::ai::AI;
 use crate::game::ai::entity::Entity;
 use crate::game::collision::Collision;
 use crate::game::map::map::Map;
@@ -59,14 +60,38 @@ impl Zone {
         todo!("Bonjour")
     }
 
-    pub fn check_powerup(&mut self, power_ups: &[PowerUp]) -> Option<Vec2> {
-        let powerup_positions: Vec<Vec2> = power_ups
+    // TODO: {loic} create generic function for getting closest position
+    pub fn closest_player(&mut self, pos: Vec2, players: &[Player]) -> Option<Vec2> {
+        let mut players_position: Vec<Vec2> = players
+            .iter()
+            .map(|player| player.position)
+            .filter(|player_pos| *player_pos != pos)
+            .collect();
+        players_position.sort_by(|p, p2| {
+            let d1 = AI::calculate_heuristic_pos(&pos, p);
+            let d2 = AI::calculate_heuristic_pos(&pos, p2);
+            d1.cmp(&d2)
+        });
+        for &player in &players_position {
+            if self.cells.contains(&player) {
+                return Some(player);
+            }
+        }
+        None
+    }
+    pub fn closest_powerup(&mut self, pos: Vec2, power_ups: &[PowerUp]) -> Option<Vec2> {
+        let mut powerup_positions: Vec<Vec2> = power_ups
             .iter()
             .map(|power_up| power_up.pos.as_vec2())
             .collect();
-        for &cell in &self.cells {
-            if powerup_positions.contains(&cell) {
-                return Some(cell);
+        powerup_positions.sort_by(|p, p2| {
+            let d1 = AI::calculate_heuristic_pos(&pos, p);
+            let d2 = AI::calculate_heuristic_pos(&pos, p2);
+            d1.cmp(&d2)
+        });
+        for &powerup in &powerup_positions {
+            if self.cells.contains(&powerup) {
+                return Some(powerup);
             }
         }
         None

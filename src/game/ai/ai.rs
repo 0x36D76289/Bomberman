@@ -65,6 +65,11 @@ impl AI {
         (from.0 - to.0).abs() + (from.1 - to.1).abs()
     }
 
+    pub fn calculate_heuristic_pos(from: &Vec2, to: &Vec2) -> i32 {
+        let from_i32 = (from.x as i32, from.y as i32);
+        let to_i32 = (to.x as i32, to.y as i32);
+        Self::calculate_heuristic(from_i32, to_i32)
+    }
     pub fn find_path(start: Vec2, goal: Vec2, map: &Map) -> Option<Vec<Vec2>> {
         let start_grid = (start.x as i32, start.y as i32);
         let goal_grid = (goal.x as i32, goal.y as i32);

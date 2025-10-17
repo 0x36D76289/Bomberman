@@ -247,6 +247,7 @@ impl GameState {
             self.bombs[i].tick(
                 delta,
                 &mut self.players,
+                &mut self.cpus,
                 &mut self.enemies,
                 &mut self.map,
                 &mut self.power_ups,
@@ -260,12 +261,6 @@ impl GameState {
                 continue;
             }
             self.bombs[i].clone().chain_react(&mut self.bombs);
-            AI::update_zone(
-                self.bombs[i].position,
-                &mut self.cpus,
-                &self.players,
-                &self.map,
-            );
         }
         self.bombs.retain(|bomb| !bomb.despawn);
         for powerup in &mut self.power_ups {
@@ -414,7 +409,7 @@ impl GameState {
     fn update_cpu_inputs(&mut self) {
         self.cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
             self.game_inputs[self.nb_humans as usize + i] =
-                cpu.get_input(&self.power_ups, &self.players, &self.map)
+                cpu.get_input(&self.bombs, &self.power_ups, &self.players, &self.map)
         });
     }
     // Put the inputs read into game inputs

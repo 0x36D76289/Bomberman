@@ -1,9 +1,7 @@
 use core::f32;
 
-use glam::{Vec2, Vec3, usize};
-use rand::random_range;
-
 use super::{collision::Collision, enemy::Enemy};
+use crate::game::ai::{ai::AI, cpu::CPU};
 use crate::{
     audio::{AudioManager, SoundEffect},
     game::{
@@ -15,6 +13,8 @@ use crate::{
     },
     graphics::{object::Object, transform::Transform},
 };
+use glam::{Vec2, Vec3, usize};
+use rand::random_range;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BombState {
@@ -110,6 +110,8 @@ impl Bomb {
 
     fn find_wall(
         &self,
+        players: &[Player],
+        cpus: &mut [CPU],
         map: &mut Map,
         dirvec: Vec2,
         power_ups: &mut Vec<PowerUp>,
@@ -125,6 +127,7 @@ impl Bomb {
                     if random_range(1..=100) <= PERCENTAGE_POWERUP_SPAWN {
                         power_ups.push(PowerUp::new(pos.y as usize, pos.x as usize, resources));
                     }
+                    AI::update_zone(pos, cpus, players, map);
                 }
                 MapElement::Unbreakable(_) => (),
             }
@@ -153,6 +156,8 @@ impl Bomb {
 
     fn explode(
         &mut self,
+        players: &[Player],
+        cpus: &mut [CPU],
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
@@ -163,16 +168,46 @@ impl Bomb {
 
         audio_manager.play_sound_effect(SoundEffect::BombExplosion);
 
-        self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
-        self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 }, power_ups, resources);
-        self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 }, power_ups, resources);
-        self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 }, power_ups, resources);
+        self.explosion.up = self.find_wall(
+            players,
+            cpus,
+            map,
+            Vec2 { x: 0.0, y: -1.0 },
+            power_ups,
+            resources,
+        );
+        self.explosion.down = self.find_wall(
+            players,
+            cpus,
+            map,
+            Vec2 { x: 0.0, y: 1.0 },
+            power_ups,
+            resources,
+        );
+        self.explosion.left = self.find_wall(
+            players,
+            cpus,
+            map,
+            Vec2 { x: -1.0, y: 0.0 },
+            power_ups,
+            resources,
+        );
+        self.explosion.right = self.find_wall(
+            players,
+            cpus,
+            map,
+            Vec2 { x: 1.0, y: 0.0 },
+            power_ups,
+            resources,
+        );
         self.set_explosion_objects(resources);
     }
 
     /// tick for bombs that are Planted or Sliding
     fn live_bomb(
         &mut self,
+        players: &[Player],
+        cpus: &mut [CPU],
         delta: f32,
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
@@ -181,7 +216,7 @@ impl Bomb {
     ) {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode(map, power_ups, resources, audio_manager);
+            self.explode(players, cpus, map, power_ups, resources, audio_manager);
             return;
         }
         self.timer -= delta;
@@ -335,6 +370,7 @@ impl Bomb {
         &mut self,
         delta: f32,
         players: &mut Vec<Player>,
+        cpus: &mut [CPU],
         enemies: &mut Vec<Enemy>,
         map: &mut Map,
         power_ups: &mut Vec<PowerUp>,
@@ -343,10 +379,26 @@ impl Bomb {
         bombs_pos: &[Vec2],
     ) {
         match self.state {
-            BombState::Planted => self.live_bomb(delta, map, power_ups, resources, audio_manager),
+            BombState::Planted => self.live_bomb(
+                players,
+                cpus,
+                delta,
+                map,
+                power_ups,
+                resources,
+                audio_manager,
+            ),
             BombState::Sliding(direction) => {
                 self.slide(direction, delta, map, players, &bombs_pos);
-                self.live_bomb(delta, map, power_ups, resources, audio_manager);
+                self.live_bomb(
+                    players,
+                    cpus,
+                    delta,
+                    map,
+                    power_ups,
+                    resources,
+                    audio_manager,
+                );
             }
             BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
         }
