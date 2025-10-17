@@ -18,6 +18,7 @@ pub enum AppStateEnum {
     Game,
     MainMenu,
     Pause,
+    LevelSelect,
     GameSettings(UIGameSettings),
     Settings {
         selected_player: usize,
@@ -62,6 +63,14 @@ impl AppState {
             state: AppStateEnum::Pause,
             game: None,
             ui: Some(UiState::pause()),
+        }
+    }
+
+    pub fn level_select() -> Self {
+        Self {
+            state: AppStateEnum::LevelSelect,
+            game: None,
+            ui: Some(UiState::level_select()),
         }
     }
 
@@ -137,6 +146,12 @@ impl AppState {
                     .as_mut()
                     .unwrap()
                     .main_menu_tick(inputs, audio_manager, resources)
+            }
+            AppStateEnum::LevelSelect => {
+                self.ui
+                    .as_mut()
+                    .unwrap()
+                    .level_select_tick(inputs, audio_manager)
             }
             AppStateEnum::GameSettings(ui_game_settings) => {
                 let (game, ui) = match (self.game.as_mut(), self.ui.as_mut()) {
@@ -218,6 +233,7 @@ impl AppState {
             AppStateEnum::Pause => true,
             AppStateEnum::GameOver => true,
             AppStateEnum::MainMenu => false,
+            AppStateEnum::LevelSelect => false,
             AppStateEnum::GameSettings(_) => false,
             AppStateEnum::Binds { .. } => false,
             AppStateEnum::Settings { .. } => false,

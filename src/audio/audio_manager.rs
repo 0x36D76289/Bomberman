@@ -49,7 +49,7 @@ impl AudioManager {
             music_sink,
             sound_effects: HashMap::new(),
             background_music: HashMap::new(),
-            master_volume: 0.0,
+            master_volume: 1.0,
             sfx_volume: 0.7,
             music_volume: 1.0,
             music_enabled: true,
@@ -64,6 +64,7 @@ impl AudioManager {
     pub fn set_volume(&mut self, settings: &Settings) {
         self.music_volume = settings.volume_music;
         self.sfx_volume = settings.volume_sfx;
+        self.update_volumes();
     }
 
     fn load_assets(&mut self) -> Result<()> {

@@ -44,6 +44,18 @@ pub fn init_settings_path() {
     settings_path(Some(path));
 }
 
+#[cfg(target_os = "windows")]
+pub fn init_settings_path() {
+    let dir = 'dir: {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            break 'dir appdata;
+        }
+        ".".to_string()
+    };
+    let path = dir + "\\Bomberman";
+    settings_path(Some(path + "\\settings.bomb"));
+}
+
 pub fn get_settings_path() -> String {
     settings_path(None)
 }
