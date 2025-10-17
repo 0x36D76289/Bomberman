@@ -77,6 +77,8 @@ impl App {
     fn update_state(&mut self) {
         self.update_inputs();
 
+        self.audio_manager.set_volume(&self.settings);
+
         let app_state = self.state_stack.last_mut().unwrap();
         let renderer = &self.graphics.renderer;
 
