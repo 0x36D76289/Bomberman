@@ -111,7 +111,6 @@ impl Zone {
             .into_iter()
             .filter(|neighbour| {
                 !cells_found.contains(&neighbour)
-                    || (self.player_zone && !self.cells.contains(&neighbour))
             })
             .collect();
         for neighbour in neighbours {
