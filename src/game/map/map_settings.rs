@@ -3,6 +3,8 @@ use crate::game::resources::Resources;
 
 pub enum MapType {
     Corners,
+    Arena,
+    Teams,
     Random,
 }
 
@@ -29,11 +31,39 @@ impl MapSettings {
         MapSettings {
             width: 15,
             height: 15,
-            cheesiness: 0,
+            cheesiness: 5,
             spawns: 4,
             spawn_size: 1,
             safe_range: 3,
             map_type: MapType::Corners,
+            walls: true,
+            attempts: 100,
+        }
+    }
+
+    pub fn arena() -> Self {
+        MapSettings {
+            width: 37,
+            height: 21,
+            cheesiness: 7,
+            spawns: 10,
+            spawn_size: 1,
+            safe_range: 3,
+            map_type: MapType::Arena,
+            walls: true,
+            attempts: 100,
+        }
+    }
+
+    pub fn teams() -> Self {
+        MapSettings {
+            width: 21,
+            height: 21,
+            cheesiness: 2,
+            spawns: 8,
+            spawn_size: 0,
+            safe_range: 3,
+            map_type: MapType::Teams,
             walls: true,
             attempts: 100,
         }
