@@ -444,8 +444,11 @@ impl UiState {
             if *value == 5 {
                 return Some("Width cannot be below 5".to_string());
             }
-            if matches!(preset, GameSettingPreset::Arena) && *value == 17 {
+            if preset == GameSettingPreset::Arena && *value == 17 {
                 return Some("Width cannot be below 17 in Arena mode".to_string());
+            }
+            if preset == GameSettingPreset::Teams && *value == 11 {
+                return Some("Width cannot be below 11 in Teams mode".to_string());
             }
         } else if modif.is_positive() {
             match preset {
@@ -475,8 +478,11 @@ impl UiState {
             if *value == 5 {
                 return Some("Height cannot be below 5".to_string());
             }
-            if matches!(preset, GameSettingPreset::Arena) && *value == 13 {
+            if preset == GameSettingPreset::Arena && *value == 13 {
                 return Some("Height cannot be below 13 in Arena mode".to_string());
+            }
+            if preset == GameSettingPreset::Teams && *value == 11 {
+                return Some("Height cannot be below 11 in Teams mode".to_string());
             }
         } else if modif.is_positive() {
             match preset {
