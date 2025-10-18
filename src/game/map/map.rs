@@ -314,14 +314,12 @@ impl Map {
 
     fn teams(mut self, resources: &Resources) -> Self {
         // Spawns
+        // First player of each team
         self.add_spawn(3, 0, 0, Direction::Right, false);
-        self.add_spawn(0, 3, 0, Direction::Down, false);
 
         self.add_spawn(self.width as i16 - 4, 0, 0, Direction::Left, false);
-        self.add_spawn(self.width as i16 - 1, 3, 0, Direction::Down, false);
 
         self.add_spawn(3, self.height as i16 - 1, 0, Direction::Right, false);
-        self.add_spawn(0, self.height as i16 - 4, 0, Direction::Up, false);
 
         self.add_spawn(
             self.width as i16 - 4,
@@ -330,6 +328,11 @@ impl Map {
             Direction::Left,
             false,
         );
+        // Second player of each team
+        // spawn order set so that teams are more balanced
+        self.add_spawn(0, 3, 0, Direction::Down, false);
+        self.add_spawn(self.width as i16 - 1, 3, 0, Direction::Down, false);
+        self.add_spawn(0, self.height as i16 - 4, 0, Direction::Up, false);
         self.add_spawn(
             self.width as i16 - 1,
             self.height as i16 - 4,
@@ -337,6 +340,7 @@ impl Map {
             Direction::Up,
             false,
         );
+
 
         // Clear center
         self.clear_range(self.width as i16 / 2, self.height as i16 / 2, 2);
