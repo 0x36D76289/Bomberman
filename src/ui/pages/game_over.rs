@@ -8,7 +8,6 @@ use crate::{
         UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        ui_state::UIPage,
     },
 };
 
@@ -70,9 +69,8 @@ impl UiState {
         Self {
             canvases: vec![shadow, title],
             buttons: vec![retry_button, menu_button],
-            is_transparent: true,
             selected: 0,
-            page: UIPage::GameOver,
+            render_info: Default::default(),
         }
     }
 
@@ -87,19 +85,19 @@ impl UiState {
                     // Retry
                     if let Some(game_state) = crate::game::game_state::GameState::new_campaign(1, 3)
                     {
-                        (Some(AppState::Game(game_state)), 2)
+                        (Some(AppState::game(game_state)), 2)
                     } else {
                         println!(
                             "Error: Failed to load campaign level 1 for retry. Returning to menu."
                         );
                         audio_manager.play_background_music(crate::audio::BackgroundMusic::Menu);
-                        (Some(AppState::Ui(UiState::main_menu())), 2)
+                        (Some(AppState::main_menu()), 2)
                     }
                 }
                 _ => {
                     // Main Menu
                     audio_manager.play_background_music(crate::audio::BackgroundMusic::Menu);
-                    (Some(AppState::Ui(UiState::main_menu())), 2)
+                    (Some(AppState::main_menu()), 2)
                 }
             };
         }

@@ -64,6 +64,7 @@ impl AudioManager {
     pub fn set_volume(&mut self, settings: &Settings) {
         self.music_volume = settings.volume_music;
         self.sfx_volume = settings.volume_sfx;
+        self.update_volumes();
     }
 
     fn load_assets(&mut self) -> Result<()> {

@@ -12,11 +12,11 @@ pub struct GameSettings {
 }
 
 impl GameSettings {
-    pub fn default() -> Result<Self, Box<dyn Error>> {
-        Ok(Self {
+    pub fn default() -> Self {
+        Self {
             nb_humans: 1,
             map_settings: MapSettings::default(),
-        })
+        }
     }
 
     pub fn new(settings: &Settings, map_settings: MapSettings) -> Result<Self, Box<dyn Error>> {

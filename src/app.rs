@@ -5,7 +5,6 @@ use crate::graphics::Graphics;
 use crate::input::event::InputEvent;
 use crate::input::input::Input;
 use crate::settings::settings::Settings;
-use crate::ui::UiState;
 use crate::ui::utils::GetRatio;
 use gilrs::Gilrs;
 use glam::Vec2;
@@ -41,7 +40,7 @@ impl App {
         let events = Vec::new();
         let inputs = vec![Input::default(); settings.binds.len()];
 
-        let gui_state1 = AppState::Ui(UiState::main_menu());
+        let gui_state1 = AppState::main_menu();
 
         let state_stack = vec![gui_state1];
 
@@ -78,6 +77,8 @@ impl App {
     fn update_state(&mut self) {
         self.update_inputs();
 
+        self.audio_manager.set_volume(&self.settings);
+
         let app_state = self.state_stack.last_mut().unwrap();
         let renderer = &self.graphics.renderer;
 
@@ -103,13 +104,14 @@ impl App {
     }
 
     fn render(&mut self) {
-        self.graphics
-            .renderer
-            .render(&self.graphics.vulkan, &self.state_stack, &self.resources);
-        self.graphics.renderer.update_time();
-        self.graphics.renderer.update_title(&format!(
+        let renderer = &mut self.graphics.renderer;
+
+        renderer.update_settings(&self.graphics.vulkan, &self.settings);
+        renderer.render_states(&self.graphics.vulkan, &self.state_stack, &self.resources);
+        renderer.update_time();
+        renderer.update_title(&format!(
             "Bomberman!! fps: {:.0}",
-            self.graphics.renderer.rcx().time_info.avg_fps
+            renderer.rcx().time_info.avg_fps
         ));
     }
     fn register_controller_inputs(&mut self) {
@@ -129,10 +131,8 @@ impl ApplicationHandler for App {
         let vulkan = &self.graphics.vulkan;
 
         if !renderer.is_initialized() {
-            renderer.init_render_context(event_loop, vulkan);
-            renderer.create_gui_pipeline(vulkan);
-            renderer.create_game_pipeline(vulkan);
-            renderer.create_postprocess_pipeline(vulkan);
+            renderer.init_render_context(event_loop, vulkan, &self.settings);
+            renderer.create_pipelines(vulkan);
         }
     }
 
@@ -141,7 +141,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 self.register_controller_inputs();
                 self.update_state();
-                self.render()
+                self.render();
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),
             WindowEvent::CloseRequested => event_loop.exit(),
