@@ -152,14 +152,26 @@ impl Map {
 
     fn corners(mut self) -> Self {
         // Set spawns
-        self.spawns.push(SpawnPoint::init(0, 0));
-        self.spawns.push(SpawnPoint::init(self.width as i32 - 1, 0));
-        self.spawns.push(SpawnPoint::init(
-            self.width as i32 - 1,
-            self.height as i32 - 1,
-        ));
-        self.spawns
-            .push(SpawnPoint::init(0, self.height as i32 - 1));
+        self.spawns.push(SpawnPoint {
+            x: 0,
+            y: 0,
+            direction: Direction::Right,
+        });
+        self.spawns.push(SpawnPoint {
+            x: self.width as i32 - 1,
+            y: 0,
+            direction: Direction::Left,
+        });
+        self.spawns.push(SpawnPoint {
+            x: 0,
+            y: self.height as i32 - 1,
+            direction: Direction::Right,
+        });
+        self.spawns.push(SpawnPoint {
+            x: self.width as i32 - 1,
+            y: self.height as i32 - 1,
+            direction: Direction::Left,
+        });
         // Top left corner
         self.content[0] = MapElement::Empty;
         self.content[1] = MapElement::Empty;
@@ -182,12 +194,12 @@ impl Map {
 
     fn arena(mut self) -> Self {
         // Top and bottom
-        self.add_spawn(self.width as i16 / 2, 0, 1, Direction::Up, false);
+        self.add_spawn(self.width as i16 / 2, 0, 1, Direction::Down, false);
         self.add_spawn(
             self.width as i16 / 2,
             self.height as i16 - 1,
             1,
-            Direction::Down,
+            Direction::Up,
             false,
         );
         // middle ring
