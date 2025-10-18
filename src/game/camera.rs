@@ -67,13 +67,18 @@ impl Camera {
             Vec4::new(u.x, v.x, w.x, 0.0),
             Vec4::new(u.y, v.y, w.y, 0.0),
             Vec4::new(u.z, v.z, w.z, 0.0),
-            Vec4::new(-u.dot(position), -v.dot(position), -w.dot(position), 1.0),
+            Vec4::new(
+                -(u.dot(position)),
+                -(v.dot(position)),
+                -(w.dot(position)),
+                1.0,
+            ),
         );
 
         self.inverse_view_matrix = Mat4::from_cols(
-            Vec4::new(u.x, u.y, u.z, 1.0),
-            Vec4::new(v.x, v.y, v.z, 1.0),
-            Vec4::new(w.x, w.y, w.z, 1.0),
+            Vec4::new(u.x, u.y, u.z, 0.0),
+            Vec4::new(v.x, v.y, v.z, 0.0),
+            Vec4::new(w.x, w.y, w.z, 0.0),
             Vec4::new(position.x, position.y, position.z, 1.0),
         );
     }
@@ -109,9 +114,9 @@ impl Camera {
         );
 
         self.inverse_view_matrix = Mat4::from_cols(
-            Vec4::new(u.x, u.y, u.z, 1.0),
-            Vec4::new(v.x, v.y, v.z, 1.0),
-            Vec4::new(w.x, w.y, w.z, 1.0),
+            Vec4::new(u.x, u.y, u.z, 0.0),
+            Vec4::new(v.x, v.y, v.z, 0.0),
+            Vec4::new(w.x, w.y, w.z, 0.0),
             Vec4::new(position.x, position.y, position.z, 1.0),
         );
     }

@@ -18,7 +18,6 @@ use crate::{
             BACKGROUND_COLOR, BUTTON_COLOR, OUTLINE_COLOR, SELECTED_BUTTON_COLOR,
             SELECTED_TEXT_COLOR, TEXT_COLOR, TEXT_SIZE,
         },
-        ui_state::UIPage,
     },
 };
 
@@ -204,12 +203,8 @@ impl UiState {
         Self {
             canvases,
             buttons,
-            is_transparent: false,
             selected: 0,
-            page: UIPage::Binds {
-                player,
-                waiting: -1,
-            },
+            render_info: Default::default(),
         }
     }
 
@@ -231,7 +226,7 @@ impl UiState {
         }
     }
 
-    fn set_wait(&mut self, inputs: &Vec<Input>) {
+    fn set_wait(&mut self, inputs: &Vec<Input>, waiting: &mut isize) {
         // TODO: take events and check if click
         if self.selected == BindsButtons::Delete as usize
             || self.selected == BindsButtons::Done as usize
@@ -242,25 +237,16 @@ impl UiState {
             return;
         }
         // here a bind is selected and someone is changing it
-        let waiting = {
-            let page = &mut self.page;
-            match page {
-                UIPage::Binds { player: _, waiting } => waiting,
-                _ => return,
-            }
-        };
         *waiting = self.selected as isize;
     }
 
-    pub fn set_bind(&mut self, events: &Vec<InputEvent>, settings: &mut Settings) {
-        let (player, waiting) = {
-            let page = &mut self.page;
-            match page {
-                UIPage::Binds { player, waiting } => (player, waiting),
-                _ => return,
-            }
-        };
-
+    pub fn set_bind(
+        &mut self,
+        events: &Vec<InputEvent>,
+        settings: &mut Settings,
+        player: &mut usize,
+        waiting: &mut isize,
+    ) {
         for event in events {
             if is_bindable_action(event) {
                 settings.binds[*player][*waiting as usize] = create_bind(event);
@@ -276,24 +262,19 @@ impl UiState {
         inputs: &Vec<Input>,
         events: &Vec<InputEvent>,
         settings: &mut Settings,
+        player: &mut usize,
+        waiting: &mut isize,
     ) -> (Option<AppState>, u8) {
-        let (player, waiting) = {
-            let page = self.page;
-            match page {
-                UIPage::Binds { player, waiting } => (player, waiting),
-                _ => return (None, 0),
-            }
-        };
-        if waiting < 0 {
+        if *waiting < 0 {
             self.button_inputs(inputs);
-            self.set_wait(inputs);
+            self.set_wait(inputs, waiting);
         } else {
-            self.set_bind(events, settings);
+            self.set_bind(events, settings, player, waiting);
         }
-        self.set_names(waiting, settings, player);
+        self.set_names(*waiting, settings, *player);
         if inputs.menu_confirm() == InputState::Pressed {
             if self.selected == BindsButtons::Delete as usize {
-                settings.binds.remove(player);
+                settings.binds.remove(*player);
                 settings.save();
             }
             if self.selected >= BindsButtons::Delete as usize {
