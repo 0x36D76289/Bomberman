@@ -1,6 +1,5 @@
 use glam::{Vec2, Vec3, i16, usize};
 use rand::random_range;
-use std::fs;
 
 use crate::{
     game::{
@@ -133,10 +132,19 @@ impl Map {
                     self.content[y * self.width + x].clone();
             }
         }
+
         Self {
             width: self.width + 2,
             height: self.height + 2,
-            spawns: self.spawns,
+            spawns: self
+                .spawns
+                .iter()
+                .map(|spawn| SpawnPoint {
+                    x: spawn.x + 1,
+                    y: spawn.y + 1,
+                    ..*spawn
+                })
+                .collect(),
             content,
             floor: Self::create_floor(self.width as u8 + 2, self.height as u8 + 2, ressources),
         }
@@ -144,11 +152,26 @@ impl Map {
 
     fn corners(mut self) -> Self {
         // Set spawns
-        self.spawns.push(SpawnPoint::init(1, 1));
-        self.spawns.push(SpawnPoint::init((self.width) as i32, 1));
-        self.spawns
-            .push(SpawnPoint::init(self.width as i32, self.height as i32));
-        self.spawns.push(SpawnPoint::init(1, self.height as i32));
+        self.spawns.push(SpawnPoint {
+            x: 0,
+            y: 0,
+            direction: Direction::Right,
+        });
+        self.spawns.push(SpawnPoint {
+            x: self.width as i32 - 1,
+            y: 0,
+            direction: Direction::Left,
+        });
+        self.spawns.push(SpawnPoint {
+            x: 0,
+            y: self.height as i32 - 1,
+            direction: Direction::Right,
+        });
+        self.spawns.push(SpawnPoint {
+            x: self.width as i32 - 1,
+            y: self.height as i32 - 1,
+            direction: Direction::Left,
+        });
         // Top left corner
         self.content[0] = MapElement::Empty;
         self.content[1] = MapElement::Empty;
@@ -169,10 +192,49 @@ impl Map {
         self
     }
 
+    fn arena(mut self) -> Self {
+        // Top and bottom
+        self.add_spawn(self.width as i16 / 2, 0, 1, Direction::Down, false);
+        self.add_spawn(
+            self.width as i16 / 2,
+            self.height as i16 - 1,
+            1,
+            Direction::Up,
+            false,
+        );
+        // middle ring
+        let quarter_x = (self.width - 1) / 4;
+        let quarter_y = (self.height - 1) / 4 + 1;
+
+        self.add_spawn(quarter_x as i16, quarter_y as i16, 1, Direction::Up, false);
+        self.add_spawn(
+            (self.width - quarter_x - 1) as i16,
+            quarter_y as i16,
+            1,
+            Direction::Up,
+            false,
+        );
+        self.add_spawn(
+            quarter_x as i16,
+            (self.height - quarter_y - 1) as i16,
+            1,
+            Direction::Down,
+            false,
+        );
+        self.add_spawn(
+            (self.width - quarter_x - 1) as i16,
+            (self.height - quarter_y - 1) as i16,
+            1,
+            Direction::Down,
+            false,
+        );
+        self
+    }
+
     fn cheese(mut self, cheesiness: u8) -> Self {
         for i in 0..self.content.len() {
             if let MapElement::Breakable(_) = self.content[i]
-                && random_range(0..=100) > (100 - cheesiness.clamp(0, 100))
+                && random_range(1..=100) <= cheesiness.clamp(0, 100)
             {
                 self.content[i] = MapElement::Empty;
             }
@@ -180,7 +242,38 @@ impl Map {
         self
     }
 
-    fn add_spawn(&mut self, safe_range: u8, spawn_size: u8) -> bool {
+    fn clear_range(&mut self, x: i16, y: i16, size: i16) {
+        for y in (y - size).max(0)..=(y + size).min(self.height as i16 - 1) {
+            for x in (x - size).max(0)..=(x + size).min(self.width as i16 - 1) {
+                if let MapElement::Breakable(_) = self.content[y as usize * self.width + x as usize]
+                {
+                    self.content[y as usize * self.width + x as usize] = MapElement::Empty
+                }
+            }
+        }
+    }
+
+    fn add_spawn(
+        &mut self,
+        x: i16,
+        y: i16,
+        spawn_size: u8,
+        direction: Direction,
+        random_dir: bool,
+    ) {
+        if random_dir {
+            self.spawns.push(SpawnPoint::init(x as i32, y as i32));
+        } else {
+            self.spawns.push(SpawnPoint {
+                x: x as i32,
+                y: y as i32,
+                direction,
+            });
+        }
+        self.clear_range(x, y, spawn_size as i16);
+    }
+
+    fn add_spawns_random(&mut self, safe_range: u8, spawn_size: u8) -> bool {
         if (self.width < 4) || (self.height < 4) {
             return false;
         }
@@ -199,19 +292,7 @@ impl Map {
                 return false;
             }
         }
-        self.spawns.push(SpawnPoint::init(x as i32, y as i32));
-        for y in
-            (y - spawn_size as i16).max(0)..=(y + spawn_size as i16).min(self.height as i16 - 1)
-        {
-            for x in
-                (x - spawn_size as i16).max(0)..=(x + spawn_size as i16).min(self.width as i16 - 1)
-            {
-                if let MapElement::Breakable(_) = self.content[y as usize * self.width + x as usize]
-                {
-                    self.content[y as usize * self.width + x as usize] = MapElement::Empty
-                }
-            }
-        }
+        self.add_spawn(x, y, spawn_size, Direction::Up, true);
         true
     }
 
@@ -219,7 +300,7 @@ impl Map {
         let mut attempts = settings.attempts;
         let mut spawns = settings.spawns;
         while (attempts != 0) && (spawns != 0) {
-            if self.add_spawn(settings.safe_range, settings.spawn_size) {
+            if self.add_spawns_random(settings.safe_range, settings.spawn_size) {
                 spawns -= 1;
             } else {
                 attempts -= 1;
@@ -229,6 +310,71 @@ impl Map {
             return None;
         }
         Some(self)
+    }
+
+    fn teams(mut self, resources: &Resources) -> Self {
+        // Spawns
+        // First player of each team
+        self.add_spawn(3, 0, 0, Direction::Right, false);
+
+        self.add_spawn(self.width as i16 - 4, 0, 0, Direction::Left, false);
+
+        self.add_spawn(3, self.height as i16 - 1, 0, Direction::Right, false);
+
+        self.add_spawn(
+            self.width as i16 - 4,
+            self.height as i16 - 1,
+            0,
+            Direction::Left,
+            false,
+        );
+        // Second player of each team
+        // spawn order set so that teams are more balanced
+        self.add_spawn(0, 3, 0, Direction::Down, false);
+        self.add_spawn(self.width as i16 - 1, 3, 0, Direction::Down, false);
+        self.add_spawn(0, self.height as i16 - 4, 0, Direction::Up, false);
+        self.add_spawn(
+            self.width as i16 - 1,
+            self.height as i16 - 4,
+            0,
+            Direction::Up,
+            false,
+        );
+
+
+        // Clear center
+        self.clear_range(self.width as i16 / 2, self.height as i16 / 2, 2);
+
+        // Set corners
+        let breakable_object = Self::create_breakable(resources);
+
+        self.clear_range(1, 1, 1);
+        self.content[0 * self.width + 0] = MapElement::Breakable(breakable_object.clone());
+        self.content[1 * self.width + 0] = MapElement::Breakable(breakable_object.clone());
+        self.content[0 * self.width + 1] = MapElement::Breakable(breakable_object.clone());
+
+        self.clear_range(self.width as i16 - 2, 1, 1);
+        self.content[self.width - 1] = MapElement::Breakable(breakable_object.clone());
+        self.content[self.width - 2] = MapElement::Breakable(breakable_object.clone());
+        self.content[2 * self.width - 1] = MapElement::Breakable(breakable_object.clone());
+
+        self.clear_range(1, self.height as i16 - 2, 1);
+        self.content[(self.height - 1) * self.width] =
+            MapElement::Breakable(breakable_object.clone());
+        self.content[((self.height - 1) * self.width) + 1] =
+            MapElement::Breakable(breakable_object.clone());
+        self.content[(self.height - 2) * self.width] =
+            MapElement::Breakable(breakable_object.clone());
+
+        self.clear_range(self.width as i16 - 2, self.height as i16 - 2, 1);
+        self.content[((self.height - 1) * self.width) + (self.width - 1)] =
+            MapElement::Breakable(breakable_object.clone());
+        self.content[((self.height - 1) * self.width) + (self.width - 2)] =
+            MapElement::Breakable(breakable_object.clone());
+        self.content[((self.height - 2) * self.width) + (self.width - 1)] =
+            MapElement::Breakable(breakable_object.clone());
+
+        self
     }
 
     /// Return neighbouring empty cells
@@ -247,6 +393,8 @@ impl Map {
 
         ret = match settings.map_type {
             MapType::Corners => Some(ret.corners()),
+            MapType::Arena => Some(ret.corners().arena()),
+            MapType::Teams => Some(ret.teams(ressources)),
             MapType::Random => ret.random(&settings),
         }?;
 
@@ -257,8 +405,14 @@ impl Map {
     }
 
     pub fn from_file(level: u32, resources: &Resources) -> Option<LevelData> {
-        let path = format!("src/assets/levels/1-{}.level", level);
-        let file_content = fs::read_to_string(path).ok()?;
+        const LEVEL_1_DATA: &str = include_str!("../../assets/levels/1-1.level");
+        const LEVEL_2_DATA: &str = include_str!("../../assets/levels/1-2.level");
+
+        let file_content = match level {
+            1 => LEVEL_1_DATA,
+            2 => LEVEL_2_DATA,
+            _ => return None,
+        };
 
         let lines: Vec<&str> = file_content.lines().collect();
         let height = lines.len();
