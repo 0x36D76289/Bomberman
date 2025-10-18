@@ -1,3 +1,5 @@
+use std::net::ToSocketAddrs;
+
 use glam::{Vec2, Vec4, usize};
 
 use crate::{
@@ -85,11 +87,13 @@ impl UIGameSettings {
             bot_count -= player_count;
         }
 
+        let map_settings = MapSettings::corners();
+
         Self {
             preset: GameSettingPreset::Corners,
-            width: 15,
-            height: 15,
-            cheesiness: 5,
+            width: map_settings.width,
+            height: map_settings.height,
+            cheesiness: map_settings.cheesiness,
             player_count,
             bot_count,
             opacity: 0.0,
@@ -104,22 +108,26 @@ impl UIGameSettings {
             bot_count -= player_count;
         }
 
+        let map_settings = MapSettings::arena();
+
         Self {
             preset: GameSettingPreset::Arena,
-            width: 37,
-            height: 21,
-            cheesiness: 7,
+            width: map_settings.width,
+            height: map_settings.height,
+            cheesiness: map_settings.cheesiness,
             player_count,
             bot_count,
             opacity: 0.0,
         }
     }
     fn teams(player_count: u8) -> Self {
+        let map_settings = MapSettings::teams();
+
         Self {
             preset: GameSettingPreset::Teams,
-            width: 21,
-            height: 21,
-            cheesiness: 10,
+            width: map_settings.width,
+            height: map_settings.height,
+            cheesiness: map_settings.cheesiness,
             player_count,
             bot_count: 0,
             opacity: 0.0,
@@ -431,6 +439,118 @@ impl UiState {
         }
     }
 
+    fn update_width(preset: GameSettingPreset, value: &mut u8, modif: i16) -> Option<String> {
+        if modif.is_negative() {
+            if *value == 5 {
+                return Some("Width cannot be below 5".to_string());
+            }
+            if matches!(preset, GameSettingPreset::Arena) && *value == 17 {
+                return Some("Width cannot be below 17 in Arena mode".to_string());
+            }
+        } else if modif.is_positive() {
+            match preset {
+                GameSettingPreset::Arena => {
+                    if *value == 97 {
+                        return Some("Width cannot be over 97 in Arena mode".to_string());
+                    }
+                }
+                _ => {
+                    if *value == 99 {
+                        return Some("Width cannot be over 99".to_string());
+                    }
+                }
+            }
+        }
+
+        let mult = match preset {
+            GameSettingPreset::Arena => 4,
+            _ => 2,
+        };
+        *value = (*value as i16 + (modif * mult)) as u8;
+        None
+    }
+
+    fn update_height(preset: GameSettingPreset, value: &mut u8, modif: i16) -> Option<String> {
+        if modif.is_negative() {
+            if *value == 5 {
+                return Some("Height cannot be below 5".to_string());
+            }
+            if matches!(preset, GameSettingPreset::Arena) && *value == 13 {
+                return Some("Height cannot be below 13 in Arena mode".to_string());
+            }
+        } else if modif.is_positive() {
+            match preset {
+                GameSettingPreset::Arena => {
+                    if *value == 97 {
+                        return Some("Height cannot be over 97 in Arena mode".to_string());
+                    }
+                }
+                _ => {
+                    if *value == 99 {
+                        return Some("Height cannot be over 99".to_string());
+                    }
+                }
+            }
+        }
+
+        let mult = match preset {
+            GameSettingPreset::Arena => 4,
+            _ => 2,
+        };
+        *value = (*value as i16 + (modif * mult)) as u8;
+        None
+    }
+
+    fn update_cheese(value: &mut u8, modif: i16) -> Option<String> {
+        if *value == 0 && modif.is_negative() {
+            return Some("Cheesiness cannot be below 0".to_string());
+        }
+        if *value == 100 && modif.is_positive() {
+            return Some("Cheesiness cannot be above 100".to_string());
+        }
+        *value = (*value as i16 + modif) as u8;
+        None
+    }
+
+    fn update_bot_count(
+        preset: GameSettingPreset,
+        value: &mut u8,
+        player_count: u8,
+        modif: i16,
+    ) -> Option<String> {
+        if modif.is_negative() && *value == 0 {
+            return Some("Bot count cannot be below 0".to_string());
+        } else if modif.is_positive() {
+            match preset {
+                GameSettingPreset::Corners => {
+                    if *value == 4 - player_count {
+                        return Some("Total players cannot exceed 4 in Corners mode".to_string());
+                    }
+                }
+                GameSettingPreset::Arena => {
+                    if *value == 10 - player_count {
+                        return Some("Total players cannot exceed 10 in Arena mode".to_string());
+                    }
+                }
+                GameSettingPreset::Teams => {
+                    if *value == 8 - player_count {
+                        return Some("Total players cannot exceed 8 in Teams mode".to_string());
+                    }
+                }
+                GameSettingPreset::Custom => {
+                    if *value == 99 - player_count {
+                        return Some("Total players cannot exceed 99 in Custom mode".to_string());
+                    }
+                }
+            }
+        }
+        *value = (*value as i16 + modif) as u8;
+        if modif.is_positive() && preset == GameSettingPreset::Teams {
+            return Some("Bots aren't recommended in Teams mode".to_string());
+        }
+        None
+    }
+
     fn update_setting_values(&mut self, inputs: &Vec<Input>) -> Option<String> {
         if self.selected < GameSettingButtons::SettingWidth as usize
             || self.selected > GameSettingButtons::SettingBotCount as usize
@@ -450,57 +570,20 @@ impl UiState {
         const SETTING_BOT_COUNT_SIZE: usize = GameSettingButtons::SettingBotCount as usize;
 
         match self.selected {
-            SETTING_WIDTH_SIZE => {
-                if modif.is_negative() {
-                    if settings.width == 5 {
-                        return Some("Width cannot be below 5".to_string());
-                    } else if settings.width == 17 && settings.preset == GameSettingPreset::Arena {
-                        return Some("Width cannot be below 17 in Arena mode".to_string());
-                    }
-                } else if modif.is_positive() && settings.width == 99 {
-                    return Some("Width cannot be over 99".to_string());
-                }
-                settings.width = (settings.width as i16 + modif * 2) as u8;
-            }
+            SETTING_WIDTH_SIZE => Self::update_width(settings.preset, &mut settings.width, modif),
             SETTING_HEIGHT_SIZE => {
-                if modif.is_negative() {
-                    if settings.height == 5 {
-                        return Some("Height cannot be below 5".to_string());
-                    } else if settings.height == 13 && settings.preset == GameSettingPreset::Arena {
-                        return Some("Height cannot be below 13 in Arena mode".to_string());
-                    }
-                } else if modif.is_positive() && settings.height == 99 {
-                    return Some("Height cannot be over 99".to_string());
-                }
-                settings.height = (settings.height as i16 + modif * 2) as u8;
+                Self::update_height(settings.preset, &mut settings.height, modif)
             }
-            SETTING_CHEESE_SIZE => {
-                if modif.is_negative() && settings.cheesiness == 0 {
-                    return Some("Cheesiness cannot be below 0".to_string());
-                } else if modif.is_positive() && settings.cheesiness == 100 {
-                    return Some("Cheesiness cannot be above 100".to_string());
-                }
-                settings.cheesiness = (settings.cheesiness as i16 + modif) as u8;
-            }
-            SETTING_BOT_COUNT_SIZE => {
-                if modif.is_negative() && settings.bot_count == 0 {
-                    return Some("Bot count cannot be below 0".to_string());
-                } else if modif.is_positive() {
-                    if settings.preset == GameSettingPreset::Corners
-                        && settings.bot_count == 4 - settings.player_count
-                    {
-                        return Some("Total players cannot exceed 4 in Corners mode".to_string());
-                    } else if settings.preset == GameSettingPreset::Arena
-                        && settings.bot_count == 10 - settings.player_count
-                    {
-                        return Some("Total players cannot exceed 10 in Arena mode".to_string());
-                    }
-                }
-                settings.bot_count = (settings.bot_count as i16 + modif) as u8;
-            }
-            _ => (),
-        };
-        return None;
+
+            SETTING_CHEESE_SIZE => Self::update_cheese(&mut settings.cheesiness, modif),
+            SETTING_BOT_COUNT_SIZE => Self::update_bot_count(
+                settings.preset,
+                &mut settings.bot_count,
+                settings.player_count,
+                modif,
+            ),
+            _ => None,
+        }
     }
 
     fn tick_error(&mut self, delta: f32) {
@@ -580,10 +663,21 @@ impl UiState {
                 spawns: settings.player_count + settings.bot_count,
                 ..MapSettings::corners()
             },
-            GameSettingPreset::Arena => return (None, 0),
-            GameSettingPreset::Teams => return (None, 0),
+            GameSettingPreset::Arena => MapSettings {
+                width: settings.width,
+                height: settings.height,
+                cheesiness: settings.cheesiness,
+                spawns: settings.player_count + settings.bot_count,
+                ..MapSettings::arena()
+            },
+            GameSettingPreset::Teams => MapSettings {
+                width: settings.width,
+                height: settings.height,
+                cheesiness: settings.cheesiness,
+                spawns: settings.player_count + settings.bot_count,
+                ..MapSettings::teams()
+            },
             GameSettingPreset::Custom => MapSettings {
-                // Arena, Teams, and Custom all use random generation
                 width: settings.width,
                 height: settings.height,
                 cheesiness: settings.cheesiness,
