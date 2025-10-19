@@ -13,9 +13,10 @@ pub struct AppState {
     pub ui: Option<UiState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum AppStateEnum {
     Game,
+    #[default]
     MainMenu,
     Pause,
     LevelSelect,
@@ -33,12 +34,6 @@ pub enum AppStateEnum {
         next_level: u32,
         lives: u32,
     },
-}
-
-impl Default for AppStateEnum {
-    fn default() -> Self {
-        AppStateEnum::MainMenu
-    }
 }
 
 impl AppState {
@@ -112,15 +107,15 @@ impl AppState {
         }
     }
 
-    pub fn stage_clear(level: u32, lives: u32) -> Self {
+    pub fn stage_clear(settings: &mut Settings, level: u32, lives: u32) -> Self {
         Self {
             state: AppStateEnum::StageClear {
                 timer: STAGE_CLEAR_DURATION,
                 next_level: level + 1,
-                lives: lives,
+                lives,
             },
             game: None,
-            ui: Some(UiState::stage_clear(level, lives)),
+            ui: Some(UiState::stage_clear(settings, level, lives)),
         }
     }
 
@@ -139,20 +134,19 @@ impl AppState {
                 self.game
                     .as_mut()
                     .unwrap()
-                    .tick(delta, inputs, resources, audio_manager)
+                    .tick(delta, inputs, resources, audio_manager, settings)
             }
             AppStateEnum::MainMenu => {
                 self.ui
                     .as_mut()
                     .unwrap()
-                    .main_menu_tick(inputs, audio_manager, resources)
+                    .main_menu_tick(inputs, audio_manager, resources, settings)
             }
-            AppStateEnum::LevelSelect => {
-                self.ui
-                    .as_mut()
-                    .unwrap()
-                    .level_select_tick(inputs, audio_manager)
-            }
+            AppStateEnum::LevelSelect => self
+                .ui
+                .as_mut()
+                .unwrap()
+                .level_select_tick(inputs, audio_manager),
             AppStateEnum::GameSettings(ui_game_settings) => {
                 let (game, ui) = match (self.game.as_mut(), self.ui.as_mut()) {
                     (Some(game), Some(ui)) => (game, ui),
@@ -160,11 +154,11 @@ impl AppState {
                         "Tried to tick game settings but app state doesnt contain a gamestate or a uistate"
                     ),
                 };
-                let old_settings = ui_game_settings.clone();
+                let old_settings = *ui_game_settings;
                 match ui.game_settings_tick(delta, inputs, ui_game_settings) {
                     None => {
                         if old_settings != *ui_game_settings {
-                            let err = game.update_from_ui_settings(&ui_game_settings, resources);
+                            let err = game.update_from_ui_settings(ui_game_settings, resources);
                             if err.is_err() {
                                 ui.set_error(
                                     "Map creation failed, try ajusting settings".to_string(),
