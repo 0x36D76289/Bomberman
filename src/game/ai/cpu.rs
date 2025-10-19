@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::path;
 use std::sync::{Arc, Mutex};
 
 use crate::game::ai::ai::AI;
@@ -208,7 +210,7 @@ impl CPU {
     }
 
     fn travel(&mut self, map: &Map, player: &Player) -> Option<Input> {
-        let start: Vec2 = player.position.grid();
+        let start: Vec2 = player.position;
         let goal: &Vec2 = self.path.first()?;
 
         if start.approx_eq(goal) {
