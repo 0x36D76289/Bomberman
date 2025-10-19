@@ -14,6 +14,7 @@ use crate::utils::vec2::{ApproxEq, Grid};
 use glam::{Vec2, Vec3};
 use log::logger;
 use rand::seq::IndexedRandom;
+use rand::{random_range, Rng};
 
 const CPU_DECISION_TIMER: f32 = 0.1;
 const CPU_REACTION_TIME: f32 = 0.9;
@@ -28,6 +29,7 @@ pub struct CPU {
     state: CPUState,
     strategy: CPUStrategy,
     target: Option<Vec2>,
+    action_timer: f32,
 }
 
 /// Possible CPU states.
@@ -43,6 +45,7 @@ pub enum CPUState {
     Mining,
     Attacking,
     Surviving,
+    Thinking
 }
 
 // Different CPU strategy
@@ -62,6 +65,7 @@ impl CPU {
             target: None,
             path: Vec::new(),
             strategy: CPUStrategy::Basic,
+            action_timer: 0.0,
         }
     }
 
@@ -80,6 +84,7 @@ impl CPU {
         powerups: &[PowerUp],
         players: &[Player],
         map: &Map,
+        delta: f32,
     ) -> Input {
         let player = &players[self.id];
 
@@ -92,7 +97,8 @@ impl CPU {
                 } else if let Some(input) = self.travel(map, player) {
                     input
                 } else {
-                    self.state = CPUState::Idle;
+                    self.action_timer = rand::rng().random_range(0.1..=0.8);
+                    self.state = CPUState::Thinking;
                     self.do_nothing()
                 }
             }
@@ -121,6 +127,13 @@ impl CPU {
                     }
                 }
                 return self.last_input.clone();
+            }
+            CPUState::Thinking => {
+                self.action_timer -= delta; 
+                if self.action_timer <= 0.0 {
+                    self.state = CPUState::Idle;
+                }
+                self.do_nothing()              
             }
             _ => self.do_nothing(),
         }

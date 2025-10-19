@@ -380,7 +380,7 @@ impl GameState {
 
         let result = match self.mode {
             GameMode::Multiplayer => {
-                self.update_cpu_inputs();
+                self.update_cpu_inputs(delta_time);
                 self.mp_game_tick(delta_time, resources, audio_manager);
                 GameTickResult::None
             }
@@ -406,10 +406,10 @@ impl GameState {
         }
     }
 
-    fn update_cpu_inputs(&mut self) {
+    fn update_cpu_inputs(&mut self, delta: f32) {
         self.cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
             self.game_inputs[self.nb_humans as usize + i] =
-                cpu.get_input(&self.bombs, &self.power_ups, &self.players, &self.map)
+                cpu.get_input(&self.bombs, &self.power_ups, &self.players, &self.map, delta)
         });
     }
     // Put the inputs read into game inputs
