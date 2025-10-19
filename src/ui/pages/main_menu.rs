@@ -5,7 +5,7 @@ use crate::{
     audio::AudioManager,
     game::{game_state::GameState, resources::Resources},
     input::input::Input,
-    settings::save::SaveState,
+    settings::settings::Settings,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -130,16 +130,20 @@ impl UiState {
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
         resources: &Resources,
+        settings: &Settings,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             return match self.selected {
-                0 => { // Continue
-                    let save = SaveState::load();
+                0 => {
+                    // Continue
+                    let save = settings.single_player_save;
                     audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
                     match GameState::new_campaign(save.level, save.lives) {
                         Some(game_state) => (Some(AppState::game(game_state)), 1),
                         None => {
-                            println!("Error: Failed to load saved game. Starting new game selection.");
+                            println!(
+                                "Error: Failed to load saved game. Starting new game selection."
+                            );
                             (Some(AppState::level_select()), 1)
                         }
                     }

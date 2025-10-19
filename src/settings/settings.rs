@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use winit::keyboard::KeyCode;
 
+use crate::settings::save::SaveState;
 use crate::{
     input::{
         event::InputEvent,
@@ -29,6 +30,8 @@ pub struct Settings {
     pub volume_sfx: f32,
     // Each member of the vector is a player, the content of the element are in order of InputName
     pub binds: Vec<Binds>,
+    // The current save file for single player
+    pub single_player_save: SaveState,
 }
 
 impl Default for Settings {
@@ -57,6 +60,7 @@ impl Default for Settings {
             volume_music: 1.0,
             volume_sfx: 1.0,
             binds: vec![p1_binds, p2_binds],
+            single_player_save: SaveState::default(),
         }
     }
 }

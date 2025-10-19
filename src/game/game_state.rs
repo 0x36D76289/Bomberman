@@ -16,6 +16,7 @@ use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::{GetOrDefault, MenuInput};
+use crate::settings::settings::Settings;
 use crate::ui::pages::game_settings::UIGameSettings;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
@@ -69,7 +70,7 @@ impl GameState {
             return Err("Map creation fail".into());
         };
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, &resources, &nb_humans);
+        let players = Self::create_players(&map, resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
@@ -193,7 +194,7 @@ impl GameState {
         map: Map,
     ) -> Result<Self, Box<dyn Error>> {
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, &resources, &nb_humans);
+        let players = Self::create_players(&map, resources, &nb_humans);
         let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
@@ -417,6 +418,7 @@ impl GameState {
         inputs: &Vec<Input>,
         resources: &Resources,
         audio_manager: &mut AudioManager,
+        settings: &mut Settings,
     ) -> (Option<AppState>, u8) {
         if inputs.menu_back() == InputState::Pressed {
             return (Some(AppState::pause()), 0);
@@ -436,7 +438,11 @@ impl GameState {
             GameTickResult::LevelComplete => {
                 if let Some(progress) = &self.campaign_progress {
                     (
-                        Some(AppState::stage_clear(progress.level, progress.lives)),
+                        Some(AppState::stage_clear(
+                            settings,
+                            progress.level,
+                            progress.lives,
+                        )),
                         1,
                     )
                 } else {

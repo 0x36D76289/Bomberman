@@ -3,21 +3,20 @@ use glam::{Vec2, Vec4};
 use crate::{
     app_state::AppState,
     game::game_state::GameState,
-    settings::save::SaveState,
+    settings::settings::Settings,
     ui::{UiState, canvas::Canvas},
 };
 
 pub const STAGE_CLEAR_DURATION: f32 = 2.0;
 
 impl UiState {
-    pub fn stage_clear(level: u32, lives: u32) -> Self {
+    pub fn stage_clear(settings: &mut Settings, level: u32, lives: u32) -> Self {
+        settings.single_player_save.level = level + 1;
+        settings.single_player_save.lives = lives;
+        settings.single_player_save.score = 0;
+        // TODO: Implement scoring and carry it over
         println!("Stage clear! Saving progress for next level.");
-        let next_level_state = SaveState {
-            level: level + 1,
-            lives,
-            score: 0, // TODO: Implement scoring and carry it over
-        };
-        next_level_state.save();
+        settings.save();
 
         let shadow = Canvas {
             center: Vec2::ZERO,
@@ -29,7 +28,10 @@ impl UiState {
 
         let title = Canvas {
             center: Vec2::new(0.0, 0.0),
-            text: Some(format!("STAGE {} CLEAR", level)),
+            text: Some(format!(
+                "STAGE {} CLEAR",
+                settings.single_player_save.level - 1
+            )),
             text_color: Some(Vec4::ONE),
             text_size: Some(2.0),
             ..Default::default()
