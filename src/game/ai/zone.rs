@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 use crate::game::ai::ai::AI;
@@ -99,39 +100,26 @@ impl Zone {
 
     // TODO: {loic} create generic function for getting closest position
     pub fn closest_player(&mut self, pos: Vec2, players: &[Player]) -> Option<Vec2> {
-        let mut players_position: Vec<Vec2> = players
+        players
             .iter()
             .map(|player| player.position)
             .filter(|player_pos| *player_pos != pos)
-            .collect();
-        players_position.sort_by(|p, p2| {
-            let d1 = AI::calculate_heuristic_pos(&pos, p);
-            let d2 = AI::calculate_heuristic_pos(&pos, p2);
-            d1.cmp(&d2)
-        });
-        for &player in &players_position {
-            if self.cells.contains(&player) {
-                return Some(player);
-            }
-        }
-        None
+            .min_by(|a, b| {
+                let dist_a = a.distance_squared(pos);
+                let dist_b = b.distance_squared(pos);
+                dist_a.partial_cmp(&dist_b).unwrap_or(Ordering::Equal)
+            })
     }
     pub fn closest_powerup(&mut self, pos: Vec2, power_ups: &[PowerUp]) -> Option<Vec2> {
-        let mut powerup_positions: Vec<Vec2> = power_ups
+        power_ups
             .iter()
             .map(|power_up| power_up.pos.as_vec2())
-            .collect();
-        powerup_positions.sort_by(|p, p2| {
-            let d1 = AI::calculate_heuristic_pos(&pos, p);
-            let d2 = AI::calculate_heuristic_pos(&pos, p2);
-            d1.cmp(&d2)
-        });
-        for &powerup in &powerup_positions {
-            if self.cells.contains(&powerup) {
-                return Some(powerup);
-            }
-        }
-        None
+            .filter(|powerup| self.cells.contains(powerup))
+            .min_by(|a, b| {
+                let dist_a = a.distance_squared(pos);
+                let dist_b = b.distance_squared(pos);
+                dist_a.partial_cmp(&dist_b).unwrap_or(Ordering::Equal)
+            })
     }
     //
     fn filling_zone(
