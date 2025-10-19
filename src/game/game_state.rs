@@ -407,9 +407,17 @@ impl GameState {
     }
 
     fn update_cpu_inputs(&mut self, delta: f32) {
-        self.cpus.iter_mut().enumerate().for_each(|(i, cpu)| {
-            self.game_inputs[self.nb_humans as usize + i] =
-                cpu.get_input(&self.bombs, &self.power_ups, &self.players, &self.map, delta)
+        self.cpus
+            .iter_mut()
+            .filter(|cpu| self.players[cpu.id].alive)
+            .for_each(|cpu| {
+                self.game_inputs[cpu.id] = cpu.get_input(
+                    &self.bombs,
+                    &self.power_ups,
+                    &self.players,
+                    &self.map,
+                    delta,
+                )
         });
     }
     // Put the inputs read into game inputs
