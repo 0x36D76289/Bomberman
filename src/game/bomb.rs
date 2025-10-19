@@ -1,7 +1,10 @@
 use core::f32;
+use std::collections::HashSet;
 
 use super::{collision::Collision, enemy::Enemy};
 use crate::game::ai::{ai::AI, cpu::CPU};
+use crate::game::bomb;
+use crate::utils::vec2::Grid;
 use crate::{
     audio::{AudioManager, SoundEffect},
     game::{
@@ -107,8 +110,51 @@ impl Bomb {
         self.position.x = self.position.x as usize as f32 + 0.5;
         self.position.y = self.position.y as usize as f32 + 0.5;
     }
+    pub fn get_explosion_cells(&self, map: &Map) -> Vec<Vec2> {
+        let up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 });
+        let down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 });
+        let left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 });
+        let right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 });
+        let bomb_x = self.position.x;
+        let bomb_y = self.position.y;
+        let mut danger_cells: Vec<Vec2> = Vec::new();
 
-    fn find_wall(
+        danger_cells.push(self.position);
+        for y in -(up as i16)..=(down as i16) {
+            danger_cells.push(
+                Vec2 {
+                    x: bomb_x,
+                    y: bomb_y + y as f32,
+                }
+                .grid(),
+            );
+        }
+        for x in -(left as i16)..=(right as i16) {
+            danger_cells.push(
+                Vec2 {
+                    x: bomb_x + x as f32,
+                    y: bomb_y,
+                }
+                .grid(),
+            );
+        }
+        danger_cells
+    }
+
+    fn find_wall(&self, map: &Map, dirvec: Vec2) -> u8 {
+        for i in 1..=self.power {
+            let pos = self.position + dirvec * i as f32;
+            let elem = map.get_elem_pos(pos);
+            match elem {
+                MapElement::Empty | MapElement::Exit(_) => continue,
+                MapElement::Breakable(_) => {}
+                MapElement::Unbreakable(_) => (),
+            }
+            return i - 1;
+        }
+        self.power
+    }
+    fn explode_wall(
         &self,
         players: &[Player],
         cpus: &mut [CPU],
@@ -168,7 +214,7 @@ impl Bomb {
 
         audio_manager.play_sound_effect(SoundEffect::BombExplosion);
 
-        self.explosion.up = self.find_wall(
+        self.explosion.up = self.explode_wall(
             players,
             cpus,
             map,
@@ -176,7 +222,7 @@ impl Bomb {
             power_ups,
             resources,
         );
-        self.explosion.down = self.find_wall(
+        self.explosion.down = self.explode_wall(
             players,
             cpus,
             map,
@@ -184,7 +230,7 @@ impl Bomb {
             power_ups,
             resources,
         );
-        self.explosion.left = self.find_wall(
+        self.explosion.left = self.explode_wall(
             players,
             cpus,
             map,
@@ -192,7 +238,7 @@ impl Bomb {
             power_ups,
             resources,
         );
-        self.explosion.right = self.find_wall(
+        self.explosion.right = self.explode_wall(
             players,
             cpus,
             map,

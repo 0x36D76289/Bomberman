@@ -14,7 +14,7 @@ use crate::utils::vec2::{ApproxEq, Grid};
 use glam::{Vec2, Vec3};
 use log::logger;
 use rand::seq::IndexedRandom;
-use rand::{random_range, Rng};
+use rand::{Rng, random_range};
 
 const CPU_DECISION_TIMER: f32 = 0.1;
 const CPU_REACTION_TIME: f32 = 0.9;
@@ -45,7 +45,7 @@ pub enum CPUState {
     Mining,
     Attacking,
     Surviving,
-    Thinking
+    Thinking,
 }
 
 // Different CPU strategy
@@ -87,11 +87,49 @@ impl CPU {
         delta: f32,
     ) -> Input {
         let player = &players[self.id];
-
+        let mut dangerous_cells: Vec<Vec2> = Vec::new();
+        let mut accessible_cells: Vec<Vec2> = Vec::new();
+        if let Ok(mut zone) = self.zone.lock() {
+            dangerous_cells = zone.check_dangerous_cells(bombs, map);
+            accessible_cells = zone.get_accessible_cells(player.position, map, bombs);
+            if (!self.path.is_empty()) {
+                log::debug!(
+                    "! == target: {1:?}, papath{0:?}, dangerous : {dangerous_cells:?}; accessible: {accessible_cells:?}",
+                    self.path,
+                    self.target
+                );
+            }
+        }
+        // log::debug!("!{dangerous_cells:?} ! CAREFUL");
+        if dangerous_cells.contains(&player.position.grid()) {
+            self.path.clear();
+            self.target = None;
+            log::debug!("! I'm surviving now");
+            self.state = CPUState::Surviving;
+        }
+        if !self.path.is_empty()
+            && self
+                .path
+                .iter()
+                .any(|road| !accessible_cells.contains(road))
+        {
+            self.path.clear();
+            self.target = None;
+            log::debug!("! Got cut off, need to rethink");
+            self.state = CPUState::Thinking;
+        }
         match self.state {
             CPUState::Moving => {
                 if self.path.is_empty() {
-                    self.state = CPUState::Idle;
+                    self.target = None;
+                    self.state = CPUState::Thinking;
+                    self.do_nothing();
+                }
+                if dangerous_cells.iter().any(|cell| self.path.contains(cell)) {
+                    self.path.clear();
+
+                    log::debug!("!my path is now dangerous. I'm surviving now");
+                    self.state = CPUState::Surviving;
                     self.target = None;
                     self.do_nothing()
                 } else if let Some(input) = self.travel(map, player) {
@@ -110,8 +148,8 @@ impl CPU {
                     } else if let Some(player_pos) = zone.closest_player(player.position, players) {
                         log::debug!("I'm going to the player !");
                         self.target = Some(player_pos);
-                    } else if !zone.cells.is_empty() {
-                        if let Some(random_target) = zone.cells.choose(&mut rand::rng()) {
+                    } else if !accessible_cells.is_empty() {
+                        if let Some(random_target) = accessible_cells.choose(&mut rand::rng()) {
                             if random_target.grid() != player.position.grid() {
                                 self.target = Some(*random_target);
                             }
@@ -127,6 +165,36 @@ impl CPU {
                     }
                 }
                 return self.last_input.clone();
+            }
+            CPUState::Surviving => {
+                if self.path.is_empty() {
+                    let safe_spot = {
+                        let safe_cells = accessible_cells
+                            .iter()
+                            .filter(|cell| !dangerous_cells.contains(&cell.grid()));
+                        log::debug!("Safe cells = {safe_cells:?}");
+                        safe_cells.min_by(|a, b| {
+                            let dist_a = a.distance_squared(player.position);
+                            let dist_b = b.distance_squared(player.position);
+                            dist_a.partial_cmp(&dist_b).unwrap_or(Ordering::Equal)
+                        })
+                    };
+                    log::debug!("=== Trying to survive == ");
+                    if let Some(target_pos) = safe_spot {
+                        if let Some(path) = AI::find_path(player.position.grid(), *target_pos, map)
+                        {
+                            self.path = path;
+                        }
+                    }
+                    log::debug!("=== Safe spot {safe_spot:?} / path {0:?}== ", self.path);
+                }
+                if let Some(input) = self.travel(map, player) {
+                    input
+                } else {
+                    self.action_timer = rand::rng().random_range(0.5..=0.7);
+                    self.state = CPUState::Thinking;
+                    self.do_nothing()
+                }
             }
             CPUState::Thinking => {
                 self.action_timer -= delta; 
