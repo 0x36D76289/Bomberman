@@ -345,7 +345,7 @@ impl Bomb {
         match self.state {
             BombState::Planted => self.live_bomb(delta, map, power_ups, resources, audio_manager),
             BombState::Sliding(direction) => {
-                self.slide(direction, delta, map, players, &bombs_pos);
+                self.slide(direction, delta, map, players, bombs_pos);
                 self.live_bomb(delta, map, power_ups, resources, audio_manager);
             }
             BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
