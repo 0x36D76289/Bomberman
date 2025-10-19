@@ -9,6 +9,8 @@ fn settings_path(path: Option<String>) -> String {
     SETTINGS_PATH.lock().unwrap().clone()
 }
 
+const FILENAME: &str = "bomberman.save";
+
 #[cfg(target_os = "linux")]
 pub fn init_settings_path() {
     let dir = 'dir: {
@@ -22,7 +24,7 @@ pub fn init_settings_path() {
         }
         ".".to_string()
     };
-    let path = dir + "/settings.bomb";
+    let path = dir + "/" + FILENAME;
     settings_path(Some(path));
 }
 
@@ -40,7 +42,7 @@ pub fn init_settings_path() {
         }
         ".".to_string()
     };
-    let path = dir + "/settings.bomb";
+    let path = dir + "/" + FILENAME;
     settings_path(Some(path));
 }
 
@@ -53,7 +55,7 @@ pub fn init_settings_path() {
         ".".to_string()
     };
     let path = dir + "\\Bomberman";
-    settings_path(Some(path + "\\settings.bomb"));
+    settings_path(Some(path + "\\" + FILENAME));
 }
 
 pub fn get_settings_path() -> String {

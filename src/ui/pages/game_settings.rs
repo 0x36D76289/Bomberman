@@ -42,7 +42,7 @@ fn create_outlined_button(
             text_size: Some(TEXT_SIZE),
         },
         outline_color: Some(OUTLINE_COLOR),
-        neighbors: neighbors,
+        neighbors,
         selected_color: SELECTED_BUTTON_COLOR,
         selected_text_color: Some(SELECTED_TEXT_COLOR),
         selected_texture: None,
