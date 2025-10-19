@@ -418,7 +418,7 @@ impl GameState {
                     &self.map,
                     delta,
                 )
-        });
+            });
     }
     // Put the inputs read into game inputs
     fn update_human_inputs(&mut self, inputs: &Vec<Input>) {

@@ -5,7 +5,9 @@ use crate::game::ai::ai::AI;
 use crate::game::ai::entity::Entity;
 use crate::game::bomb::Bomb;
 use crate::game::collision::Collision;
+use crate::game::direction::Direction;
 use crate::game::map::map::Map;
+use crate::game::map::map_element::MapElement;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::{ai::entity::EntityType, game_state::GameState};
@@ -121,6 +123,27 @@ impl Zone {
                 dist_a.partial_cmp(&dist_b).unwrap_or(Ordering::Equal)
             })
     }
+
+    pub fn find_mining_spot(pos: Vec2, accessible_cells: &[Vec2], map: &Map) -> Option<Vec2> {
+        accessible_cells
+            .iter()
+            .filter(|&cell| {
+                for dir in Direction::iterator() {
+                    let neighbour = *cell + dir.to_vec2();
+                    if let MapElement::Breakable(_) = map.get_elem_pos(neighbour) {
+                        return true;
+                    }
+                }
+                false
+            })
+            .min_by(|a, b| {
+                pos.distance_squared(**a)
+                    .partial_cmp(&pos.distance_squared(**b))
+                    .unwrap_or(Ordering::Equal)
+            })
+            .copied()
+    }
+
     //
     fn filling_zone(
         &mut self,
