@@ -223,8 +223,8 @@ impl UiState {
         };
 
         // save new
-        let new = (sup_index as isize + direction as isize) as usize % FRAMECAP_COUNT;
-        settings.framerate_limit = FRAMECAPS[new];
+        let new = (sup_index as isize + direction as isize).rem_euclid(FRAMECAP_COUNT as isize);
+        settings.framerate_limit = FRAMECAPS[new as usize];
         settings.save();
     }
 
