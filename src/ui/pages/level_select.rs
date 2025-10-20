@@ -6,9 +6,9 @@ use crate::{
     game::game_state::GameState,
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
     ui::{
+        UiState,
         button::{Button, ButtonNeighbors},
         canvas::Canvas,
-        UiState,
     },
 };
 
@@ -77,7 +77,10 @@ impl UiState {
             return match GameState::new_campaign(selected_level, 3) {
                 Some(game_state) => (Some(AppState::game(game_state)), 1),
                 None => {
-                    println!("Error: Failed to load campaign level {}. Returning to menu.", selected_level);
+                    println!(
+                        "Error: Failed to load campaign level {}. Returning to menu.",
+                        selected_level
+                    );
                     audio_manager.play_background_music(BackgroundMusic::Menu);
                     (Some(AppState::main_menu()), 1)
                 }

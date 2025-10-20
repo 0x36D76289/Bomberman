@@ -341,7 +341,6 @@ impl Map {
             false,
         );
 
-
         // Clear center
         self.clear_range(self.width as i16 / 2, self.height as i16 / 2, 2);
 
