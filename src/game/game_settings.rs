@@ -5,10 +5,6 @@ use crate::{game::map::map_settings::MapSettings, settings::settings::Settings};
 pub struct GameSettings {
     pub nb_humans: u32,
     pub map_settings: MapSettings,
-    // TODO: complete with more options that the user can chose before the game:
-    // powers up list?
-    // AI difficulty?
-    // ...
 }
 
 impl GameSettings {

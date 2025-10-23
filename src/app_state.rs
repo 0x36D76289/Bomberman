@@ -34,9 +34,21 @@ pub enum AppStateEnum {
         next_level: u32,
         lives: u32,
     },
+    MultiplayerEndScreen,
 }
 
 impl AppState {
+    pub fn binds(player: usize, ratio: f32) -> Self {
+        Self {
+            state: AppStateEnum::Binds {
+                player,
+                waiting: -1,
+            },
+            game: None,
+            ui: Some(UiState::binds(player, ratio)),
+        }
+    }
+
     pub fn game(game_state: GameState) -> Self {
         Self {
             state: AppStateEnum::Game,
@@ -44,28 +56,11 @@ impl AppState {
             ..Default::default()
         }
     }
-
-    pub fn main_menu() -> Self {
+    pub fn game_over() -> Self {
         Self {
-            state: AppStateEnum::MainMenu,
+            state: AppStateEnum::GameOver,
             game: None,
-            ui: Some(UiState::main_menu()),
-        }
-    }
-
-    pub fn pause() -> Self {
-        Self {
-            state: AppStateEnum::Pause,
-            game: None,
-            ui: Some(UiState::pause()),
-        }
-    }
-
-    pub fn level_select() -> Self {
-        Self {
-            state: AppStateEnum::LevelSelect,
-            game: None,
-            ui: Some(UiState::level_select()),
+            ui: Some(UiState::game_over()),
         }
     }
 
@@ -79,7 +74,35 @@ impl AppState {
             ui: Some(UiState::game_settings(player_count)),
         }
     }
+    pub fn level_select() -> Self {
+        Self {
+            state: AppStateEnum::LevelSelect,
+            game: None,
+            ui: Some(UiState::level_select()),
+        }
+    }
+    pub fn main_menu() -> Self {
+        Self {
+            state: AppStateEnum::MainMenu,
+            game: None,
+            ui: Some(UiState::main_menu()),
+        }
+    }
+    pub fn multiplayer_end_screen(winners: Vec<u32>) -> Self {
+        Self {
+            state: AppStateEnum::MultiplayerEndScreen,
+            game: None,
+            ui: Some(UiState::multiplayer_end_screen(winners)),
+        }
+    }
 
+    pub fn pause() -> Self {
+        Self {
+            state: AppStateEnum::Pause,
+            game: None,
+            ui: Some(UiState::pause()),
+        }
+    }
     pub fn settings() -> Self {
         Self {
             state: AppStateEnum::Settings { selected_player: 0 },
@@ -87,26 +110,6 @@ impl AppState {
             ui: Some(UiState::settings()),
         }
     }
-
-    pub fn binds(player: usize, ratio: f32) -> Self {
-        Self {
-            state: AppStateEnum::Binds {
-                player,
-                waiting: -1,
-            },
-            game: None,
-            ui: Some(UiState::binds(player, ratio)),
-        }
-    }
-
-    pub fn game_over() -> Self {
-        Self {
-            state: AppStateEnum::GameOver,
-            game: None,
-            ui: Some(UiState::game_over()),
-        }
-    }
-
     pub fn stage_clear(settings: &mut Settings, level: u32, lives: u32) -> Self {
         Self {
             state: AppStateEnum::StageClear {
@@ -179,7 +182,7 @@ impl AppState {
                                     )
                                     .unwrap(),
                                 )),
-                                1,
+                                0,
                             )
                         } else {
                             (None, 1)
@@ -218,6 +221,11 @@ impl AppState {
                 .as_mut()
                 .unwrap()
                 .stage_clear_tick(delta, timer, next_level, lives),
+            AppStateEnum::MultiplayerEndScreen => self
+                .ui
+                .as_ref()
+                .unwrap()
+                .multiplayer_end_screen_tick(inputs),
         }
     }
 
@@ -232,6 +240,7 @@ impl AppState {
             AppStateEnum::Binds { .. } => false,
             AppStateEnum::Settings { .. } => false,
             AppStateEnum::StageClear { .. } => true,
+            AppStateEnum::MultiplayerEndScreen => false,
         }
     }
 }

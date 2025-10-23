@@ -36,7 +36,7 @@ impl Direction {
             (x, _) if x < 0.0 => Direction::Left,
             (_, y) if y > 0.0 => Direction::Down,
             (_, y) if y < 0.0 => Direction::Up,
-            (_, _) => Direction::Up, // TODO: Find better default
+            (_, _) => Direction::Up,
         }
     }
 }

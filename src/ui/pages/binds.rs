@@ -227,7 +227,6 @@ impl UiState {
     }
 
     fn set_wait(&mut self, inputs: &Vec<Input>, waiting: &mut isize) {
-        // TODO: take events and check if click
         if self.selected == BindsButtons::Delete as usize
             || self.selected == BindsButtons::Done as usize
         {
