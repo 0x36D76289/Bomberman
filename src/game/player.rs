@@ -134,9 +134,6 @@ impl Player {
             }
         }
 
-        //TODO:
-        // check position doesn't have another player / enemy
-
         self.bombs_remaining -= 1;
         Some(ret_bomb)
     }

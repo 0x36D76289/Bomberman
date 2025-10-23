@@ -74,7 +74,7 @@ impl App {
         }
     }
 
-    fn update_state(&mut self) {
+    fn update_state(&mut self, event_loop: &ActiveEventLoop) {
         self.update_inputs();
 
         self.audio_manager.set_volume(&self.settings);
@@ -94,8 +94,9 @@ impl App {
         // println!("{:#?}", self.events);
         self.events.clear();
         for _ in 0..res.1 {
-            if self.state_stack.pop().is_none() {
-                // TODO: Handle application stop if last state is popped
+            if self.state_stack.pop().is_none() || self.state_stack.is_empty() {
+                event_loop.exit();
+                return;
             }
         }
         if let Some(new_state) = res.0 {
@@ -140,7 +141,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::RedrawRequested => {
                 self.register_controller_inputs();
-                self.update_state();
+                self.update_state(event_loop);
                 self.render();
             }
             WindowEvent::Resized(_) => self.graphics.renderer.recreate_swapchain(true),

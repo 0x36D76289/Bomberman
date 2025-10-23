@@ -48,26 +48,30 @@ impl Map {
         }
     }
 
+    fn fix_object(elem: &mut MapElement, x: usize, y: usize) {
+        match elem {
+            MapElement::Empty | MapElement::Exit(_) => (),
+            MapElement::Breakable(obj) => {
+                obj.transform = Transform {
+                    translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
+                    scale: Vec3::splat(0.9),
+                    rotation: Vec3::ZERO,
+                }
+            }
+            MapElement::Unbreakable(obj) => {
+                obj.transform = Transform {
+                    translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
+                    scale: Vec3::ONE,
+                    rotation: Vec3::ZERO,
+                }
+            }
+        }
+    }
+
     fn fix_objects(mut self) -> Self {
         for y in 0..self.height {
             for x in 0..self.width {
-                match &mut self.content[y * self.width + x] {
-                    MapElement::Empty | MapElement::Exit(_) => (),
-                    MapElement::Breakable(obj) => {
-                        obj.transform = Transform {
-                            translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
-                            scale: Vec3::splat(0.9),
-                            rotation: Vec3::ZERO,
-                        }
-                    }
-                    MapElement::Unbreakable(obj) => {
-                        obj.transform = Transform {
-                            translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
-                            scale: Vec3::ONE,
-                            rotation: Vec3::ZERO,
-                        }
-                    }
-                }
+                Self::fix_object(&mut self.content[y * self.width + x], x, y);
             }
         }
         self
@@ -500,7 +504,7 @@ impl Map {
             return Err(());
         }
         self.content[y * self.width + x] = elem;
-        // TODO: update object
+        Self::fix_object(&mut self.content[y * self.width + x], x, y);
         Ok(())
     }
 

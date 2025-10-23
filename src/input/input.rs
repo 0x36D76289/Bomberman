@@ -93,7 +93,6 @@ impl Input {
         }
     }
 
-    // TODO: rename to reflect change, add controller support
     fn update_input_component_from_events(
         &mut self,
         events: &Vec<InputEvent>,

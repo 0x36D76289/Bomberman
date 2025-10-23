@@ -3,8 +3,6 @@ use gilrs::EventType;
 
 const DEADZONE: f32 = 0.2;
 
-/// TODO:
-/// this is "is_down"
 pub fn is_bindable_action(event: &InputEvent) -> bool {
     match event {
         InputEvent::Keyboard { key: _, down } => *down,
