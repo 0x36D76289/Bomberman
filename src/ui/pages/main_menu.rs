@@ -149,7 +149,13 @@ impl UiState {
                     }
                 }
                 1 => (Some(AppState::level_select()), 1),
-                2 => (Some(AppState::game_settings(resources, 2)), 0),
+                2 => (
+                    Some(AppState::game_settings(
+                        resources,
+                        settings.binds.len() as u8,
+                    )),
+                    0,
+                ),
                 3 => (Some(AppState::settings()), 0),
                 4 => (None, 1), // Quit
                 _ => (None, 0),

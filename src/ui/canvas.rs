@@ -13,9 +13,9 @@ use vulkano::{
 pub struct Canvas {
     /// Center of the canvas (between \[-1, -1\] and \[1, 1\]).
     pub center: Vec2,
-    /// Width of the canvas (between -1 and 1).
+    /// Width of the canvas (between 0 and 2).
     pub width: f32,
-    /// Height of the canvas (between -1 and 1).
+    /// Height of the canvas (between 0 and 2).
     pub height: f32,
     /// Color of the canvas (RGBA format).
     pub color: Vec4,
