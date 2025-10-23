@@ -58,6 +58,7 @@ pub struct GameState {
     map: Map,
     camera: Transform,
     light: LightInfo,
+    alive_players: Vec<u32>,
     pub render_info: StateRenderInfo,
 }
 
@@ -71,6 +72,7 @@ impl GameState {
         };
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, resources, &nb_humans);
+        let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
@@ -105,6 +107,7 @@ impl GameState {
             camera,
             light,
             render_info,
+            alive_players,
         })
     }
 
@@ -130,6 +133,7 @@ impl GameState {
             resources_to_load_map,
             true,
         ));
+        let alive_players = players.iter().map(|player| player.id).collect();
 
         let mut enemies = Vec::new();
         for (i, spawn) in enemy_spawns.iter().enumerate() {
@@ -172,6 +176,7 @@ impl GameState {
             camera,
             light,
             render_info,
+            alive_players,
         })
     }
 
@@ -195,6 +200,7 @@ impl GameState {
     ) -> Result<Self, Box<dyn Error>> {
         let nb_humans = settings.nb_humans;
         let players = Self::create_players(&map, resources, &nb_humans);
+        let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
         let camera = Transform {
@@ -229,6 +235,7 @@ impl GameState {
             camera,
             light,
             render_info,
+            alive_players,
         })
     }
 
@@ -280,7 +287,7 @@ impl GameState {
         delta: f32,
         resources: &Resources,
         audio_manager: &mut AudioManager,
-    ) {
+    ) -> Option<Vec<u32>> {
         // tick bombs
         for i in 0..self.bombs.len() {
             let bombs_pos = self
@@ -339,6 +346,24 @@ impl GameState {
                 &mut self.bombs,
             );
         }
+        self.create_mp_ret()
+    }
+
+    fn create_mp_ret(&mut self) -> Option<Vec<u32>> {
+        let alive_players: Vec<u32> = self
+            .players
+            .iter()
+            .filter_map(|player| if player.alive { Some(player.id) } else { None })
+            .collect();
+
+        if alive_players.is_empty() {
+            return Some(self.alive_players.clone());
+        }
+        if alive_players.len() == 1 {
+            return Some(alive_players);
+        }
+        self.alive_players = alive_players;
+        return None;
     }
 
     fn campaign_tick(
@@ -428,7 +453,9 @@ impl GameState {
 
         let result = match self.mode {
             GameMode::Multiplayer => {
-                self.mp_game_tick(delta_time, resources, audio_manager);
+                if let Some(winners) = self.mp_game_tick(delta_time, resources, audio_manager) {
+                    return (Some(AppState::multiplayer_end_screen(winners)), 1);
+                }
                 GameTickResult::None
             }
             GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
