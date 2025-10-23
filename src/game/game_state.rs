@@ -71,7 +71,7 @@ impl GameState {
             return Err("Map creation fail".into());
         };
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, resources, &nb_humans);
+        let players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
         let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
@@ -197,9 +197,9 @@ impl GameState {
         resources: &Resources,
         settings: GameSettings,
         map: Map,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> Self {
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, resources, &nb_humans);
+        let players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
         let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
@@ -220,7 +220,7 @@ impl GameState {
             ..Default::default()
         };
 
-        Ok(Self {
+        Self {
             mode: GameMode::Multiplayer,
             campaign_progress: None,
             players,
@@ -236,13 +236,21 @@ impl GameState {
             light,
             render_info,
             alive_players,
-        })
+        }
     }
 
-    fn create_players(map: &Map, resources: &Resources, nb_humans: &u32) -> Vec<Player> {
+    fn create_players(
+        map: &Map,
+        resources: &Resources,
+        nb_humans: u32,
+        nb_bots: u32,
+    ) -> Vec<Player> {
         let mut players = Vec::<Player>::new();
         let mut id: u32 = 0;
-        for spawn in map.spawns.clone() {
+        for (i, spawn) in map.spawns.clone().iter().enumerate() {
+            if i >= (nb_humans + nb_bots) as usize {
+                break;
+            }
             players.push(Player::new(
                 id,
                 Vec2 {
@@ -251,7 +259,7 @@ impl GameState {
                 },
                 spawn.direction,
                 resources,
-                id < *nb_humans,
+                id < nb_humans,
             ));
 
             id += 1;

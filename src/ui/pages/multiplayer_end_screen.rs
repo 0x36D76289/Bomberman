@@ -17,20 +17,20 @@ impl UiState {
         let text = if winners.len() == 1 {
             (
                 "The winner is:".to_string(),
-                format!("Player {}", winners[0]),
+                format!("Player {}", winners[0] + 1),
             )
         } else {
             let mut ret = "Players ".to_string();
             let mut win_copy = winners.clone();
 
             while win_copy.len() >= 3 {
-                ret += &format!("{}, ", win_copy.pop().unwrap());
+                ret += &format!("{}, ", win_copy.pop().unwrap() + 1);
             }
             if win_copy.len() == 2 {
-                ret += &format!("{}, and ", win_copy.pop().unwrap());
+                ret += &format!("{}, and ", win_copy.pop().unwrap() + 1);
             }
             if win_copy.len() == 1 {
-                ret += &format!("{}", win_copy.pop().unwrap())
+                ret += &format!("{}", win_copy.pop().unwrap() + 1)
             }
             ("The winners are:".to_string(), ret)
         };
