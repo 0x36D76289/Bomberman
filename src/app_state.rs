@@ -174,14 +174,15 @@ impl AppState {
                     Some(enter_pressed) => {
                         if enter_pressed {
                             (
-                                Some(AppState::game(
-                                    GameState::new_multiplayer_from_map(
-                                        resources,
-                                        GameSettings::default(),
-                                        game.get_map().clone(),
-                                    )
-                                    .unwrap(),
-                                )),
+                                Some(AppState::game(GameState::new_multiplayer_from_map(
+                                    resources,
+                                    GameSettings {
+                                        nb_humans: ui_game_settings.player_count as u32,
+                                        nb_bots: ui_game_settings.bot_count as u32,
+                                        ..GameSettings::default()
+                                    },
+                                    game.get_map().clone(),
+                                ))),
                                 0,
                             )
                         } else {
