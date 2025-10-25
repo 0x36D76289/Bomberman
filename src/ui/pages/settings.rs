@@ -20,6 +20,7 @@ use crate::{
     },
 };
 
+/// The ordered list of buttons in the settings ui page
 enum SettingsButtons {
     Resolution,
     Filtering,
@@ -29,8 +30,11 @@ enum SettingsButtons {
     SfxVol,
     Binds,
 }
+
+/// The amount of values in the enum, used for layout
 const BUTTON_COUNT: u8 = 7;
 
+/// The shortcut to unified button creation on the settings page
 fn create_button(index: u8, text: &str) -> Button {
     Button {
         canvas: Canvas {
@@ -60,6 +64,7 @@ fn create_button(index: u8, text: &str) -> Button {
 }
 
 impl UiState {
+    /// The general settings ui page constructor
     pub fn settings() -> Self {
         let mut canvases = Vec::new();
 
@@ -107,6 +112,7 @@ impl UiState {
         }
     }
 
+    /// Updates the resolution from a preset list
     fn update_resolution(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::Resolution as usize;
         if self.selected != index {
@@ -158,6 +164,7 @@ impl UiState {
         settings.save();
     }
 
+    /// Updates the filtering of the game
     fn update_filtering(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::Filtering as usize;
         if self.selected != index {
@@ -171,6 +178,7 @@ impl UiState {
         }
     }
 
+    /// Updates the fullscreen display of the game
     fn update_fullscreen(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::Fullscreen as usize;
         if self.selected != index {
@@ -183,6 +191,8 @@ impl UiState {
             settings.save();
         }
     }
+
+    /// Updates the maximum framerate from a preset list of values + vsync and uncapped
     fn update_framerate(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::Framecap as usize;
         if self.selected != index {
@@ -228,6 +238,7 @@ impl UiState {
         settings.save();
     }
 
+    /// Updates the music volume
     fn update_music_volume(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::MusicVol as usize;
         if self.selected != index {
@@ -247,6 +258,8 @@ impl UiState {
             settings.save();
         }
     }
+
+    /// Updates the Sound Effects volume
     fn update_sfx_volume(&mut self, settings: &mut Settings, direction: i8) {
         let index = SettingsButtons::SfxVol as usize;
         if self.selected != index {
@@ -254,6 +267,7 @@ impl UiState {
             return;
         }
 
+        // TODO: play a sound effect on change (explosion)
         const TICKS: usize = 21;
         let mut str: String = "-".to_string().repeat(TICKS);
         let vol = (settings.volume_sfx.clamp(0.0, 1.0) * (TICKS - 1) as f32) as usize;
@@ -267,6 +281,7 @@ impl UiState {
         }
     }
 
+    /// Changes the selected player in binds and opens the ui page if selected
     fn update_binds(
         &mut self,
         settings: &mut Settings,
@@ -304,6 +319,7 @@ impl UiState {
         return None;
     }
 
+    /// The general settings ui page tick function
     pub fn settings_tick(
         &mut self,
         inputs: &Vec<Input>,

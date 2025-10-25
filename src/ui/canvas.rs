@@ -29,6 +29,7 @@ pub struct Canvas {
     pub text_size: Option<f32>,
 }
 
+// TODO: doc
 const VERTEX_UV: [[f32; 2]; 6] = [
     [1.0, 0.0],
     [0.0, 0.0],
@@ -39,6 +40,7 @@ const VERTEX_UV: [[f32; 2]; 6] = [
 ];
 
 impl Canvas {
+    // TODO: doc
     fn vertex_positions(&self) -> [Vec2; 6] {
         let half_width = self.width / 2.0;
         let half_height = self.height / 2.0;

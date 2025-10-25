@@ -5,13 +5,17 @@ use crate::input::{
     input_state::InputState,
 };
 
+/// The amount of binds for each player
 pub const BIND_LEN: usize = 6;
+/// The binds of each player
 pub type Binds = [InputEvent; BIND_LEN];
 
+/// Default constructor for [Binds] as it is a foreign type (can't impl)
 pub fn default_binds() -> Binds {
     [InputEvent::unbound(); BIND_LEN]
 }
 
+/// The current state of a player's input
 #[derive(Debug, Clone, Copy)]
 pub struct Input {
     states: [InputState; BIND_LEN],
@@ -26,16 +30,19 @@ impl Default for Input {
 }
 
 impl Input {
+    /// Constructor with every key already pressed, used when changing player count
     pub fn held_new() -> Self {
         Self {
             states: [InputState::Held; BIND_LEN],
         }
     }
 
+    /// Converts 2 directions into a single value from [-1.0] to [1.0]
     fn axis_to_float(negative: InputState, positive: InputState) -> f32 {
         -(negative.is_down() as u8 as f32) + positive.is_down() as u8 as f32
     }
 
+    /// Creates a Vec2 representing the position of the 4 movement keys
     pub fn as_vec2(&self) -> Vec2 {
         Vec2 {
             x: Self::axis_to_float(self.left(), self.right()),
@@ -43,25 +50,32 @@ impl Input {
         }
     }
 
+    /// Query a single InputState from a player
     pub fn get_state(&self, name: InputName) -> InputState {
         self.states[name as usize]
     }
 
+    /// Gets the current value of a player's Up input
     pub fn up(&self) -> InputState {
         self.get_state(InputName::Up)
     }
+    /// Gets the current value of a player's Down input
     pub fn down(&self) -> InputState {
         self.get_state(InputName::Down)
     }
+    /// Gets the current value of a player's Left input
     pub fn left(&self) -> InputState {
         self.get_state(InputName::Left)
     }
+    /// Gets the current value of a player's Right input
     pub fn right(&self) -> InputState {
         self.get_state(InputName::Right)
     }
+    /// Gets the current value of a player's Bomb input
     pub fn bomb(&self) -> InputState {
         self.get_state(InputName::Bomb)
     }
+    /// Gets the current value of a player's Back input
     pub fn back(&self) -> InputState {
         self.get_state(InputName::Back)
     }
@@ -79,12 +93,14 @@ impl Input {
         }
     }
 
+    // TODO: remove or document (unused)
     pub fn release_all(&mut self) {
         for state in self.states.iter_mut() {
             *state = InputState::Released;
         }
     }
 
+    // TODO: remove or document (unused)
     pub fn release_all_but(&mut self, input: InputName) {
         for (i, state) in self.states.iter_mut().enumerate() {
             if i != input as usize {
@@ -93,6 +109,7 @@ impl Input {
         }
     }
 
+    /// Updates a single Input State from a player's binds and the tick's events
     fn update_input_component_from_events(
         &mut self,
         events: &Vec<InputEvent>,

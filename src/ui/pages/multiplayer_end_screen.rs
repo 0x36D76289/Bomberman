@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec4};
+use glam::Vec2;
 
 use crate::{
     app_state::AppState,
@@ -10,9 +10,11 @@ use crate::{
     },
 };
 
+/// The space between the 2 lines of text
 const LINE_SPACING: f32 = 0.1;
 
 impl UiState {
+    /// The multiplayer end screen ui page constructor
     pub fn multiplayer_end_screen(winners: Vec<u32>) -> Self {
         let text = if winners.len() == 1 {
             (
@@ -79,6 +81,7 @@ impl UiState {
         }
     }
 
+    /// The multiplayer end screen ui tick function
     pub fn multiplayer_end_screen_tick(&self, inputs: &Vec<Input>) -> (Option<AppState>, u8) {
         if inputs.menu_confirm() == InputState::Pressed {
             (None, 1)

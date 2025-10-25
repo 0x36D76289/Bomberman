@@ -21,6 +21,7 @@ use crate::{
     },
 };
 
+/// The list of buttons in the page
 enum BindsButtons {
     Up,
     Down,
@@ -32,6 +33,7 @@ enum BindsButtons {
     Done,
 }
 
+/// A shortcut to create the format of buttons this page uses
 fn create_button() -> Button {
     const BUTTON_HEIGHT: f32 = 0.2;
     const BUTTON_WIDTH: f32 = 0.3;
@@ -52,6 +54,7 @@ fn create_button() -> Button {
 }
 
 impl UiState {
+    /// The binds page ui constructor
     pub fn binds(player: usize, ratio: f32) -> Self {
         let mut canvases = Vec::new();
         canvases.push(Canvas {
@@ -208,6 +211,7 @@ impl UiState {
         }
     }
 
+    /// Sets the name of each bind if unselected, the key if selected, or "..." if waiting
     fn set_names(&mut self, waiting: isize, settings: &Settings, player: usize) {
         self.buttons[BindsButtons::Up as usize].canvas.text = Some("Up".to_string());
         self.buttons[BindsButtons::Down as usize].canvas.text = Some("Down".to_string());
@@ -226,6 +230,7 @@ impl UiState {
         }
     }
 
+    /// Sets the value of the bind being waited on
     fn set_wait(&mut self, inputs: &Vec<Input>, waiting: &mut isize) {
         if self.selected == BindsButtons::Delete as usize
             || self.selected == BindsButtons::Done as usize
@@ -239,6 +244,7 @@ impl UiState {
         *waiting = self.selected as isize;
     }
 
+    /// Replaces a bind with the earliest valid event
     pub fn set_bind(
         &mut self,
         events: &Vec<InputEvent>,
@@ -256,6 +262,7 @@ impl UiState {
         }
     }
 
+    /// The tick function for the binds ui page
     pub fn binds_tick(
         &mut self,
         inputs: &Vec<Input>,

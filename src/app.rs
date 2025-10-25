@@ -17,19 +17,31 @@ use winit::{
     window::WindowId,
 };
 
+/// The main structure containing the entire event loop
 pub struct App {
+    /// The list of App States, it is modified as a stack only pushing at the top or popping from
+    /// the top. The state at the top of the stack is ticked every frame
     state_stack: Vec<AppState>,
+    /// The last observed position of the mouse, used to save click positions
     mouse_pos: PhysicalPosition<f64>,
+    /// The list of events since the last tick
     events: Vec<InputEvent>,
+    /// The list of player inputs
     inputs: Vec<Input>,
+    /// The app's assets
     resources: Resources,
+    /// The internal graphics data
     graphics: Graphics,
+    /// The application's settings, loaded at app start
     settings: Settings,
+    /// The audio manager plays, interrupts, and modifies music and sound effects
     audio_manager: AudioManager,
+    /// The gilrs structure polls controller events
     gilrs: Gilrs,
 }
 
 impl App {
+    /// The main App constructor
     pub fn init(settings: Settings, event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let graphics = Graphics::new(event_loop)?;
         let gilrs = Gilrs::new()?;
@@ -61,10 +73,12 @@ impl App {
         })
     }
 
+    /// getter for the app's Resources
     pub fn get_resources(&self) -> &Resources {
         &self.resources
     }
 
+    /// updates each of the player's inputs based on the current state of the binds
     fn update_inputs(&mut self) {
         if self.inputs.len() != self.settings.binds.len() {
             self.inputs = vec![Input::held_new(); self.settings.binds.len()]
@@ -74,6 +88,7 @@ impl App {
         }
     }
 
+    /// Ticks the stack's topmost element and pops or pushes according to result
     fn update_state(&mut self, event_loop: &ActiveEventLoop) {
         self.update_inputs();
 
@@ -104,6 +119,7 @@ impl App {
         }
     }
 
+    /// Renders a single frame onto the window
     fn render(&mut self) {
         let renderer = &mut self.graphics.renderer;
 
@@ -115,6 +131,8 @@ impl App {
             renderer.rcx().time_info.avg_fps
         ));
     }
+
+    /// Adds every controller input to the event vector since the last tick
     fn register_controller_inputs(&mut self) {
         while let Some(event) = self.gilrs.next_event() {
             self.events.push(InputEvent::ControllerInput {
@@ -127,6 +145,7 @@ impl App {
 
 impl ApplicationHandler for App {
     // This is called when the window is created
+    //TODO: doc
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let renderer = &mut self.graphics.renderer;
         let vulkan = &self.graphics.vulkan;
@@ -137,6 +156,8 @@ impl ApplicationHandler for App {
         }
     }
 
+    /// This function is called by winit on every event the window receives
+    /// eg. resize, keyboard inputs, clicks, moving, etc.
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::RedrawRequested => {
@@ -178,6 +199,7 @@ impl ApplicationHandler for App {
         }
     }
 
+    //TODO: doc
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         self.graphics.renderer.request_redraw();
     }

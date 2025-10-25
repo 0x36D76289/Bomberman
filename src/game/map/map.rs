@@ -13,15 +13,22 @@ use crate::{
     graphics::{object::Object, transform::Transform},
 };
 
+/// Represents the entire play area with a list of tiles and spawnpoints
 #[derive(Debug, Clone)]
 pub struct Map {
+    /// The width of the map (including walls)
     pub width: usize,
+    /// The height of the map (including walls)
     pub height: usize,
+    /// The internal representation of the map, each tile is at pos y * width + x
     content: Vec<MapElement>,
+    /// The list of player spawn points
     pub spawns: Vec<SpawnPoint>,
+    /// A single object that is rendered below the map
     pub floor: Object,
 }
 
+/// The representation of a level of the campaign with a [Map], enemy spawns, and the level exit
 pub struct LevelData {
     pub map: Map,
     pub player_spawn: Vec2,
@@ -30,6 +37,7 @@ pub struct LevelData {
 }
 
 impl Map {
+    /// Creates the internal object for a Breakable MapElement
     fn create_breakable(ressources: &Resources) -> Object {
         Object {
             model: ressources.models[&ResourceName::Breakable].clone(),
@@ -39,6 +47,7 @@ impl Map {
         }
     }
 
+    /// Creates the internal object for an Unbreakable MapElement
     fn create_unbreakable(ressources: &Resources) -> Object {
         Object {
             model: ressources.models[&ResourceName::Unbreakable].clone(),
@@ -48,6 +57,7 @@ impl Map {
         }
     }
 
+    /// Sets a [MapElement]'s internal position to match its index in the content vector
     fn fix_object(elem: &mut MapElement, x: usize, y: usize) {
         match elem {
             MapElement::Empty | MapElement::Exit(_) => (),
@@ -68,6 +78,7 @@ impl Map {
         }
     }
 
+    /// Aligns each object with their position in the vector
     fn fix_objects(mut self) -> Self {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -77,6 +88,7 @@ impl Map {
         self
     }
 
+    /// Creates and places the object for the floor
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
         Object {
             model: ressources.models[&ResourceName::Floor].clone(),
@@ -90,6 +102,7 @@ impl Map {
         }
     }
 
+    /// Constructor: creates an empty x*y map
     fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
         Map {
             width: width as usize,
@@ -100,6 +113,7 @@ impl Map {
         }
     }
 
+    /// Creates unbreakable blocks at every (x,y) such that x and y are odd (unfixed)
     fn grid(mut self, ressources: &Resources) -> Self {
         let unbreakable_object = Self::create_unbreakable(ressources);
 
@@ -112,6 +126,7 @@ impl Map {
         self
     }
 
+    /// Replaces every empty map element with a breakable object (unfixed)
     fn fill_break(mut self, ressources: &Resources) -> Self {
         let breakable_object = Self::create_breakable(ressources);
 
@@ -124,6 +139,7 @@ impl Map {
         self
     }
 
+    /// Expands the map by adding a ring of unbreakable blocks around it (unfixed)
     fn walls(self, ressources: &Resources) -> Self {
         let unbreakable_object = Self::create_unbreakable(ressources);
 
@@ -154,6 +170,7 @@ impl Map {
         }
     }
 
+    /// Adds 4 spawns in the corners of a map
     fn corners(mut self) -> Self {
         // Set spawns
         self.spawns.push(SpawnPoint {
@@ -196,45 +213,44 @@ impl Map {
         self
     }
 
+    /// Adds a spawn in the center of each quarter of the map
+    /// as well as one at (width/2, 0) and at (width/2, height-1)
     fn arena(mut self) -> Self {
         // Top and bottom
-        self.add_spawn(self.width as i16 / 2, 0, 1, Direction::Down, false);
+        self.add_spawn(self.width as i16 / 2, 0, 1, Some(Direction::Down));
         self.add_spawn(
             self.width as i16 / 2,
             self.height as i16 - 1,
             1,
-            Direction::Up,
-            false,
+            Some(Direction::Up),
         );
         // middle ring
         let quarter_x = (self.width - 1) / 4;
         let quarter_y = (self.height - 1) / 4 + 1;
 
-        self.add_spawn(quarter_x as i16, quarter_y as i16, 1, Direction::Up, false);
+        self.add_spawn(quarter_x as i16, quarter_y as i16, 1, Some(Direction::Up));
         self.add_spawn(
             (self.width - quarter_x - 1) as i16,
             quarter_y as i16,
             1,
-            Direction::Up,
-            false,
+            Some(Direction::Up),
         );
         self.add_spawn(
             quarter_x as i16,
             (self.height - quarter_y - 1) as i16,
             1,
-            Direction::Down,
-            false,
+            Some(Direction::Down),
         );
         self.add_spawn(
             (self.width - quarter_x - 1) as i16,
             (self.height - quarter_y - 1) as i16,
             1,
-            Direction::Down,
-            false,
+            Some(Direction::Down),
         );
         self
     }
 
+    /// Replaces a percentage of the breakable blocks with air (random)
     fn cheese(mut self, cheesiness: u8) -> Self {
         for i in 0..self.content.len() {
             if let MapElement::Breakable(_) = self.content[i]
@@ -246,6 +262,7 @@ impl Map {
         self
     }
 
+    /// Replaces breakable blocks with air around position x, y
     fn clear_range(&mut self, x: i16, y: i16, size: i16) {
         for y in (y - size).max(0)..=(y + size).min(self.height as i16 - 1) {
             for x in (x - size).max(0)..=(x + size).min(self.width as i16 - 1) {
@@ -257,26 +274,22 @@ impl Map {
         }
     }
 
-    fn add_spawn(
-        &mut self,
-        x: i16,
-        y: i16,
-        spawn_size: u8,
-        direction: Direction,
-        random_dir: bool,
-    ) {
-        if random_dir {
-            self.spawns.push(SpawnPoint::init(x as i32, y as i32));
-        } else {
+    /// Adds a spawnpoint, if direction is [None] then a random one is selected
+    fn add_spawn(&mut self, x: i16, y: i16, spawn_size: u8, direction: Option<Direction>) {
+        if let Some(direction) = direction {
             self.spawns.push(SpawnPoint {
                 x: x as i32,
                 y: y as i32,
                 direction,
             });
+        } else {
+            self.spawns.push(SpawnPoint::init(x as i32, y as i32));
         }
         self.clear_range(x, y, spawn_size as i16);
     }
 
+    /// Adds spawns at random points towards the map that aren't less that safe_range away from
+    /// each other on both axis
     fn add_spawns_random(&mut self, safe_range: u8, spawn_size: u8) -> bool {
         if (self.width < 4) || (self.height < 4) {
             return false;
@@ -296,10 +309,11 @@ impl Map {
                 return false;
             }
         }
-        self.add_spawn(x, y, spawn_size, Direction::Up, true);
+        self.add_spawn(x, y, spawn_size, None);
         true
     }
 
+    /// Adds spawns/spawnpoints at random throughout a map
     fn random(mut self, settings: &MapSettings) -> Option<Self> {
         let mut attempts = settings.attempts;
         let mut spawns = settings.spawns;
@@ -316,33 +330,33 @@ impl Map {
         Some(self)
     }
 
+    /// The teams generator clears a small range at the center and 2 spawns in each corner of
+    /// the map
     fn teams(mut self, resources: &Resources) -> Self {
         // Spawns
         // First player of each team
-        self.add_spawn(3, 0, 0, Direction::Right, false);
+        self.add_spawn(3, 0, 0, Some(Direction::Right));
 
-        self.add_spawn(self.width as i16 - 4, 0, 0, Direction::Left, false);
+        self.add_spawn(self.width as i16 - 4, 0, 0, Some(Direction::Left));
 
-        self.add_spawn(3, self.height as i16 - 1, 0, Direction::Right, false);
+        self.add_spawn(3, self.height as i16 - 1, 0, Some(Direction::Right));
 
         self.add_spawn(
             self.width as i16 - 4,
             self.height as i16 - 1,
             0,
-            Direction::Left,
-            false,
+            Some(Direction::Left),
         );
         // Second player of each team
         // spawn order set so that teams are more balanced
-        self.add_spawn(0, 3, 0, Direction::Down, false);
-        self.add_spawn(self.width as i16 - 1, 3, 0, Direction::Down, false);
-        self.add_spawn(0, self.height as i16 - 4, 0, Direction::Up, false);
+        self.add_spawn(0, 3, 0, Some(Direction::Down));
+        self.add_spawn(self.width as i16 - 1, 3, 0, Some(Direction::Down));
+        self.add_spawn(0, self.height as i16 - 4, 0, Some(Direction::Up));
         self.add_spawn(
             self.width as i16 - 1,
             self.height as i16 - 4,
             0,
-            Direction::Up,
-            false,
+            Some(Direction::Up),
         );
 
         // Clear center
@@ -388,6 +402,7 @@ impl Map {
             .collect()
     }
 
+    /// Creates a new [Map] object following MapSettings, may fail
     pub fn new(settings: MapSettings, ressources: &Resources) -> Option<Self> {
         let mut ret = Self::empty(settings.width, settings.height, ressources)
             .grid(ressources)
@@ -407,6 +422,7 @@ impl Map {
         Some(ret.fix_objects())
     }
 
+    /// Loads a map layout from a file according to the current level
     pub fn from_file(level: u32, resources: &Resources) -> Option<LevelData> {
         const LEVEL_1_DATA: &str = include_str!("../../assets/levels/1-1.level");
         const LEVEL_2_DATA: &str = include_str!("../../assets/levels/1-2.level");
@@ -472,6 +488,7 @@ impl Map {
         })
     }
 
+    /// Makes a string representation of the map for debug purposes
     #[cfg(debug_assertions)]
     #[allow(unused)]
     pub fn to_str(&self) -> String {
@@ -485,6 +502,7 @@ impl Map {
         str
     }
 
+    /// Obtains a reference for the [MapElement] at coords (x, y)
     pub fn get_elem(&self, x: usize, y: usize) -> &MapElement {
         if x >= self.width || y >= self.height {
             return &MapElement::Empty;
@@ -492,6 +510,7 @@ impl Map {
         &self.content[y * self.width + x]
     }
 
+    /// Obtains a reference for the [MapElement] at coords (x, y)
     pub fn get_elem_pos(&self, pos: Vec2) -> &MapElement {
         if pos.x < 0.0 || pos.y < 0.0 {
             return &MapElement::Empty;
@@ -499,6 +518,7 @@ impl Map {
         self.get_elem(pos.x as usize, pos.y as usize)
     }
 
+    /// Replaces the [MapElement] at coords (x, y) and fixes it, fails if position is out of bounds
     pub fn set_elem(&mut self, x: usize, y: usize, elem: MapElement) -> Result<(), ()> {
         if x >= self.width || y >= self.height {
             return Err(());
@@ -508,6 +528,7 @@ impl Map {
         Ok(())
     }
 
+    /// Replaces the [MapElement] at coords (x, y) and fixes it, fails if position is out of bounds
     pub fn set_elem_pos(&mut self, pos: Vec2, elem: MapElement) -> Result<(), ()> {
         if pos.x < 0.0 || pos.y < 0.0 {
             return Err(());
@@ -515,6 +536,7 @@ impl Map {
         self.set_elem(pos.x as usize, pos.y as usize, elem)
     }
 
+    /// Lists every [MapElement] in the map
     pub fn iter(&self) -> impl Iterator<Item = &MapElement> {
         self.content.iter()
     }

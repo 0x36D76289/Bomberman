@@ -1,6 +1,6 @@
 use core::f32;
 
-use glam::{Vec2, Vec3, usize};
+use glam::{Vec2, Vec3};
 use rand::random_range;
 
 use super::{collision::Collision, enemy::Enemy};
@@ -16,14 +16,18 @@ use crate::{
     graphics::{object::Object, transform::Transform},
 };
 
+/// The different states a bomb can be in
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BombState {
+    /// A [Planted] bomb is static and ticking
     Planted,
-    #[allow(unused)]
+    /// A [Sliding] bomb moves and ticks until it collides or explodes
     Sliding(Direction),
+    /// An Exploding bomb kills any player around it and triggers other bombs
     Exploding,
 }
 
+/// When an bomb is in its [Exploding](BombState::Exploding) state it will act in the range of the [Explosion]
 #[derive(Default, Debug, Clone)]
 pub struct Explosion {
     up: u8,
@@ -32,6 +36,7 @@ pub struct Explosion {
     right: u8,
 }
 
+/// The [Bomb] object, it is spawnable by [Player]
 #[derive(Debug, Clone)]
 pub struct Bomb {
     pub position: Vec2,
@@ -45,16 +50,25 @@ pub struct Bomb {
     pub objects: Vec<Object>,
 }
 
+/// How long a [Bomb] ticks before exploding
 const BOMB_TIMER_DEFAULT: f32 = 3.0;
+/// How long a [Bomb] stays in its [Exploding](BombState::Exploding) before despawning
 const BOMB_EXPLOSION_TIME: f32 = 2.0;
+/// The radius of a [Bomb] of explosion size 0
 const BOMB_EXPLOSION_RADIUS: f32 = 0.4;
-pub const BOMB_RADIUS: f32 = 0.5;
+/// The radius of a [Bomb] while it is sliding, used for collision detection
 const BOMB_SLIDE_RADIUS: f32 = 0.45;
+/// How fast a [Bomb] slides in tiles/second
 const BOMB_SLIDE_SPEED: f32 = 4.0;
 
+/// The radius of a bomb while it is [Planted](BombState::Planted)
+pub const BOMB_RADIUS: f32 = 0.5;
+
+/// The chance of a powerup spawning when a [Bomb] destroys a  [Breakable](MapElement::Breakable) tile
 const PERCENTAGE_POWERUP_SPAWN: u64 = 15;
 
 impl Bomb {
+    /// The Bomb constructor, used by [Player]s when pressing the Bomb bind
     pub fn new(owner: u32, x: usize, y: usize, power: u8, resources: &Resources) -> Self {
         Self {
             position: Vec2 {
@@ -72,6 +86,7 @@ impl Bomb {
         }
     }
 
+    /// The creation of the 3d model at bomb creation
     fn create_object(x: usize, y: usize, resources: &Resources) -> Object {
         Object {
             model: resources.models[&ResourceName::Bomb].clone(),
@@ -85,11 +100,14 @@ impl Bomb {
         }
     }
 
+    /// updates the model's position, used when sliding
     fn update_model_pos(&mut self) {
         self.objects[0].transform.translation.x = self.position.x;
         self.objects[0].transform.translation.z = self.position.y;
     }
 
+    /// When a [Player] spawns a [Bomb] they are unable to collide with one another
+    /// As soon as the [Player] stops touching the [Bomb] collision is set to normal
     fn enable_collision(&mut self, players: &[Player]) {
         if self.collision_enabled {
             return;
@@ -103,11 +121,14 @@ impl Bomb {
         }
     }
 
+    /// Resets a [Bomb]'s position to be aligned with the grid
     fn center(&mut self) {
         self.position.x = self.position.x as usize as f32 + 0.5;
         self.position.y = self.position.y as usize as f32 + 0.5;
     }
 
+    /// Used during explosions to set the explosion range and break nearby
+    /// [Breakable](MapElement::Breakable) blocks
     fn find_wall(
         &self,
         map: &mut Map,
@@ -133,6 +154,7 @@ impl Bomb {
         self.power
     }
 
+    /// Creates all the other models for the explosion
     fn set_explosion_objects(&mut self, resources: &Resources) {
         self.objects.clear();
         for y in -(self.explosion.up as i16)..=(self.explosion.down as i16) {
@@ -151,6 +173,7 @@ impl Bomb {
         }
     }
 
+    /// Triggered when a [Bomb] is set to the [Exploding](BombState::Exploding) state
     fn explode(
         &mut self,
         map: &mut Map,
@@ -170,7 +193,7 @@ impl Bomb {
         self.set_explosion_objects(resources);
     }
 
-    /// tick for bombs that are Planted or Sliding
+    /// Tick for [Bomb]s that are Planted or Sliding
     fn live_bomb(
         &mut self,
         delta: f32,
@@ -192,6 +215,7 @@ impl Bomb {
         (self.position.y as usize, self.position.x as usize)
     }
 
+    /// Detects other bombs within explosion radius to trigger chain reactions
     fn in_range(&self, bomb: &Self) -> bool {
         let (self_y, self_x) = self.pos_as_usize();
         let (other_y, other_x) = bomb.pos_as_usize();
@@ -213,7 +237,7 @@ impl Bomb {
         false
     }
 
-    /// finds every live bomb near it and explodes it
+    /// Finds every live bomb near it and explodes it
     pub fn chain_react(&self, bombs: &mut Vec<Self>) {
         for bomb in bombs {
             if self.in_range(bomb) {
@@ -231,6 +255,7 @@ impl Bomb {
         }
     }
 
+    /// Checks if the position of a game object is within a [Bomb]'s explosion radius
     fn is_pos_in_explosion(&self, pos: Vec2, radius: f32) -> bool {
         let (px, py) = pos.into();
         let (bx, by) = self.position.into();
@@ -252,6 +277,7 @@ impl Bomb {
         false
     }
 
+    /// The tick function of a [Bomb] in the [Exploding](BombState::Exploding) State
     fn exploding_bomb(
         &mut self,
         delta: f32,
@@ -284,6 +310,7 @@ impl Bomb {
         }
     }
 
+    /// Stops a [Sliding](BombExplosion::Sliding) [Bomb] and Plants it
     fn stop_slide(&mut self, map: &Map) {
         self.bound(map);
         self.center();
@@ -291,6 +318,7 @@ impl Bomb {
         self.state = BombState::Planted;
     }
 
+    /// The tick function of a [Bomb] in the [Sliding](BombExplosion::Sliding) State
     fn slide(
         &mut self,
         direction: Direction,
@@ -331,6 +359,7 @@ impl Bomb {
         self.update_model_pos();
     }
 
+    /// The general [Bomb] tick function
     pub fn tick(
         &mut self,
         delta: f32,
@@ -361,6 +390,7 @@ impl Collision for Bomb {
     fn set_pos(&mut self, pos: Vec2) {
         self.position = pos
     }
+    /// A [Bomb's] size changes depending on its state
     fn get_size(&self) -> f32 {
         match self.state {
             BombState::Exploding => 0.0,

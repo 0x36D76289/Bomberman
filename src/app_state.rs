@@ -6,6 +6,7 @@ use crate::{
     ui::{UiState, pages::game_settings::UIGameSettings, pages::stage_clear::STAGE_CLEAR_DURATION},
 };
 
+/// All the states the program can be in
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
     pub state: AppStateEnum,
@@ -13,6 +14,7 @@ pub struct AppState {
     pub ui: Option<UiState>,
 }
 
+/// The list of App States, dictates current behaviour
 #[derive(Debug, Clone, Default)]
 pub enum AppStateEnum {
     Game,
@@ -38,6 +40,7 @@ pub enum AppStateEnum {
 }
 
 impl AppState {
+    /// The binds app state constructor
     pub fn binds(player: usize, ratio: f32) -> Self {
         Self {
             state: AppStateEnum::Binds {
@@ -49,6 +52,7 @@ impl AppState {
         }
     }
 
+    /// The game app state constructor
     pub fn game(game_state: GameState) -> Self {
         Self {
             state: AppStateEnum::Game,
@@ -56,6 +60,8 @@ impl AppState {
             ..Default::default()
         }
     }
+
+    /// The game over app state constructor
     pub fn game_over() -> Self {
         Self {
             state: AppStateEnum::GameOver,
@@ -64,6 +70,7 @@ impl AppState {
         }
     }
 
+    /// The game settings app state constructor
     pub fn game_settings(resources: &Resources, player_count: u8) -> Self {
         Self {
             state: AppStateEnum::GameSettings(UIGameSettings::corners(player_count)),
@@ -74,6 +81,8 @@ impl AppState {
             ui: Some(UiState::game_settings(player_count)),
         }
     }
+
+    /// The level select app state constructor
     pub fn level_select() -> Self {
         Self {
             state: AppStateEnum::LevelSelect,
@@ -81,6 +90,8 @@ impl AppState {
             ui: Some(UiState::level_select()),
         }
     }
+
+    /// The main menu app state constructor
     pub fn main_menu() -> Self {
         Self {
             state: AppStateEnum::MainMenu,
@@ -88,6 +99,8 @@ impl AppState {
             ui: Some(UiState::main_menu()),
         }
     }
+
+    /// The multiplayer end screen app state constructor
     pub fn multiplayer_end_screen(winners: Vec<u32>) -> Self {
         Self {
             state: AppStateEnum::MultiplayerEndScreen,
@@ -96,6 +109,7 @@ impl AppState {
         }
     }
 
+    /// The pause app state constructor
     pub fn pause() -> Self {
         Self {
             state: AppStateEnum::Pause,
@@ -103,6 +117,8 @@ impl AppState {
             ui: Some(UiState::pause()),
         }
     }
+
+    /// The main settings app state constructor
     pub fn settings() -> Self {
         Self {
             state: AppStateEnum::Settings { selected_player: 0 },
@@ -110,6 +126,8 @@ impl AppState {
             ui: Some(UiState::settings()),
         }
     }
+
+    /// The stage clear app state constructor
     pub fn stage_clear(settings: &mut Settings, level: u32, lives: u32) -> Self {
         Self {
             state: AppStateEnum::StageClear {
@@ -122,6 +140,8 @@ impl AppState {
         }
     }
 
+    /// The main game's logic, is triggered once per frame and handles any action the game needs to
+    /// execute during [delta](f32) amount of time
     pub fn tick(
         &mut self,
         delta: f32,
@@ -230,6 +250,7 @@ impl AppState {
         }
     }
 
+    /// If an App State is considered transparent the State below it in the stack will also be rendered
     pub fn is_transparent(&self) -> bool {
         match self.state {
             AppStateEnum::Game => false,

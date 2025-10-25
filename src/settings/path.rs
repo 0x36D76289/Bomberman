@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 
+/// The singleton to get / set the settings path, give a String to set or None to get
 fn settings_path(path: Option<String>) -> String {
     static SETTINGS_PATH: Mutex<String> = Mutex::new(String::new());
 
@@ -11,6 +12,8 @@ fn settings_path(path: Option<String>) -> String {
 
 const FILENAME: &str = "bomberman.save";
 
+/// The public setter of the settings path (OS dependent)
+/// The linux path tries to query XDG_DATA_HOME, then $HOME/.local/share, then ./
 #[cfg(target_os = "linux")]
 pub fn init_settings_path() {
     let dir = 'dir: {
@@ -28,6 +31,8 @@ pub fn init_settings_path() {
     settings_path(Some(path));
 }
 
+/// The public setter of the settings path (OS dependent)
+/// The macos path tries to query XDG_DATA_HOME, then $HOME/Library/Application Support, then ./
 #[cfg(target_os = "macos")]
 pub fn init_settings_path() {
     let dir = 'dir: {
@@ -46,6 +51,8 @@ pub fn init_settings_path() {
     settings_path(Some(path));
 }
 
+/// The public setter of the settings path (OS dependent)
+/// The windows path tries to query $APPDATA, then ./
 #[cfg(target_os = "windows")]
 pub fn init_settings_path() {
     let dir = 'dir: {
@@ -58,6 +65,7 @@ pub fn init_settings_path() {
     settings_path(Some(path + "\\" + FILENAME));
 }
 
+/// The public getter for the path singleton
 pub fn get_settings_path() -> String {
     settings_path(None)
 }
