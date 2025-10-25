@@ -12,9 +12,11 @@ use crate::{
     },
 };
 
+/// The amount of levels in the campaign
 const LEVEL_COUNT: u32 = 2;
 
 impl UiState {
+    /// The level select page ui constructor
     pub fn level_select() -> Self {
         let mut buttons = Vec::new();
 
@@ -65,6 +67,7 @@ impl UiState {
         }
     }
 
+    /// The level select ui page tick function
     pub fn level_select_tick(
         &mut self,
         inputs: &Vec<Input>,

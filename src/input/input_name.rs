@@ -1,5 +1,6 @@
 use crate::{game::direction::Direction, input::input::BIND_LEN};
 
+/// The list of inputs a player can emit
 #[derive(Clone, Copy)]
 pub enum InputName {
     Up,
@@ -11,6 +12,7 @@ pub enum InputName {
 }
 
 impl InputName {
+    /// Iterates over all of the enum's values
     pub fn iterator() -> impl Iterator<Item = &'static InputName> {
         static DIRECTIONS: [InputName; BIND_LEN] = [
             InputName::Up,
@@ -23,6 +25,7 @@ impl InputName {
         DIRECTIONS.iter()
     }
 
+    // TODO: document or remove (unused)
     pub fn direction_to_input(direction: Direction) -> InputName {
         match direction {
             Direction::Down => InputName::Down,

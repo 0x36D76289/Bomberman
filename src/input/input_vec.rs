@@ -1,5 +1,6 @@
 use crate::input::{input::Input, input_name::InputName, input_state::InputState};
 
+/// lets you obtain a copy of the nth element of an object or the default value
 pub trait GetOrDefault<T> {
     fn get_or_default(&self, i: usize) -> T;
 }
@@ -21,6 +22,8 @@ pub trait MenuInput {
 }
 
 impl MenuInput for Vec<Input> {
+    /// Iterates over the vector to find the most important match of the input
+    /// Prioritises [Pressed](InputState::Pressed) > [Held](InputState::Held) > [Released](InputState::Released)
     fn get_input(&self, name: InputName) -> InputState {
         let mut ret = InputState::Released;
 
@@ -34,21 +37,27 @@ impl MenuInput for Vec<Input> {
         ret
     }
 
+    /// Checks if any player is pressing [Up](InputName::Up)
     fn menu_up(&self) -> InputState {
         self.get_input(InputName::Up)
     }
+    /// Checks if any player is pressing [Down](InputName::Down)
     fn menu_down(&self) -> InputState {
         self.get_input(InputName::Down)
     }
+    /// Checks if any player is pressing [Left](InputName::Left)
     fn menu_left(&self) -> InputState {
         self.get_input(InputName::Left)
     }
+    /// Checks if any player is pressing [Right](InputName::Right)
     fn menu_right(&self) -> InputState {
         self.get_input(InputName::Right)
     }
+    /// Checks if any player is pressing confirm/[Bomb](InputName::Bomb)
     fn menu_confirm(&self) -> InputState {
         self.get_input(InputName::Bomb)
     }
+    /// Checks if any player is pressing [Back](InputName::Back)
     fn menu_back(&self) -> InputState {
         self.get_input(InputName::Back)
     }

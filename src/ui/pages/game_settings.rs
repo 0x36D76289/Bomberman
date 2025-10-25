@@ -14,15 +14,22 @@ use crate::{
 use super::super::consts::*;
 use super::super::utils::*;
 
+/// The size of each of the preset buttons
 const PRESET_BUTTON_SIZE: Vec2 = Vec2::new(0.4, 0.3);
+/// The horizontal space between preset buttons
 const PRESET_SPACING: f32 = 0.05;
 
+/// The y position of the presets
 const PRESET_VERTICAL_HEIGHT: f32 = -0.65;
 
+/// The size of the settings buttons
 const SETTINGS_SIZE: Vec2 = Vec2::new(0.9, 0.2);
+/// The size of the grid the settings buttons are layed on
 const SETTING_GRID_COUNT: u8 = 8;
+/// The start index of the layout the buttons are placed on
 const SETTING_GRID_START_INDEX: u8 = 2;
 
+/// The shortcut to create unified buttons on this page
 fn create_outlined_button(
     pos: Vec2,
     size: Vec2,
@@ -49,6 +56,7 @@ fn create_outlined_button(
     });
 }
 
+/// The list of presets (ordered)
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum GameSettingPreset {
     Corners,
@@ -57,6 +65,7 @@ enum GameSettingPreset {
     Custom,
 }
 
+/// The internal data the page has to hold
 #[derive(Debug, Copy, Clone)]
 pub struct UIGameSettings {
     preset: GameSettingPreset,
@@ -86,6 +95,7 @@ impl PartialEq for UIGameSettings {
 }
 
 impl UIGameSettings {
+    /// The corners preset data
     pub fn corners(player_count: u8) -> Self {
         let mut bot_count = 4;
 
@@ -107,6 +117,8 @@ impl UIGameSettings {
             opacity: 0.0,
         }
     }
+
+    /// The arena preset data
     fn arena(player_count: u8) -> Self {
         let mut bot_count = 10;
 
@@ -128,6 +140,8 @@ impl UIGameSettings {
             opacity: 0.0,
         }
     }
+
+    /// The teams preset data
     fn teams(player_count: u8) -> Self {
         let map_settings = MapSettings::teams();
 
@@ -142,6 +156,7 @@ impl UIGameSettings {
         }
     }
 
+    /// Converts the ui page's settings into map settings
     pub fn into_map_settings(&self) -> MapSettings {
         match self.preset {
             GameSettingPreset::Corners => MapSettings {
@@ -176,6 +191,7 @@ impl UIGameSettings {
     }
 }
 
+/// The list of buttons on the game settings page (ordered)
 enum GameSettingButtons {
     PresetCorners,
     PresetArena,
@@ -193,6 +209,7 @@ enum GameSettingButtons {
 }
 
 impl UiState {
+    /// The game settings ui page constructor
     pub fn game_settings(player_count: u8) -> Self {
         let mut canvases = Vec::<Canvas>::new();
         let mut buttons = Vec::<Button>::new();
@@ -454,6 +471,7 @@ impl UiState {
         }
     }
 
+    /// Updates the labels to show the current settings and highlight the current preset
     fn update_label_text(&mut self, settings: &mut UIGameSettings) {
         self.buttons[GameSettingButtons::LabelWidth as usize]
             .canvas
@@ -479,6 +497,7 @@ impl UiState {
         }
     }
 
+    /// Updates the width based on player input and selected preset
     fn update_width(preset: GameSettingPreset, value: &mut u8, modif: i16) -> Option<String> {
         if modif.is_negative() {
             if *value == 5 {
@@ -513,6 +532,7 @@ impl UiState {
         None
     }
 
+    /// Updates the height based on player input and selected preset
     fn update_height(preset: GameSettingPreset, value: &mut u8, modif: i16) -> Option<String> {
         if modif.is_negative() {
             if *value == 5 {
@@ -547,6 +567,7 @@ impl UiState {
         None
     }
 
+    /// Updates the cheese based on player input and selected preset
     fn update_cheese(value: &mut u8, modif: i16) -> Option<String> {
         if *value == 0 && modif.is_negative() {
             return Some("Cheesiness cannot be below 0".to_string());
@@ -558,6 +579,7 @@ impl UiState {
         None
     }
 
+    /// Updates the bot count based on player input, selected preset, and player count
     fn update_bot_count(
         preset: GameSettingPreset,
         value: &mut u8,
@@ -597,6 +619,7 @@ impl UiState {
         None
     }
 
+    /// Updates all the settings value based on player input and current selected button
     fn update_setting_values(
         &mut self,
         inputs: &Vec<Input>,
@@ -633,6 +656,7 @@ impl UiState {
         }
     }
 
+    /// Makes error messages gradually disappear over time
     fn tick_error(&mut self, delta: f32, settings: &mut UIGameSettings) {
         settings.opacity = (settings.opacity - delta).max(0.0);
         if let Some(label) = self.canvases.last_mut() {
@@ -642,6 +666,7 @@ impl UiState {
         }
     }
 
+    /// Creates an error message with full visibility
     pub fn set_error(&mut self, error_message: String, settings: &mut UIGameSettings) {
         settings.opacity = ERROR_VISIBILITY_TIME;
         if let Some(label) = self.canvases.last_mut() {
@@ -651,6 +676,7 @@ impl UiState {
         }
     }
 
+    /// Updates the data when preset is changed
     fn update_preset(&mut self, inputs: &Vec<Input>, settings: &mut UIGameSettings) {
         if self.selected > GameSettingButtons::PresetCustom as usize {
             return;
@@ -679,6 +705,8 @@ impl UiState {
         }
     }
 
+    /// Creates a return value for the game settings tick function
+    /// if the game is to be started true is sent, else None
     fn create_return_value(&mut self, inputs: &Vec<Input>) -> Option<bool> {
         if self.selected != GameSettingButtons::Start as usize
             || inputs.menu_confirm() != InputState::Pressed
@@ -689,6 +717,7 @@ impl UiState {
         }
     }
 
+    /// The game settings ui page tick function
     pub fn game_settings_tick(
         &mut self,
         delta: f32,

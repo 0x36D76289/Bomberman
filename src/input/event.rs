@@ -8,6 +8,8 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
+/// The app merges inputs from any source into this structure
+/// Anything that doesn't match is discarded
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum InputEvent {
     Keyboard {
@@ -69,12 +71,14 @@ impl Display for InputEvent {
 }
 
 impl InputEvent {
+    /// Special value: KeyCode F35 is treated as unset
     pub fn unbound() -> Self {
         Self::Keyboard {
             key: PhysicalKey::Code(KeyCode::F35),
             down: true,
         }
     }
+    /// Construct an InputEvent from a keyboard press
     pub fn from_keycode(code: KeyCode) -> Self {
         Self::Keyboard {
             key: PhysicalKey::Code(code),

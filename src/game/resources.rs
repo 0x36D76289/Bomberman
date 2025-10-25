@@ -8,6 +8,7 @@ use vulkano::{
 
 use crate::graphics::{Model, Vulkan, load_texture, object::TextureIndex};
 
+/// The list of objects a Game might require
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceName {
     Breakable,
@@ -23,6 +24,7 @@ pub enum ResourceName {
     FontAtlas,
 }
 
+/// the global [Resources] object saves the current textures and models in use
 #[derive(Debug, Clone)]
 pub struct Resources {
     pub textures: Vec<Arc<ImageView>>,
@@ -31,6 +33,7 @@ pub struct Resources {
 }
 
 impl Resources {
+    /// Executed at the start of the program it loads all the required data in memory
     pub fn load_resources(vulkan: &Vulkan) -> Self {
         let mut textures: HashMap<ResourceName, &[u8]> = HashMap::new();
         let mut models: HashMap<ResourceName, &[u8]> = HashMap::new();
@@ -121,6 +124,8 @@ impl Resources {
         }
     }
 
+    // TODO: review doc
+    /// Loads the textures into the Vulkan memory, making them able to be rendered
     fn load_textures(
         textures: HashMap<ResourceName, &[u8]>,
         vulkan: &Vulkan,
@@ -153,6 +158,8 @@ impl Resources {
         (texture_array, texture_indexes)
     }
 
+    // TODO: review doc
+    /// Loads the model into the Vulkan memory, making them able to be rendered
     fn load_models(
         models: HashMap<ResourceName, &[u8]>,
         memory_allocator: Arc<StandardMemoryAllocator>,

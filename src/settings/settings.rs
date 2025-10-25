@@ -14,23 +14,24 @@ use crate::{
     settings::path::get_settings_path,
 };
 
+/// The layout of the entire save file
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
-    // The resolution of the display in pixel as (x, y)
+    /// The resolution of the display in pixel as (x, y)
     pub resolution: (u32, u32),
-    // If scaling should use nearest neighbor or bilinear TODO:
+    /// If scaling should use nearest neighbor or bilinear TODO:
     pub filtering: bool,
-    // Should the window be displayed in fullscreen
+    /// Should the window be displayed in fullscreen
     pub fullscreen: bool,
-    // what is the framerate limit in fps, -1 if none, 0 for vsync
+    /// what is the framerate limit in fps, -1 if none, 0 for vsync
     pub framerate_limit: i32,
-    // Music Volume, between 0 and 1
+    /// Music Volume, between 0 and 1
     pub volume_music: f32,
-    // SFX Volume, between 0 and 1
+    /// SFX Volume, between 0 and 1
     pub volume_sfx: f32,
-    // Each member of the vector is a player, the content of the element are in order of InputName
+    /// Each member of the vector is a player, the content of the element are in order of InputName
     pub binds: Vec<Binds>,
-    // The current save file for single player
+    /// The current save file for single player
     pub single_player_save: SaveState,
 }
 
@@ -66,6 +67,7 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// Saves the settings file to the settings path using [get_settings_path()]
     pub fn save(&self) {
         let path_str = get_settings_path();
         let path = Path::new(&path_str);
@@ -94,6 +96,7 @@ impl Settings {
         }
     }
 
+    /// Returns the [Settings] struct from the serialized file at [get_settings_path()]
     pub fn load_settings() -> Self {
         let settings_file = OpenOptions::new().read(true).open(get_settings_path());
 

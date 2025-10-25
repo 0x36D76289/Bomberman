@@ -14,6 +14,7 @@ use crate::{
 };
 
 impl UiState {
+    /// The main menu ui constructor
     pub fn main_menu() -> Self {
         let title = Canvas {
             center: Vec2::new(0.0, -0.4),
@@ -125,6 +126,8 @@ impl UiState {
             render_info: Default::default(),
         }
     }
+
+    /// The main menu ui tick function
     pub fn main_menu_tick(
         &mut self,
         inputs: &Vec<Input>,
