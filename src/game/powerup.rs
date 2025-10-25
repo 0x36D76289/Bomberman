@@ -11,15 +11,22 @@ use crate::{
     graphics::{object::Object, transform::Transform},
 };
 
+/// The various types of [PowerUp]s, they each provide a different bonus
 #[derive(Debug, Clone)]
 pub enum PowerUpType {
+    /// The [Speed](PowerUpType::Speed) [PowerUp] increases the [Player]'s speed
     Speed,
+    /// The [Power](PowerUpType::Power) [PowerUp] increases how far a [Player]'s [Bomb]s can explode
     Power,
+    /// The [Bomb](PowerUpType::Bomb) [PowerUp] increases how many [Bomb]s a [Player] can
+    /// deploy at the same time
     Bomb,
+    /// The [Slide](PowerUpType::Slide) [PowerUp] lets a [Player] push [Bomb]s by walking into them
     Slide,
 }
 
 impl PowerUpType {
+    /// Used when a [Player] obtains a [PowerUp]
     fn apply(&self) -> impl Fn(&mut Player) {
         match self {
             PowerUpType::Speed => |p: &mut Player| p.speed_level += 1,
@@ -30,11 +37,16 @@ impl PowerUpType {
     }
 }
 
+/// A [PowerUp] is a bonus a [Player] can pick up to obtain an advantage
 #[derive(Debug, Clone)]
 pub struct PowerUp {
+    /// The type of bonus the [Player] will obtain
     pub power_up_type: PowerUpType,
+    /// The [PowerUp]'s 3d model
     pub object: Object,
+    /// The [PowerUp]'s position on the board
     pub pos: USizeVec2,
+    /// If the [PowerUp] should disappear at the end of the current tick
     pub despawn: bool,
 }
 
@@ -43,6 +55,7 @@ impl PowerUp {
         0.4
     }
 
+    /// The [PowerUp]'s tick function finds all colliding players and applies the correct effect onto them
     pub fn tick(&mut self, players: &mut Vec<Player>, audio_manager: &mut AudioManager) {
         for player in players {
             if player.is_colliding_with(
@@ -61,6 +74,7 @@ impl PowerUp {
 }
 
 impl PowerUp {
+    /// The main [PowerUp] constructor
     pub fn new(y: usize, x: usize, resources: &Resources) -> Self {
         let (power_up_type, model, texture) = match random_range(0..=3) {
             0 => (

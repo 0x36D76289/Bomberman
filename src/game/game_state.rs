@@ -23,46 +23,70 @@ use glam::{Vec2, Vec3, Vec4};
 use std::error::Error;
 use std::vec::Vec;
 
+/// This enum is used to select what tick function to use
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
     Multiplayer,
     Campaign,
 }
 
+/// The [CampaignProgress] mirrors the [SaveState](crate::settings::save::SaveState) but is a temporary format
 #[derive(Debug, Clone, Default)]
 pub struct CampaignProgress {
     pub level: u32,
     pub lives: u32,
+    // TODO: implement score
     pub score: u32,
 }
 
+/// The return type of [GameState]'s singleplayer tick function
 #[derive(Debug, Clone)]
 pub enum GameTickResult {
+    /// The level is still ongoing
     None,
+    /// The [Player] failed
     GameOver,
+    /// The [Player] killed all the [Enemy]s and got to the [exit point](MapElement::Exit)
     LevelComplete,
 }
 
+/// The entire game logic's data, receives input and updates game state
 #[derive(Debug, Clone)]
 pub struct GameState {
+    /// Whether this is a singleplayer or multiplayer game
     mode: GameMode,
+    /// The live state of the current campaign, None in multiplayer
     campaign_progress: Option<CampaignProgress>,
+    /// The list of players at game start
     players: Vec<Player>,
+    /// The list of enemies for singleplayer levels
     enemies: Vec<Enemy>,
+    // TODO: does this double up on the exit mapelement ? add doc
     exit_pos: Vec2,
+    /// becomes true once all enemies are killed, lets the player complete a level
     exit_revealed: bool,
+    /// The inputs of every player after processing events
     game_inputs: Vec<Input>,
+    // TODO: if unused by AI input then remove else doc
     nb_humans: u32,
+    /// The list of bombs/explosions currently in game
     bombs: Vec<Bomb>,
+    /// The list of PowerUps that [Player]s can pick up
     power_ups: Vec<PowerUp>,
+    /// The map the game takes place in
     map: Map,
+    /// The camera data changes how the game is rendered
     camera: Transform,
+    /// The lighting of the game
     light: LightInfo,
+    /// The [ids](Player::id) of currently alive [Player]s
     alive_players: Vec<u32>,
+    // TODO: doc
     pub render_info: StateRenderInfo,
 }
 
 impl GameState {
+    /// Initiates a new game for multiplayer from given settings
     pub fn new_multiplayer(
         resources: &Resources,
         settings: GameSettings,
@@ -111,6 +135,7 @@ impl GameState {
         })
     }
 
+    /// begins a new campaign, used by the New Game button
     pub fn new_campaign(level: u32, lives: u32) -> Option<Self> {
         let resources_to_load_map = unsafe {
             (*std::ptr::addr_of!(crate::GLOBAL_RESOURCES))
@@ -180,6 +205,7 @@ impl GameState {
         })
     }
 
+    /// Creates a partial gamestate, used in multiplayer settings selection for map preview
     pub fn new_settings_preview(settings: GameSettings, resources: &Resources) -> Self {
         Self {
             render_info: StateRenderInfo {
@@ -193,6 +219,8 @@ impl GameState {
         }
     }
 
+    /// Creates a multiplayer game from an existing map
+    /// Used when starting a multiplayer game
     pub fn new_multiplayer_from_map(
         resources: &Resources,
         settings: GameSettings,
@@ -239,6 +267,8 @@ impl GameState {
         }
     }
 
+    /// Creates all the [Player] objects for a GameState and prepares them to be manipulated by
+    /// AI or humans
     fn create_players(
         map: &Map,
         resources: &Resources,
@@ -268,6 +298,7 @@ impl GameState {
         players
     }
 
+    /// Creates a list of objects to render from the gamestate for the render function
     pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
         let map_objects = self.map.iter().filter_map(|el| match el {
             MapElement::Empty => None,
@@ -290,6 +321,7 @@ impl GameState {
             .chain(power_up_objects)
     }
 
+    /// The main tick function of multiplayer games, simulates every event since the last frame
     fn mp_game_tick(
         &mut self,
         delta: f32,
@@ -357,6 +389,7 @@ impl GameState {
         self.create_mp_ret()
     }
 
+    /// Helper function to detect the end of multiplayer game
     fn create_mp_ret(&mut self) -> Option<Vec<u32>> {
         let alive_players: Vec<u32> = self
             .players
@@ -374,6 +407,8 @@ impl GameState {
         return None;
     }
 
+    /// The main tick function of campaign level games, it simulates every event since the
+    /// last frame
     fn campaign_tick(
         &mut self,
         delta: f32,
@@ -445,6 +480,9 @@ impl GameState {
         GameTickResult::None
     }
 
+    /// The tick function distributes behaviour between the
+    /// [multiplayer tick function](GameState::mp_game_tick()) or the
+    /// [campaign tick function](GameState::campaign_tick())
     pub fn tick(
         &mut self,
         delta_time: f32,
@@ -489,6 +527,8 @@ impl GameState {
         }
     }
 
+    /// Copies all the players inputs to the gamestate. The extra layer is used so that bots and
+    /// player inputs can come from the same source
     fn inputs_to_game_inputs(&mut self, inputs: &Vec<Input>) {
         for (i, input) in inputs.iter().enumerate() {
             if i < self.game_inputs.len() {
@@ -497,6 +537,7 @@ impl GameState {
         }
     }
 
+    // TODO: doc
     pub fn create_ubo(&self, aspect_ratio: f32) -> GlobalUbo {
         let camera = {
             let mut camera = Camera::new();
@@ -523,6 +564,7 @@ impl GameState {
         }
     }
 
+    /// Modifies a GameState's map for display purposes in game settings
     pub fn update_from_ui_settings(
         &mut self,
         settings: &UIGameSettings,
@@ -544,10 +586,12 @@ impl GameState {
         }
     }
 
+    // TODO: remove or doc, currently unused
     pub fn get_player(&self, id: u32) -> Option<&Player> {
         self.players.get(id as usize)
     }
 
+    /// Gets an unmutable reference to the [GameState]'s [Map]
     pub fn get_map(&self) -> &Map {
         &self.map
     }

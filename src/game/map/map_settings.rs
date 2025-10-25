@@ -1,13 +1,19 @@
 use super::map::Map;
 use crate::game::resources::Resources;
 
+/// The various presets of map creation
 pub enum MapType {
+    /// The Corners preset is meant for 4 players
     Corners,
+    /// The Arena preset is meant for 10 players (from the Genesis classic)
     Arena,
+    /// The Teams preset is meant for 8 players in a 2v2v2v2 configuration
     Teams,
+    /// The Random map type enables an arbitrary amount of players
     Random,
 }
 
+/// The [MapSettings] control all the instructions in the [Map new constructor](Map::new())
 pub struct MapSettings {
     pub width: u8,
     pub height: u8,
@@ -27,6 +33,7 @@ impl Default for MapSettings {
 }
 
 impl MapSettings {
+    /// The corners map preset MapSettings constructor
     pub fn corners() -> Self {
         MapSettings {
             width: 15,
@@ -41,6 +48,7 @@ impl MapSettings {
         }
     }
 
+    /// The arena map preset MapSettings constructor
     pub fn arena() -> Self {
         MapSettings {
             width: 37,
@@ -55,6 +63,7 @@ impl MapSettings {
         }
     }
 
+    /// The teams map preset MapSettings constructor
     pub fn teams() -> Self {
         MapSettings {
             width: 21,
@@ -69,6 +78,7 @@ impl MapSettings {
         }
     }
 
+    /// The cheese map preset MapSettings constructor
     pub fn default_cheese() -> Self {
         MapSettings {
             width: 15,
@@ -83,6 +93,7 @@ impl MapSettings {
         }
     }
 
+    /// creates a map from the current map settings
     pub fn new_map(settings: Self, resources: &Resources) -> Option<Map> {
         Map::new(settings, resources)
     }

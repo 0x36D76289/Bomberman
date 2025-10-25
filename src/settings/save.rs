@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
 
+/// The structure containing the singleplayer campaign data
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct SaveState {
+    /// The current level
     pub level: u32,
+    /// The amount of lives remaining
     pub lives: u32,
+    // TODO: unimplemented
+    /// The score of the ongoing campaign
     pub score: u32,
 }
 

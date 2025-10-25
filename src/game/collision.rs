@@ -5,13 +5,20 @@ use crate::game::{
     map::{map::Map, map_element::MapElement},
 };
 
+/// The width of the invisible layer around collision, avoid jittering
 const PUSHBACK: f32 = 0.01;
 
+/// The [Collision] trait makes an object collidable with and lets you easily test and resolve
+/// collisions between game objects
 pub trait Collision {
+    /// Get the game object's positon
     fn get_pos(&self) -> Vec2;
+    /// Set a game object's position
     fn set_pos(&mut self, pos: Vec2);
+    /// Get a game object's radius (collision are boxes)
     fn get_size(&self) -> f32;
 
+    /// Clamps a game object's position to be within the map
     fn bound(&mut self, map: &Map) {
         let mut pos = self.get_pos();
         pos.x = pos
@@ -28,6 +35,7 @@ pub trait Collision {
             && ((self.get_pos().y - pos.y).abs() < (self.get_size() + radius))
     }
 
+    /// Resolves the collision between 2 game objects
     fn resolve_collision_with(&mut self, pos: Vec2, mut radius: f32, direction: Direction) -> bool {
         if !self.is_colliding_with(pos, radius) {
             return false;
@@ -57,6 +65,7 @@ pub trait Collision {
         true
     }
 
+    /// Checks if a game object is currently colliding with the [Map]
     fn does_map_collide(map: &Map, x: f32, y: f32) -> bool {
         if x < 0.0 || y < 0.0 {
             return true;
@@ -71,7 +80,8 @@ pub trait Collision {
         }
     }
 
-    /// returns True if collision was found
+    /// Tests if an object is colliding with the map and makes it move back to an empty area
+    /// returns True if a collision was found/resolved
     fn collide_map(&mut self, map: &Map, direction: Direction) -> bool {
         let mut ret = false;
         for y in -1..=1 {

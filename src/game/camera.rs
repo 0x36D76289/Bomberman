@@ -1,5 +1,6 @@
 use glam::{Mat4, Vec3, Vec4};
 
+// TODO: doc
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Camera {
     pub projection_matrix: Mat4,
@@ -8,6 +9,7 @@ pub struct Camera {
 }
 
 impl Camera {
+    // TODO: doc
     pub fn new() -> Self {
         Self {
             projection_matrix: Mat4::IDENTITY,
@@ -16,6 +18,7 @@ impl Camera {
         }
     }
 
+    // TODO: doc
     #[allow(unused)]
     pub fn set_orthographic_projection(
         &mut self,
@@ -39,6 +42,7 @@ impl Camera {
         )
     }
 
+    // TODO: doc
     #[allow(unused)]
     pub fn set_perspective_projection(&mut self, fovy: f32, aspect: f32, near: f32, far: f32) {
         assert!((aspect - f32::EPSILON).abs() > 0.0);
@@ -56,6 +60,7 @@ impl Camera {
         )
     }
 
+    // TODO: doc
     #[allow(unused)]
     pub fn set_view_direction(&mut self, position: Vec3, direction: Vec3) {
         let up = Vec3::new(0.0, -1.0, 0.0);
@@ -83,11 +88,13 @@ impl Camera {
         );
     }
 
+    // TODO: doc
     #[allow(unused)]
     pub fn set_view_target(&mut self, position: Vec3, target: Vec3) {
         self.set_view_direction(position, target - position);
     }
 
+    // TODO: doc
     #[allow(unused)]
     pub fn set_view_xyz(&mut self, position: Vec3, rotation: Vec3) {
         let c3 = rotation.z.cos();

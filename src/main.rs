@@ -13,8 +13,10 @@ use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::settings::{path::init_settings_path, settings::Settings};
 
+/// A global with the resources (assets) used in game
 pub static mut GLOBAL_RESOURCES: Option<Resources> = None;
 
+/// The start point
 fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Poll);

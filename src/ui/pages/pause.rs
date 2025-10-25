@@ -13,6 +13,7 @@ use crate::{
 };
 
 impl UiState {
+    /// The pause ui page constructor
     pub fn pause() -> Self {
         let shadow = Canvas {
             center: Vec2::ZERO,
@@ -102,6 +103,7 @@ impl UiState {
         }
     }
 
+    /// The pause ui page tick function
     pub fn pause_tick(
         &mut self,
         inputs: &Vec<Input>,

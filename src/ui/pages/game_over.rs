@@ -12,6 +12,7 @@ use crate::{
 };
 
 impl UiState {
+    /// The game over screen ui page constructor
     pub fn game_over() -> Self {
         let shadow = Canvas {
             center: Vec2::ZERO,
@@ -74,6 +75,7 @@ impl UiState {
         }
     }
 
+    /// The game over ui page tick function
     pub fn game_over_tick(
         &mut self,
         inputs: &Vec<Input>,

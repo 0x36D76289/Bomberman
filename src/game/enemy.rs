@@ -13,17 +13,24 @@ use super::{
 const ENEMY_RADIUS: f32 = 0.4;
 const ENEMY_SPEED: f32 = 1.5;
 
+/// The Enemy is the main obstacle of the singleplayer campaign
 #[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct Enemy {
+    /// The unique id of an [Enemy], it is also its position in the enemies vector
     pub id: u32,
+    /// The position of the [Enemy]
     pub position: Vec2,
+    /// The [Enemy] always walks in the direction it faces
     pub direction: Direction,
+    /// Wether the [Enemy] is alive or not, necessary to preserve the [id](Enemy::id)
     pub alive: bool,
+    /// The [Enemy]'s 3d model
     pub object: Option<Object>,
 }
 
 impl Enemy {
+    /// The [Enemy]'s constructor
     pub fn new(id: u32, position: Vec2, resources: &Resources) -> Self {
         Self {
             id,
@@ -34,6 +41,7 @@ impl Enemy {
         }
     }
 
+    /// Creates the 3d model for the [Enemy]
     fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
@@ -48,11 +56,13 @@ impl Enemy {
         }
     }
 
+    /// Disables the [Enemy], effectively removing it from the game
     pub fn kill(&mut self) {
         self.alive = false;
         self.object = None;
     }
 
+    /// The [Enemy]'s tick function runs every tick, simulating all events since last frame
     pub fn tick(
         &mut self,
         delta: f32,

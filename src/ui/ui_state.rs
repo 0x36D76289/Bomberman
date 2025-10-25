@@ -4,6 +4,7 @@ use crate::{
     ui::{button::Button, canvas::Canvas},
 };
 
+/// A [UiState] represents all UI Elements and their interactions
 #[derive(Debug, Clone)]
 pub struct UiState {
     pub canvases: Vec<Canvas>,
@@ -13,6 +14,7 @@ pub struct UiState {
 }
 
 impl UiState {
+    /// Unselects the current button and selects the target
     fn select_button(&mut self, target: usize) {
         let mut target = target;
         if target >= self.buttons.len() {
@@ -24,6 +26,7 @@ impl UiState {
         self.selected = target;
     }
 
+    /// Moves the selection to the appropriate button based on the neighbor property and inputs
     /// Returns true if confirm button is used
     pub fn button_inputs(&mut self, inputs: &Vec<Input>) -> bool {
         if !self.buttons.is_empty() {
