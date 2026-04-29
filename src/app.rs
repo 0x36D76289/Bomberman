@@ -109,13 +109,17 @@ impl App {
         // println!("{:#?}", self.events);
         self.events.clear();
         for _ in 0..res.1 {
-            if self.state_stack.pop().is_none() || self.state_stack.is_empty() {
+            if self.state_stack.pop().is_none()/* || self.state_stack.is_empty()*/ {
                 event_loop.exit();
                 return;
             }
         }
         if let Some(new_state) = res.0 {
             self.state_stack.push(new_state);
+        }
+        if self.state_stack.is_empty() {
+            println!("No state in stack, exiting");
+            event_loop.exit();
         }
     }
 
