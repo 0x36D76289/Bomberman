@@ -4,6 +4,7 @@ use crate::{
     app_state::AppState,
     audio::AudioManager,
     input::input::Input,
+    settings::save::GameDifficulty,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -13,7 +14,7 @@ use crate::{
 
 impl UiState {
     /// The game over screen ui page constructor
-    pub fn game_over() -> Self {
+    pub fn game_over(score: u32) -> Self {
         let shadow = Canvas {
             center: Vec2::ZERO,
             width: 2.0,
@@ -27,6 +28,14 @@ impl UiState {
             text: Some("GAME OVER".to_string()),
             text_color: Some(Vec4::ONE),
             text_size: Some(2.0),
+            ..Default::default()
+        };
+
+        let score_text = Canvas {
+            center: Vec2::new(0.0, -0.05),
+            text: Some(format!("SCORE: {}", score)),
+            text_color: Some(Vec4::ONE),
+            text_size: Some(1.2),
             ..Default::default()
         };
 
@@ -68,7 +77,7 @@ impl UiState {
         };
 
         Self {
-            canvases: vec![shadow, title],
+            canvases: vec![shadow, title, score_text],
             buttons: vec![retry_button, menu_button],
             selected: 0,
             render_info: Default::default(),
@@ -80,12 +89,14 @@ impl UiState {
         &mut self,
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
+        difficulty: GameDifficulty,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             return match self.selected {
                 0 => {
                     // Retry
-                    if let Some(game_state) = crate::game::game_state::GameState::new_campaign(1, 3)
+                    if let Some(game_state) =
+                        crate::game::game_state::GameState::new_campaign(1, 3, 0, difficulty)
                     {
                         (Some(AppState::game(game_state)), 2)
                     } else {

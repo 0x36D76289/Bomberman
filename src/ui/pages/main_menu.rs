@@ -141,17 +141,22 @@ impl UiState {
                     // Continue
                     let save = settings.single_player_save;
                     audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
-                    match GameState::new_campaign(save.level, save.lives) {
+                    match GameState::new_campaign(
+                        save.level,
+                        save.lives,
+                        save.score,
+                        save.difficulty,
+                    ) {
                         Some(game_state) => (Some(AppState::game(game_state)), 1),
                         None => {
                             println!(
                                 "Error: Failed to load saved game. Starting new game selection."
                             );
-                            (Some(AppState::level_select()), 1)
+                            (Some(AppState::difficulty_select()), 1)
                         }
                     }
                 }
-                1 => (Some(AppState::level_select()), 1),
+                1 => (Some(AppState::difficulty_select()), 1),
                 2 => (
                     Some(AppState::game_settings(
                         resources,

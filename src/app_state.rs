@@ -2,7 +2,7 @@ use crate::{
     audio::AudioManager,
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
     input::{event::InputEvent, input::Input},
-    settings::settings::Settings,
+    settings::{save::GameDifficulty, settings::Settings},
     ui::{UiState, pages::game_settings::UIGameSettings, pages::stage_clear::STAGE_CLEAR_DURATION},
 };
 
@@ -21,7 +21,10 @@ pub enum AppStateEnum {
     #[default]
     MainMenu,
     Pause,
-    LevelSelect,
+    DifficultySelect,
+    LevelSelect {
+        difficulty: GameDifficulty,
+    },
     GameSettings(UIGameSettings),
     Settings {
         selected_player: usize,
@@ -30,11 +33,15 @@ pub enum AppStateEnum {
         player: usize,
         waiting: isize,
     },
-    GameOver,
+    GameOver {
+        difficulty: GameDifficulty,
+    },
     StageClear {
         timer: f32,
         next_level: u32,
         lives: u32,
+        score: u32,
+        difficulty: GameDifficulty,
     },
     MultiplayerEndScreen,
 }
@@ -62,11 +69,20 @@ impl AppState {
     }
 
     /// The game over app state constructor
-    pub fn game_over() -> Self {
+    pub fn game_over(score: u32, difficulty: GameDifficulty) -> Self {
         Self {
-            state: AppStateEnum::GameOver,
+            state: AppStateEnum::GameOver { difficulty },
             game: None,
-            ui: Some(UiState::game_over()),
+            ui: Some(UiState::game_over(score)),
+        }
+    }
+
+    /// The difficulty select app state constructor
+    pub fn difficulty_select() -> Self {
+        Self {
+            state: AppStateEnum::DifficultySelect,
+            game: None,
+            ui: Some(UiState::difficulty_select()),
         }
     }
 
@@ -83,11 +99,11 @@ impl AppState {
     }
 
     /// The level select app state constructor
-    pub fn level_select() -> Self {
+    pub fn level_select(difficulty: GameDifficulty) -> Self {
         Self {
-            state: AppStateEnum::LevelSelect,
+            state: AppStateEnum::LevelSelect { difficulty },
             game: None,
-            ui: Some(UiState::level_select()),
+            ui: Some(UiState::level_select(difficulty)),
         }
     }
 
@@ -128,15 +144,25 @@ impl AppState {
     }
 
     /// The stage clear app state constructor
-    pub fn stage_clear(settings: &mut Settings, level: u32, lives: u32) -> Self {
+    pub fn stage_clear(
+        settings: &mut Settings,
+        level: u32,
+        lives: u32,
+        score: u32,
+        difficulty: GameDifficulty,
+    ) -> Self {
         Self {
             state: AppStateEnum::StageClear {
                 timer: STAGE_CLEAR_DURATION,
                 next_level: level + 1,
                 lives,
+                score,
+                difficulty,
             },
             game: None,
-            ui: Some(UiState::stage_clear(settings, level, lives)),
+            ui: Some(UiState::stage_clear(
+                settings, level, lives, score, difficulty,
+            )),
         }
     }
 
@@ -165,11 +191,16 @@ impl AppState {
                     .unwrap()
                     .main_menu_tick(inputs, audio_manager, resources, settings)
             }
-            AppStateEnum::LevelSelect => self
+            AppStateEnum::DifficultySelect => self
                 .ui
                 .as_mut()
                 .unwrap()
-                .level_select_tick(inputs, audio_manager),
+                .difficulty_select_tick(inputs, audio_manager),
+            AppStateEnum::LevelSelect { difficulty } => self
+                .ui
+                .as_mut()
+                .unwrap()
+                .level_select_tick(inputs, audio_manager, *difficulty, settings),
             AppStateEnum::GameSettings(ui_game_settings) => {
                 let (game, ui) = match (self.game.as_mut(), self.ui.as_mut()) {
                     (Some(game), Some(ui)) => (game, ui),
@@ -226,22 +257,28 @@ impl AppState {
                 self.ui
                     .as_mut()
                     .unwrap()
-                    .pause_tick(inputs, resources, audio_manager)
+                    .pause_tick(inputs, resources, audio_manager, settings)
             }
-            AppStateEnum::GameOver => self
-                .ui
-                .as_mut()
-                .unwrap()
-                .game_over_tick(inputs, audio_manager),
+            AppStateEnum::GameOver { difficulty } => {
+                self.ui
+                    .as_mut()
+                    .unwrap()
+                    .game_over_tick(inputs, audio_manager, *difficulty)
+            }
             AppStateEnum::StageClear {
                 timer,
                 next_level,
                 lives,
-            } => self
-                .ui
-                .as_mut()
-                .unwrap()
-                .stage_clear_tick(delta, timer, next_level, lives),
+                score,
+                difficulty,
+            } => self.ui.as_mut().unwrap().stage_clear_tick(
+                delta,
+                timer,
+                next_level,
+                lives,
+                score,
+                *difficulty,
+            ),
             AppStateEnum::MultiplayerEndScreen => self
                 .ui
                 .as_ref()
@@ -255,9 +292,10 @@ impl AppState {
         match self.state {
             AppStateEnum::Game => false,
             AppStateEnum::Pause => true,
-            AppStateEnum::GameOver => true,
+            AppStateEnum::GameOver { .. } => true,
             AppStateEnum::MainMenu => false,
-            AppStateEnum::LevelSelect => false,
+            AppStateEnum::DifficultySelect => false,
+            AppStateEnum::LevelSelect { .. } => false,
             AppStateEnum::GameSettings(_) => false,
             AppStateEnum::Binds { .. } => false,
             AppStateEnum::Settings { .. } => false,

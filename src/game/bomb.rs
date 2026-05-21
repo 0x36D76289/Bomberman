@@ -27,6 +27,14 @@ pub enum BombState {
     Exploding,
 }
 
+/// Events emitted by a [Bomb] tick for scoring and game logic
+#[derive(Default, Debug, Clone, Copy)]
+pub struct BombEvents {
+    pub breakables_destroyed: u32,
+    pub enemies_killed: u32,
+    pub players_killed: u32,
+}
+
 /// When an bomb is in its [Exploding](BombState::Exploding) state it will act in the range of the [Explosion]
 #[derive(Default, Debug, Clone)]
 pub struct Explosion {
@@ -135,7 +143,8 @@ impl Bomb {
         dirvec: Vec2,
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
-    ) -> u8 {
+    ) -> (u8, u32) {
+        let mut breakables_destroyed = 0;
         for i in 1..=self.power {
             let pos = self.position + dirvec * i as f32;
             let elem = map.get_elem_pos(pos);
@@ -146,12 +155,15 @@ impl Bomb {
                     if random_range(1..=100) <= PERCENTAGE_POWERUP_SPAWN {
                         power_ups.push(PowerUp::new(pos.y as usize, pos.x as usize, resources));
                     }
+                    breakables_destroyed += 1;
+                    return (i - 1, breakables_destroyed);
                 }
-                MapElement::Unbreakable(_) => (),
+                MapElement::Unbreakable(_) => {
+                    return (i - 1, breakables_destroyed);
+                }
             }
-            return i - 1;
         }
-        self.power
+        (self.power, breakables_destroyed)
     }
 
     /// Creates all the other models for the explosion
@@ -180,17 +192,33 @@ impl Bomb {
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
         audio_manager: &mut AudioManager,
-    ) {
+    ) -> u32 {
         self.state = BombState::Exploding;
         self.center();
 
         audio_manager.play_sound_effect(SoundEffect::BombExplosion);
 
-        self.explosion.up = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
-        self.explosion.down = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 }, power_ups, resources);
-        self.explosion.left = self.find_wall(map, Vec2 { x: -1.0, y: 0.0 }, power_ups, resources);
-        self.explosion.right = self.find_wall(map, Vec2 { x: 1.0, y: 0.0 }, power_ups, resources);
+        let mut breakables_destroyed = 0;
+
+        let (up, up_break) = self.find_wall(map, Vec2 { x: 0.0, y: -1.0 }, power_ups, resources);
+        self.explosion.up = up;
+        breakables_destroyed += up_break;
+
+        let (down, down_break) = self.find_wall(map, Vec2 { x: 0.0, y: 1.0 }, power_ups, resources);
+        self.explosion.down = down;
+        breakables_destroyed += down_break;
+
+        let (left, left_break) =
+            self.find_wall(map, Vec2 { x: -1.0, y: 0.0 }, power_ups, resources);
+        self.explosion.left = left;
+        breakables_destroyed += left_break;
+
+        let (right, right_break) =
+            self.find_wall(map, Vec2 { x: 1.0, y: 0.0 }, power_ups, resources);
+        self.explosion.right = right;
+        breakables_destroyed += right_break;
         self.set_explosion_objects(resources);
+        breakables_destroyed
     }
 
     /// Tick for [Bomb]s that are Planted or Sliding
@@ -201,13 +229,17 @@ impl Bomb {
         power_ups: &mut Vec<PowerUp>,
         resources: &Resources,
         audio_manager: &mut AudioManager,
-    ) {
+    ) -> BombEvents {
         if (self.timer == 0.0) || (delta >= self.timer) {
             self.timer = 0.0;
-            self.explode(map, power_ups, resources, audio_manager);
-            return;
+            let breakables_destroyed = self.explode(map, power_ups, resources, audio_manager);
+            return BombEvents {
+                breakables_destroyed,
+                ..Default::default()
+            };
         }
         self.timer -= delta;
+        BombEvents::default()
     }
 
     /// returns y, x as usize
@@ -284,7 +316,8 @@ impl Bomb {
         players: &mut Vec<Player>,
         enemies: &mut Vec<Enemy>,
         audio_manager: &mut AudioManager,
-    ) {
+    ) -> BombEvents {
+        let mut events = BombEvents::default();
         if self.timer >= BOMB_EXPLOSION_TIME {
             self.despawn = true;
             if let Some(player) = players.get_mut(self.owner_id as usize) {
@@ -298,6 +331,7 @@ impl Bomb {
             if self.is_pos_in_explosion(player.position, player.get_size()) {
                 audio_manager.play_sound_effect(SoundEffect::PlayerDeath);
                 player.kill();
+                events.players_killed += 1;
             }
         }
 
@@ -306,8 +340,10 @@ impl Bomb {
             if self.is_pos_in_explosion(enemy.position, enemy.get_size()) {
                 audio_manager.play_sound_effect(SoundEffect::EnemyDeath);
                 enemy.kill();
+                events.enemies_killed += 1;
             }
         }
+        events
     }
 
     /// Stops a [Sliding](BombExplosion::Sliding) [Bomb] and Plants it
@@ -370,16 +406,17 @@ impl Bomb {
         resources: &Resources,
         audio_manager: &mut AudioManager,
         bombs_pos: &[Vec2],
-    ) {
-        match self.state {
+    ) -> BombEvents {
+        let events = match self.state {
             BombState::Planted => self.live_bomb(delta, map, power_ups, resources, audio_manager),
             BombState::Sliding(direction) => {
                 self.slide(direction, delta, map, players, bombs_pos);
-                self.live_bomb(delta, map, power_ups, resources, audio_manager);
+                self.live_bomb(delta, map, power_ups, resources, audio_manager)
             }
             BombState::Exploding => self.exploding_bomb(delta, players, enemies, audio_manager),
-        }
+        };
         self.enable_collision(players);
+        events
     }
 }
 

@@ -1,5 +1,7 @@
 /// The modification of a player's binds page
 pub mod binds;
+/// The singleplayer difficulty selection screen
+pub mod difficulty_select;
 /// The single player game over screen
 pub mod game_over;
 /// The game settings selection screen

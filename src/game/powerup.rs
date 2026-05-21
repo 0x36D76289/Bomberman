@@ -56,7 +56,7 @@ impl PowerUp {
     }
 
     /// The [PowerUp]'s tick function finds all colliding players and applies the correct effect onto them
-    pub fn tick(&mut self, players: &mut Vec<Player>, audio_manager: &mut AudioManager) {
+    pub fn tick(&mut self, players: &mut Vec<Player>, audio_manager: &mut AudioManager) -> bool {
         for player in players {
             if player.is_colliding_with(
                 Vec2 {
@@ -68,8 +68,10 @@ impl PowerUp {
                 audio_manager.play_sound_effect(SoundEffect::BonusPickup);
                 self.power_up_type.apply()(player);
                 self.despawn = true;
+                return true;
             }
         }
+        false
     }
 }
 

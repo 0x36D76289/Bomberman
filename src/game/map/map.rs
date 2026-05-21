@@ -518,6 +518,57 @@ impl Map {
         self.get_elem(pos.x as usize, pos.y as usize)
     }
 
+    /// Returns true if the position is walkable (empty or exit tile)
+    pub fn is_walkable(&self, pos: Vec2) -> bool {
+        matches!(
+            self.get_elem_pos(pos),
+            MapElement::Empty | MapElement::Exit(_)
+        )
+    }
+
+    /// Returns true if the tile coordinates are walkable (empty or exit tile)
+    pub fn is_walkable_tile(&self, x: i32, y: i32) -> bool {
+        if x < 0 || y < 0 {
+            return false;
+        }
+        if x >= self.width as i32 || y >= self.height as i32 {
+            return false;
+        }
+        matches!(
+            self.get_elem(x as usize, y as usize),
+            MapElement::Empty | MapElement::Exit(_)
+        )
+    }
+
+    /// Finds a random empty tile center, keeping distance from avoided positions
+    pub fn find_random_empty(
+        &self,
+        avoid: &[Vec2],
+        min_distance: f32,
+        attempts: u32,
+    ) -> Option<Vec2> {
+        if self.width == 0 || self.height == 0 {
+            return None;
+        }
+        let min_distance_sq = min_distance * min_distance;
+        for _ in 0..attempts {
+            let x = random_range(0..self.width) as i32;
+            let y = random_range(0..self.height) as i32;
+            if !self.is_walkable_tile(x, y) {
+                continue;
+            }
+            let pos = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+            if avoid
+                .iter()
+                .any(|other| other.distance_squared(pos) <= min_distance_sq)
+            {
+                continue;
+            }
+            return Some(pos);
+        }
+        None
+    }
+
     /// Replaces the [MapElement] at coords (x, y) and fixes it, fails if position is out of bounds
     pub fn set_elem(&mut self, x: usize, y: usize, elem: MapElement) -> Result<(), ()> {
         if x >= self.width || y >= self.height {

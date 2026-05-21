@@ -1,8 +1,8 @@
 use crate::app_state::AppState;
-use crate::game::bomb::{Bomb, BombState};
+use crate::game::bomb::{Bomb, BombEvents, BombState};
 use crate::game::camera::Camera;
 use crate::game::collision::Collision;
-use crate::game::enemy::Enemy;
+use crate::game::enemy::{Enemy, EnemyBehavior};
 use crate::game::game_settings::GameSettings;
 use crate::game::map::map::{LevelData, Map};
 use crate::game::map::map_element::MapElement;
@@ -16,10 +16,11 @@ use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
 use crate::input::input::Input;
 use crate::input::input_state::InputState;
 use crate::input::input_vec::{GetOrDefault, MenuInput};
-use crate::settings::settings::Settings;
+use crate::settings::{save::GameDifficulty, settings::Settings};
 use crate::ui::pages::game_settings::UIGameSettings;
 use crate::{audio::AudioManager, audio::SoundEffect};
 use glam::{Vec2, Vec3, Vec4};
+use rand::random_range;
 use std::error::Error;
 use std::vec::Vec;
 
@@ -30,13 +31,132 @@ pub enum GameMode {
     Campaign,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ScoreRules {
+    enemy_kill: u32,
+    breakable_destroyed: u32,
+    powerup_pickup: u32,
+    level_clear: u32,
+    time_bonus_seconds: u32,
+    time_bonus_per_second: u32,
+    time_bonus_cap: u32,
+}
+
+impl ScoreRules {
+    fn time_bonus(&self, elapsed: f32) -> u32 {
+        if self.time_bonus_per_second == 0 || self.time_bonus_seconds == 0 {
+            return 0;
+        }
+        let elapsed_seconds = elapsed.max(0.0) as u32;
+        if elapsed_seconds >= self.time_bonus_seconds {
+            return 0;
+        }
+        let remaining = self.time_bonus_seconds - elapsed_seconds;
+        (remaining * self.time_bonus_per_second).min(self.time_bonus_cap)
+    }
+}
+
+const SCORE_RULES: ScoreRules = ScoreRules {
+    enemy_kill: 100,
+    breakable_destroyed: 10,
+    powerup_pickup: 25,
+    level_clear: 300,
+    time_bonus_seconds: 120,
+    time_bonus_per_second: 2,
+    time_bonus_cap: 240,
+};
+
+#[derive(Default, Debug, Clone, Copy)]
+struct TickEvents {
+    breakables_destroyed: u32,
+    enemies_killed: u32,
+    powerups_picked: u32,
+}
+
+impl TickEvents {
+    fn add_bomb_events(&mut self, events: BombEvents) {
+        self.breakables_destroyed = self
+            .breakables_destroyed
+            .saturating_add(events.breakables_destroyed);
+        self.enemies_killed = self.enemies_killed.saturating_add(events.enemies_killed);
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MpTickResult {
+    winners: Option<Vec<u32>>,
+    events: TickEvents,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DifficultyPreset {
+    enemy_speed_multiplier: f32,
+    decision_interval: f32,
+    aggressive_pct: u32,
+    coward_pct: u32,
+    extra_enemies: u32,
+}
+
+impl DifficultyPreset {
+    fn for_level(level: u32, difficulty: GameDifficulty) -> Self {
+        let level_index = level.saturating_sub(1);
+        let mut enemy_speed_multiplier = (1.0 + level_index as f32 * 0.08).min(1.6);
+        let mut decision_interval = (0.65 - level_index as f32 * 0.04).max(0.3);
+        let mut aggressive_pct = (30 + level_index * 5).min(60);
+        let coward_pct = 20;
+        let mut extra_enemies = level_index.min(4);
+
+        match difficulty {
+            GameDifficulty::Easy => {
+                enemy_speed_multiplier *= 0.85;
+                decision_interval *= 1.2;
+                aggressive_pct = aggressive_pct.saturating_sub(10);
+                extra_enemies = extra_enemies.saturating_sub(1);
+            }
+            GameDifficulty::Normal => {}
+            GameDifficulty::Hard => {
+                enemy_speed_multiplier *= 1.15;
+                decision_interval *= 0.85;
+                aggressive_pct = (aggressive_pct + 10).min(80);
+                extra_enemies = (extra_enemies + 1).min(6);
+            }
+        }
+
+        enemy_speed_multiplier = enemy_speed_multiplier.clamp(0.6, 2.0);
+        decision_interval = decision_interval.clamp(0.25, 0.9);
+
+        Self {
+            enemy_speed_multiplier,
+            decision_interval,
+            aggressive_pct,
+            coward_pct,
+            extra_enemies,
+        }
+    }
+
+    fn pick_behavior(&self) -> EnemyBehavior {
+        let roll = random_range(0..=99);
+        let aggressive = self.aggressive_pct.min(100);
+        let coward = self.coward_pct.min(100 - aggressive);
+        if roll < aggressive {
+            EnemyBehavior::Aggressive
+        } else if roll < aggressive + coward {
+            EnemyBehavior::Coward
+        } else {
+            EnemyBehavior::Wander
+        }
+    }
+}
+
 /// The [CampaignProgress] mirrors the [SaveState](crate::settings::save::SaveState) but is a temporary format
 #[derive(Debug, Clone, Default)]
 pub struct CampaignProgress {
     pub level: u32,
     pub lives: u32,
-    // TODO: implement score
+    /// The score of the ongoing campaign
     pub score: u32,
+    pub level_time: f32,
+    pub difficulty: GameDifficulty,
 }
 
 /// The return type of [GameState]'s singleplayer tick function
@@ -136,7 +256,12 @@ impl GameState {
     }
 
     /// begins a new campaign, used by the New Game button
-    pub fn new_campaign(level: u32, lives: u32) -> Option<Self> {
+    pub fn new_campaign(
+        level: u32,
+        lives: u32,
+        score: u32,
+        difficulty: GameDifficulty,
+    ) -> Option<Self> {
         let resources_to_load_map = unsafe {
             (*std::ptr::addr_of!(crate::GLOBAL_RESOURCES))
                 .as_ref()
@@ -160,9 +285,29 @@ impl GameState {
         ));
         let alive_players = players.iter().map(|player| player.id).collect();
 
+        let difficulty_preset = DifficultyPreset::for_level(level, difficulty);
+        let mut enemy_positions = enemy_spawns;
+        let mut avoid_positions = vec![player_spawn];
+        avoid_positions.extend(enemy_positions.iter().copied());
+
+        for _ in 0..difficulty_preset.extra_enemies {
+            if let Some(pos) = map.find_random_empty(&avoid_positions, 2.0, 40) {
+                enemy_positions.push(pos);
+                avoid_positions.push(pos);
+            }
+        }
+
         let mut enemies = Vec::new();
-        for (i, spawn) in enemy_spawns.iter().enumerate() {
-            enemies.push(Enemy::new(i as u32, *spawn, resources_to_load_map));
+        for (i, spawn) in enemy_positions.iter().enumerate() {
+            let behavior = difficulty_preset.pick_behavior();
+            enemies.push(Enemy::new(
+                i as u32,
+                *spawn,
+                behavior,
+                difficulty_preset.enemy_speed_multiplier,
+                difficulty_preset.decision_interval,
+                resources_to_load_map,
+            ));
         }
 
         let camera = Transform {
@@ -187,7 +332,9 @@ impl GameState {
             campaign_progress: Some(CampaignProgress {
                 level,
                 lives,
-                score: 0,
+                score,
+                level_time: 0.0,
+                difficulty,
             }),
             players,
             enemies,
@@ -327,7 +474,8 @@ impl GameState {
         delta: f32,
         resources: &Resources,
         audio_manager: &mut AudioManager,
-    ) -> Option<Vec<u32>> {
+    ) -> MpTickResult {
+        let mut events = TickEvents::default();
         // tick bombs
         for i in 0..self.bombs.len() {
             let bombs_pos = self
@@ -338,7 +486,7 @@ impl GameState {
                 .map(|(_, bomb)| bomb.position)
                 .collect::<Vec<_>>();
 
-            self.bombs[i].tick(
+            let bomb_events = self.bombs[i].tick(
                 delta,
                 &mut self.players,
                 &mut self.enemies,
@@ -348,6 +496,7 @@ impl GameState {
                 audio_manager,
                 &bombs_pos,
             );
+            events.add_bomb_events(bomb_events);
         }
         for i in 0..self.bombs.len() {
             if self.bombs[i].state != BombState::Exploding {
@@ -357,7 +506,9 @@ impl GameState {
         }
         self.bombs.retain(|bomb| !bomb.despawn);
         for powerup in &mut self.power_ups {
-            powerup.tick(&mut self.players, audio_manager);
+            if powerup.tick(&mut self.players, audio_manager) {
+                events.powerups_picked = events.powerups_picked.saturating_add(1);
+            }
         }
         self.power_ups.retain(|powerup| !powerup.despawn);
         // for player in players: summon bomb if Pressed
@@ -386,7 +537,10 @@ impl GameState {
                 &mut self.bombs,
             );
         }
-        self.create_mp_ret()
+        MpTickResult {
+            winners: self.create_mp_ret(),
+            events,
+        }
     }
 
     /// Helper function to detect the end of multiplayer game
@@ -428,12 +582,17 @@ impl GameState {
             }
         }
 
+        if let Some(progress) = &mut self.campaign_progress {
+            progress.level_time += delta;
+        }
+
         // Tick enemies
+        let player_pos = self.players.get(0).filter(|p| p.alive).map(|p| p.position);
         for i in 0..self.enemies.len() {
             let (left, right) = self.enemies.split_at_mut(i);
             if let Some((current, right)) = right.split_first_mut() {
                 let other_enemies: Vec<_> = left.iter().chain(right.iter()).cloned().collect();
-                current.tick(delta, &self.map, &self.bombs, &other_enemies);
+                current.tick(delta, &self.map, player_pos, &self.bombs, &other_enemies);
             }
 
             if self.players[0].alive
@@ -447,7 +606,29 @@ impl GameState {
         }
 
         // Tick bombs and other shared logic
-        self.mp_game_tick(delta, resources, audio_manager);
+        let mp_result = self.mp_game_tick(delta, resources, audio_manager);
+        if let Some(progress) = &mut self.campaign_progress {
+            let mut added_score: u32 = 0;
+            added_score = added_score.saturating_add(
+                mp_result
+                    .events
+                    .enemies_killed
+                    .saturating_mul(SCORE_RULES.enemy_kill),
+            );
+            added_score = added_score.saturating_add(
+                mp_result
+                    .events
+                    .breakables_destroyed
+                    .saturating_mul(SCORE_RULES.breakable_destroyed),
+            );
+            added_score = added_score.saturating_add(
+                mp_result
+                    .events
+                    .powerups_picked
+                    .saturating_mul(SCORE_RULES.powerup_pickup),
+            );
+            progress.score = progress.score.saturating_add(added_score);
+        }
 
         self.enemies.retain(|e| e.alive);
         if self.enemies.is_empty() && !self.exit_revealed {
@@ -473,6 +654,11 @@ impl GameState {
         if self.exit_revealed {
             if self.players[0].is_colliding_with(self.exit_pos, 0.8) {
                 println!("Level complete triggered!");
+                if let Some(progress) = &mut self.campaign_progress {
+                    let time_bonus = SCORE_RULES.time_bonus(progress.level_time);
+                    let added = SCORE_RULES.level_clear.saturating_add(time_bonus);
+                    progress.score = progress.score.saturating_add(added);
+                }
                 return GameTickResult::LevelComplete;
             }
         }
@@ -499,7 +685,8 @@ impl GameState {
 
         let result = match self.mode {
             GameMode::Multiplayer => {
-                if let Some(winners) = self.mp_game_tick(delta_time, resources, audio_manager) {
+                let mp_result = self.mp_game_tick(delta_time, resources, audio_manager);
+                if let Some(winners) = mp_result.winners {
                     return (Some(AppState::multiplayer_end_screen(winners)), 1);
                 }
                 GameTickResult::None
@@ -515,6 +702,8 @@ impl GameState {
                             settings,
                             progress.level,
                             progress.lives,
+                            progress.score,
+                            progress.difficulty,
                         )),
                         1,
                     )
@@ -522,7 +711,19 @@ impl GameState {
                     (None, 0)
                 }
             }
-            GameTickResult::GameOver => (Some(AppState::game_over()), 1),
+            GameTickResult::GameOver => {
+                let score = self
+                    .campaign_progress
+                    .as_ref()
+                    .map(|progress| progress.score)
+                    .unwrap_or(0);
+                let difficulty = self
+                    .campaign_progress
+                    .as_ref()
+                    .map(|progress| progress.difficulty)
+                    .unwrap_or_default();
+                (Some(AppState::game_over(score, difficulty)), 1)
+            }
             GameTickResult::None => (None, 0),
         }
     }

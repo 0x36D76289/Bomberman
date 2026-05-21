@@ -5,6 +5,7 @@ use crate::{
     audio::{AudioManager, BackgroundMusic},
     game::{game_state::GameState, resources::Resources},
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
+    settings::settings::Settings,
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -109,6 +110,7 @@ impl UiState {
         inputs: &Vec<Input>,
         _resources: &Resources,
         audio_manager: &mut AudioManager,
+        settings: &Settings,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             return match self.selected {
@@ -116,7 +118,9 @@ impl UiState {
                 1 => {
                     // Restart
                     audio_manager.play_background_music(BackgroundMusic::Game);
-                    if let Some(game_state) = GameState::new_campaign(1, 3) {
+                    if let Some(game_state) =
+                        GameState::new_campaign(1, 3, 0, settings.single_player_save.difficulty)
+                    {
                         (Some(AppState::game(game_state)), 2)
                     } else {
                         println!(

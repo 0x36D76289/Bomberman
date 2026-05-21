@@ -5,6 +5,7 @@ use crate::{
     audio::{AudioManager, BackgroundMusic},
     game::game_state::GameState,
     input::{input::Input, input_state::InputState, input_vec::MenuInput},
+    settings::{save::GameDifficulty, settings::Settings},
     ui::{
         UiState,
         button::{Button, ButtonNeighbors},
@@ -17,7 +18,7 @@ const LEVEL_COUNT: u32 = 2;
 
 impl UiState {
     /// The level select page ui constructor
-    pub fn level_select() -> Self {
+    pub fn level_select(difficulty: GameDifficulty) -> Self {
         let mut buttons = Vec::new();
 
         for i in 1..=LEVEL_COUNT {
@@ -51,6 +52,14 @@ impl UiState {
             ..Default::default()
         };
 
+        let difficulty_label = Canvas {
+            center: Vec2::new(0.0, -0.2),
+            text: Some(format!("Difficulty: {}", difficulty.label())),
+            text_color: Some(Vec4::new(0.9, 0.9, 0.9, 1.0)),
+            text_size: Some(0.9),
+            ..Default::default()
+        };
+
         let background = Canvas {
             center: Vec2::ZERO,
             width: 2.0,
@@ -60,7 +69,7 @@ impl UiState {
         };
 
         Self {
-            canvases: vec![background, title],
+            canvases: vec![background, title, difficulty_label],
             buttons,
             selected: 0,
             render_info: Default::default(),
@@ -72,13 +81,22 @@ impl UiState {
         &mut self,
         inputs: &Vec<Input>,
         audio_manager: &mut AudioManager,
+        difficulty: GameDifficulty,
+        settings: &mut Settings,
     ) -> (Option<AppState>, u8) {
         if self.button_inputs(inputs) {
             let selected_level = self.selected as u32 + 1;
             audio_manager.play_background_music(BackgroundMusic::Game);
 
-            return match GameState::new_campaign(selected_level, 3) {
-                Some(game_state) => (Some(AppState::game(game_state)), 1),
+            return match GameState::new_campaign(selected_level, 3, 0, difficulty) {
+                Some(game_state) => {
+                    settings.single_player_save.level = selected_level;
+                    settings.single_player_save.lives = 3;
+                    settings.single_player_save.score = 0;
+                    settings.single_player_save.difficulty = difficulty;
+                    settings.save();
+                    (Some(AppState::game(game_state)), 1)
+                }
                 None => {
                     println!(
                         "Error: Failed to load campaign level {}. Returning to menu.",
@@ -90,7 +108,7 @@ impl UiState {
             };
         }
         if MenuInput::menu_back(inputs) == InputState::Pressed {
-            return (None, 1); // reviens sur le menu principal
+            return (Some(AppState::difficulty_select()), 1);
         }
         (None, 0)
     }
