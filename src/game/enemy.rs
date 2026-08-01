@@ -1,4 +1,4 @@
-use crate::graphics::{object::Object, transform::Transform};
+use crate::graphics::{mesh::Mesh, object::Object, transform::Transform};
 use glam::{Vec2, Vec3};
 use rand::prelude::*;
 use std::collections::VecDeque;
@@ -82,7 +82,7 @@ impl Enemy {
     ) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
-            model: resources.models[&ResourceName::Player].clone(), // TODO: Using player model for now
+            mesh: Mesh::Static(resources.models[&ResourceName::Player].clone()), // TODO: Using player model for now
             texture: Some(resources.textures_index[&ResourceName::Player]),
             color: Self::behavior_color(behavior),
             transform: Transform {

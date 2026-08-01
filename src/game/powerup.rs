@@ -2,13 +2,11 @@ use glam::{USizeVec2, Vec2, Vec3, usize};
 use rand::random_range;
 
 use crate::{
-    audio::{AudioManager, SoundEffect},
-    game::{
+    audio::{AudioManager, SoundEffect}, game::{
         collision::Collision,
         player::Player,
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
 };
 
 /// The various types of [PowerUp]s, they each provide a different bonus
@@ -104,7 +102,7 @@ impl PowerUp {
         Self {
             power_up_type,
             object: Object {
-                model,
+                mesh: Mesh::Static(model),
                 texture: Some(texture),
                 transform: Transform {
                     translation: Vec3 {

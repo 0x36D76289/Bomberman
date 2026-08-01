@@ -10,6 +10,9 @@ use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::resources::{ResourceName, Resources};
+#[cfg(debug_assertions)]
+use crate::graphics::Vulkan;
+use crate::graphics::mesh::Mesh;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
@@ -29,6 +32,8 @@ use std::vec::Vec;
 pub enum GameMode {
     Multiplayer,
     Campaign,
+    #[cfg(debug_assertions)]
+    TestScene
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -174,7 +179,7 @@ pub enum GameTickResult {
 #[derive(Debug, Clone)]
 pub struct GameState {
     /// Whether this is a singleplayer or multiplayer game
-    mode: GameMode,
+    pub mode: GameMode,
     /// The live state of the current campaign, None in multiplayer
     campaign_progress: Option<CampaignProgress>,
     /// The list of players at game start
@@ -468,6 +473,24 @@ impl GameState {
             .chain(power_up_objects)
     }
 
+    #[cfg(debug_assertions)]
+    pub fn objects_test_scene(&self, resources: &Resources) -> Vec<Object> {
+        let object_1: Object = Object {
+            mesh: Mesh::Static(resources.models[&ResourceName::Test].clone()),
+            texture: None,//Some(resources.textures_index[&ResourceName::Test]),
+            transform: Transform {
+                translation: Vec3::new(0.0, -1.0, 0.0),
+                scale: Vec3::splat(1.0),
+                rotation: Vec3::ZERO
+            },
+            color: Vec3::new(1.0, 0.0, 0.0)
+        };
+
+        let objects = vec![object_1];
+
+        objects
+    }
+
     /// The main tick function of multiplayer games, simulates every event since the last frame
     fn mp_game_tick(
         &mut self,
@@ -638,7 +661,7 @@ impl GameState {
                 self.exit_pos
             );
             let exit_obj = Object {
-                model: resources.models[&ResourceName::Floor].clone(),
+                mesh: Mesh::Static(resources.models[&ResourceName::Floor].clone()),
                 texture: None,
                 color: Vec3::new(0.2, 0.8, 0.2),
                 transform: Transform {
@@ -692,6 +715,8 @@ impl GameState {
                 GameTickResult::None
             }
             GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
+            #[cfg(debug_assertions)]
+            GameMode::TestScene => GameTickResult::None,
         };
 
         match result {
@@ -795,5 +820,37 @@ impl GameState {
     /// Gets an unmutable reference to the [GameState]'s [Map]
     pub fn get_map(&self) -> &Map {
         &self.map
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn create_test_scene(resources: &Resources) -> Self {
+        Self {
+            mode: GameMode::TestScene,
+            campaign_progress: None,
+            players: Vec::new(),
+            enemies: Vec::new(),
+            exit_pos: Vec2::ZERO,
+            exit_revealed: false,
+            game_inputs: Vec::new(),
+            nb_humans: 0,
+            bombs: Vec::new(),
+            power_ups: Vec::new(),
+            map: Map::empty(8, 8, resources),
+            camera: Transform {
+                translation: Vec3::new(0.0, -1.0, 0.0),
+                scale: Vec3::ONE,
+                rotation: Vec3::new(-1.25, 0.0, 0.0),
+            },
+            light: LightInfo {
+                ambient_light_color: Vec4::ONE.with_w(0.8),
+                direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+                directional_light_color: Vec4::ONE.with_w(0.6),
+            },
+            alive_players: Vec::new(),
+            render_info: StateRenderInfo {
+                drawn_first: true,
+                ..Default::default()
+            }
+        }
     }
 }

@@ -4,9 +4,7 @@ use crate::{
         collision::Collision,
         map::{map::Map, map_element::MapElement},
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
-    input::input::Input,
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform}, input::input::Input,
 };
 
 use super::direction::Direction;
@@ -75,12 +73,12 @@ impl Player {
     fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
-            model: resources.models[&ResourceName::Player].clone(),
+            mesh: Mesh::Static(resources.models[&ResourceName::Player].clone()),
             texture: Some(resources.textures_index[&ResourceName::Player]),
             color: Vec3::ONE,
             transform: Transform {
                 translation: Vec3::new(position.x, 0.0, position.y),
-                scale: Vec3::splat(0.35),
+                scale: Vec3::splat(1.0),//Vec3::splat(0.35),
                 rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
             },
         }

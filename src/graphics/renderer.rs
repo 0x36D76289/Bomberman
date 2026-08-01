@@ -1,9 +1,10 @@
+#[cfg(debug_assertions)]
+use crate::app_state::AppStateEnum;
 use crate::{
-    app_state::AppState,
-    game::resources::Resources,
-    graphics::{GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan},
-    settings::settings::Settings,
+    app_state::AppState, game::resources::Resources, graphics::{AnimationVertex, GameVertex, GuiVertex, TextRenderer, TimeInfo, Vulkan}, settings::settings::Settings,
 };
+#[cfg(debug_assertions)]
+use std::matches;
 use std::{sync::Arc, time::Instant};
 use vulkano::{
     Validated, VulkanError,
@@ -45,6 +46,7 @@ use winit::{
 pub struct Renderer {
     pub rcx: Option<RenderContext>,
     pub game_pipeline: Option<Arc<GraphicsPipeline>>,
+    pub animation_pipeline: Option<Arc<GraphicsPipeline>>,
     pub gui_pipeline: Option<Arc<GraphicsPipeline>>,
     pub post_process_pipeline: Option<Arc<GraphicsPipeline>>,
     pub command_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>>,
@@ -126,6 +128,7 @@ impl Renderer {
         Self {
             rcx: None,
             game_pipeline: None,
+            animation_pipeline: None,
             gui_pipeline: None,
             post_process_pipeline: None,
             command_buffer: None,
@@ -257,6 +260,26 @@ impl Renderer {
                 Some(2),
             ))
         };
+        self.animation_pipeline = {
+            let vertex_shader = animation_vs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let fragment_shader = animation_fs::load(vulkan.device.clone())
+                .unwrap()
+                .entry_point("main")
+                .unwrap();
+            let vertex_input_state = AnimationVertex::per_vertex().definition(&vertex_shader).unwrap();
+            Some(self.create_pipeline(
+                vulkan,
+                vertex_shader,
+                Some(fragment_shader),
+                vertex_input_state,
+                true,
+                true,
+                Some(3),
+            ))
+        };
         self.gui_pipeline = {
             let vertex_shader = gui_vs::load(vulkan.device.clone())
                 .unwrap()
@@ -307,7 +330,7 @@ impl Renderer {
         vertex_input_state: VertexInputState,
         has_color_attachment: bool,
         has_depth_attachment: bool,
-        variable_descriptor_count: Option<u32>,
+        variable_descriptor_id: Option<u32>,
     ) -> Arc<GraphicsPipeline> {
         let stages = match fragment_shader {
             Some(fragment_shader) => vec![
@@ -321,7 +344,7 @@ impl Renderer {
             let mut layout_create_info =
                 PipelineDescriptorSetLayoutCreateInfo::from_stages(&stages);
 
-            if let Some(index) = variable_descriptor_count {
+            if let Some(index) = variable_descriptor_id {
                 let binding = layout_create_info.set_layouts[0]
                     .bindings
                     .get_mut(&index)
@@ -392,6 +415,7 @@ impl Renderer {
     pub fn is_initialized(&self) -> bool {
         self.rcx.is_some()
             && self.game_pipeline.is_some()
+            && self.animation_pipeline.is_some()
             && self.gui_pipeline.is_some()
             && self.post_process_pipeline.is_some()
     }
@@ -697,6 +721,20 @@ pub mod game_fs {
     vulkano_shaders::shader! {
         ty: "fragment",
         path: "src/shaders/game.frag"
+    }
+}
+
+pub mod animation_vs {
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        path: "src/shaders/game_animation.vert"
+    }
+}
+
+pub mod animation_fs {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        path: "src/shaders/game_animation.frag"
     }
 }
 

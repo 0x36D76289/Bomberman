@@ -1,17 +1,18 @@
 pub mod game_state;
 pub mod init;
 pub mod light;
-pub mod model;
+pub mod mesh;
 pub mod object;
 pub mod renderer;
 pub mod text;
 pub mod texture;
 pub mod transform;
 pub mod ui_state;
+pub mod animation;
 
 pub use {
     light::LightInfo,
-    model::Model,
+    mesh::StaticMesh,
     renderer::{Renderer, StateRenderInfo, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
     text::TextRenderer,
     texture::load_texture,
@@ -65,6 +66,30 @@ pub struct GameVertex {
     #[format(R32G32_SFLOAT)]
     #[name("in_uv")]
     pub uv: [f32; 2],
+}
+
+#[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct AnimationVertex {
+    #[format(R32G32B32_SFLOAT)]
+    #[name("in_position")]
+    pub position: [f32; 3],
+
+    #[format(R32G32B32_SFLOAT)]
+    #[name("in_normal")]
+    pub normal: [f32; 3],
+
+    #[format(R32G32_SFLOAT)]
+    #[name("in_uv")]
+    pub uv: [f32; 2],
+
+    #[format(R32G32B32_UINT)]
+    #[name("in_joint_indices")]
+    pub joint_ids: [u32; 3],
+
+    #[format(R32G32B32_SFLOAT)]
+    #[name("in_joint_weights")]
+    pub joint_weights: [f32; 3],
 }
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]

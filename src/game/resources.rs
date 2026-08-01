@@ -6,7 +6,9 @@ use vulkano::{
     memory::allocator::StandardMemoryAllocator,
 };
 
-use crate::graphics::{Model, Vulkan, load_texture, object::TextureIndex};
+#[cfg(debug_assertions)]
+use crate::graphics::mesh::FbxImport;
+use crate::graphics::{StaticMesh, Vulkan, load_texture, object::TextureIndex};
 
 /// The list of objects a Game might require
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -22,6 +24,8 @@ pub enum ResourceName {
     PowerBomb,
     PowerSlide,
     FontAtlas,
+    #[cfg(debug_assertions)]
+    Test
 }
 
 /// the global [Resources] object saves the current textures and models in use
@@ -29,7 +33,7 @@ pub enum ResourceName {
 pub struct Resources {
     pub textures: Vec<Arc<ImageView>>,
     pub textures_index: HashMap<ResourceName, TextureIndex>,
-    pub models: HashMap<ResourceName, Arc<Model>>,
+    pub models: HashMap<ResourceName, Arc<StaticMesh>>,
 }
 
 impl Resources {
@@ -80,6 +84,11 @@ impl Resources {
             ResourceName::FontAtlas,
             include_bytes!("../assets/font_atlas.png"),
         );
+        #[cfg(debug_assertions)]
+        textures.insert(
+            ResourceName::Test,
+            include_bytes!("../assets/Valkyrie.png"),
+        );
 
         // load the models
         models.insert(
@@ -115,7 +124,13 @@ impl Resources {
         );
 
         let (textures, textures_index) = Resources::load_textures(textures, vulkan);
-        let models = Resources::load_models(models, vulkan.memory_allocator.clone());
+        let mut models = Resources::load_models(models, vulkan.memory_allocator.clone());
+
+        #[cfg(debug_assertions)]
+        models.insert(
+            ResourceName::Test,
+            Arc::new(FbxImport::from_bytes(include_bytes!("../assets/Car.fbx"), vulkan.memory_allocator.clone()).unwrap().static_meshes[0].clone())
+        );
 
         Self {
             textures,
@@ -163,13 +178,13 @@ impl Resources {
     fn load_models(
         models: HashMap<ResourceName, &[u8]>,
         memory_allocator: Arc<StandardMemoryAllocator>,
-    ) -> HashMap<ResourceName, Arc<Model>> {
-        let mut model_map: HashMap<ResourceName, Arc<Model>> = HashMap::new();
+    ) -> HashMap<ResourceName, Arc<StaticMesh>> {
+        let mut model_map: HashMap<ResourceName, Arc<StaticMesh>> = HashMap::new();
 
         for model in models {
             model_map.insert(
                 model.0,
-                Model::load(model.1, memory_allocator.clone()).unwrap(),
+                StaticMesh::load(model.1, memory_allocator.clone()).unwrap(),
             );
         }
 

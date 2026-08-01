@@ -9,8 +9,7 @@ use crate::{
             map_settings::{MapSettings, MapType},
         },
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
 };
 
 /// Represents the entire play area with a list of tiles and spawnpoints
@@ -40,7 +39,7 @@ impl Map {
     /// Creates the internal object for a Breakable MapElement
     fn create_breakable(ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[&ResourceName::Breakable].clone(),
+            mesh: Mesh::Static(ressources.models[&ResourceName::Breakable].clone()),
             texture: Some(ressources.textures_index[&ResourceName::Breakable]),
             transform: Default::default(),
             color: Default::default(),
@@ -50,7 +49,7 @@ impl Map {
     /// Creates the internal object for an Unbreakable MapElement
     fn create_unbreakable(ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[&ResourceName::Unbreakable].clone(),
+            mesh: Mesh::Static(ressources.models[&ResourceName::Unbreakable].clone()),
             texture: Some(ressources.textures_index[&ResourceName::Unbreakable]),
             transform: Default::default(),
             color: Default::default(),
@@ -91,7 +90,7 @@ impl Map {
     /// Creates and places the object for the floor
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
         Object {
-            model: ressources.models[&ResourceName::Floor].clone(),
+            mesh: Mesh::Static(ressources.models[&ResourceName::Floor].clone()),
             texture: Some(ressources.textures_index[&ResourceName::Floor]),
             transform: Transform {
                 translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
@@ -103,7 +102,7 @@ impl Map {
     }
 
     /// Constructor: creates an empty x*y map
-    fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
+    pub fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
         Map {
             width: width as usize,
             height: height as usize,
