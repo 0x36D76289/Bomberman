@@ -82,7 +82,7 @@ impl Enemy {
     ) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
-            mesh: Mesh::Static(resources.models[&ResourceName::Player].clone()), // TODO: Using player model for now
+            mesh: resources.models[&ResourceName::Player].clone(), // TODO: Using player model for now
             texture: Some(resources.textures_index[&ResourceName::Player]),
             color: Self::behavior_color(behavior),
             transform: Transform {

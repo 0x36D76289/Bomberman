@@ -1,3 +1,5 @@
+use std::print;
+
 use glam::Mat4;
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage},
@@ -23,6 +25,7 @@ impl Renderer {
         is_first: bool,
     ) {
         self.game_pass(vulkan, resources, state);
+        self.animation_pass(vulkan, resources, state);
         self.postprocess_pass(vulkan, &state.render_info, image_index, is_first);
     }
 
@@ -116,17 +119,7 @@ impl Renderer {
             )
             .unwrap();
 
-        let mut objects: Vec<&Object> = state.objects_to_render().filter(|o| matches!(o.mesh, Mesh::Static(_))).collect();
-        
-        #[cfg(debug_assertions)]
-        let mut o = Vec::new();
-
-        if cfg!(debug_assertions) && state.mode == GameMode::TestScene {
-            o = state.objects_test_scene(resources);
-            objects = o.iter().collect();
-        }
-
-        for object in objects {
+        for object in state.objects_to_render().filter(|o| matches!(o.mesh, Mesh::Static(_))) {
             let push_constant = GamePush {
                 model_matrix: object.transform.mat4().to_cols_array_2d(),
                 normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
@@ -142,9 +135,9 @@ impl Renderer {
             command_buffer
                 .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap()
-                .bind_vertex_buffers(0, mesh.vertex_buffer.clone())
+                .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())
                 .unwrap()
-                .bind_index_buffer(mesh.index_buffer.clone())
+                .bind_index_buffer((*mesh.index_buffer).clone())
                 .unwrap();
 
             unsafe {
@@ -202,13 +195,13 @@ impl Renderer {
         let rendering_info = {
             let mut color_attachment = RenderingAttachmentInfo::image_view(rcx.color_image.clone());
             color_attachment.store_op = AttachmentStoreOp::Store;
-            color_attachment.load_op = AttachmentLoadOp::Clear;
-            color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
+            color_attachment.load_op = AttachmentLoadOp::Load;
+            //color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
 
             let mut depth_attachment = RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
-            depth_attachment.load_op = AttachmentLoadOp::Clear;
+            depth_attachment.load_op = AttachmentLoadOp::Load;
             depth_attachment.store_op = AttachmentStoreOp::Store;
-            depth_attachment.clear_value = Some(1f32.into());
+            //depth_attachment.clear_value = Some(1f32.into());
             RenderingInfo {
                 color_attachments: vec![Some(color_attachment)],
                 depth_attachment: Some(depth_attachment),
@@ -252,8 +245,9 @@ impl Renderer {
                 resources.textures.len() as u32,
                 [
                     WriteDescriptorSet::buffer(0, uniform_buffer),
-                    WriteDescriptorSet::sampler(1, self.game_sampler.clone()),
-                    WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
+                    WriteDescriptorSet::buffer(1, joints_ubo.clone()),
+                    WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
+                    WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
                 ],
                 [],
             )
@@ -287,9 +281,9 @@ impl Renderer {
             command_buffer
                 .push_constants(pipeline.layout().clone(), 0, push_constant)
                 .unwrap()
-                .bind_vertex_buffers(0, mesh.vertex_buffer.clone())
+                .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())
                 .unwrap()
-                .bind_index_buffer(mesh.index_buffer.clone())
+                .bind_index_buffer((*mesh.index_buffer).clone())
                 .unwrap();
 
             unsafe {

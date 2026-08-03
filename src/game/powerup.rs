@@ -102,7 +102,7 @@ impl PowerUp {
         Self {
             power_up_type,
             object: Object {
-                mesh: Mesh::Static(model),
+                mesh: model,
                 texture: Some(texture),
                 transform: Transform {
                     translation: Vec3 {

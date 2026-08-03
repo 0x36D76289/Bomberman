@@ -1,11 +1,11 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, println, time::Duration};
 use glam::{Mat4, Quat, Vec3};
 use ufbx::Scene;
 use vulkano::{buffer::{Subbuffer}};
 use crate::graphics::{object::Object, renderer::animation_vs::JointsUbo};
 
 /// A component of the skeleton, can also be refered as a bone
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Joint {
     pub id: u32,
     pub name: String,
@@ -103,12 +103,6 @@ impl Animator {
         }
     }
 
-    pub fn do_animation(&mut self, animation: Animation) {
-        self.animation_time = Duration::new(0, 0);
-        self.current_anim = Some(animation);
-        self.current_frame = 0;
-    }
-
     pub fn update(&mut self, delta_time: f32, root_joint: &mut Joint) {
         if self.current_anim.is_none() {
             return;
@@ -145,7 +139,7 @@ impl Animator {
         let current_anim = self.current_anim.as_ref().unwrap();
 
         let (frame1, frame2) = {
-            let next_frame_id = if self.current_frame + 1 >= current_anim.frames.len() {self.current_frame + 1} else {0};
+            let next_frame_id = if self.current_frame + 1 >= current_anim.frames.len() {0} else {self.current_frame + 1};
             (&current_anim.frames[self.current_frame], &current_anim.frames[next_frame_id])
         };
 
@@ -154,6 +148,9 @@ impl Animator {
     }
 
     fn calc_progression(&self, frame1: &KeyFrame, frame2: &KeyFrame) -> f32 {
+        if frame2.time_stamp < frame1.time_stamp {
+            return 1.0;
+        }
         let total_time = frame2.time_stamp - frame1.time_stamp;
         let current_time = self.animation_time - frame1.time_stamp;
         current_time.as_secs_f32() / total_time.as_secs_f32()

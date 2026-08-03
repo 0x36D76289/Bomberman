@@ -73,7 +73,7 @@ impl Player {
     fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
-            mesh: Mesh::Static(resources.models[&ResourceName::Player].clone()),
+            mesh: resources.models[&ResourceName::Player].clone(),
             texture: Some(resources.textures_index[&ResourceName::Player]),
             color: Vec3::ONE,
             transform: Transform {

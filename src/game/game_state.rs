@@ -208,6 +208,9 @@ pub struct GameState {
     alive_players: Vec<u32>,
     // TODO: doc
     pub render_info: StateRenderInfo,
+
+    #[cfg(debug_assertions)]
+    test_objs: Vec<Object>
 }
 
 impl GameState {
@@ -257,6 +260,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         })
     }
 
@@ -354,6 +359,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         })
     }
 
@@ -416,6 +423,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         }
     }
 
@@ -451,7 +460,12 @@ impl GameState {
     }
 
     /// Creates a list of objects to render from the gamestate for the render function
-    pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
+    pub fn objects_to_render(&self) -> Box<dyn Iterator<Item = &Object> + '_> {
+        #[cfg(debug_assertions)]
+        if self.mode == GameMode::TestScene {
+            return Box::new(self.test_objs.iter());
+        }
+
         let map_objects = self.map.iter().filter_map(|el| match el {
             MapElement::Empty => None,
             MapElement::Breakable(obj) => Some(obj),
@@ -465,30 +479,14 @@ impl GameState {
         let bomb_objects = self.bombs.iter().flat_map(|b| &b.objects);
         let power_up_objects = self.power_ups.iter().map(|p| &p.object);
 
-        map_objects
-            .chain(floor_iter)
-            .chain(players_objects)
-            .chain(enemy_objects)
-            .chain(bomb_objects)
-            .chain(power_up_objects)
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn objects_test_scene(&self, resources: &Resources) -> Vec<Object> {
-        let object_1: Object = Object {
-            mesh: Mesh::Static(resources.models[&ResourceName::Test].clone()),
-            texture: None,//Some(resources.textures_index[&ResourceName::Test]),
-            transform: Transform {
-                translation: Vec3::new(0.0, -1.0, 0.0),
-                scale: Vec3::splat(1.0),
-                rotation: Vec3::ZERO
-            },
-            color: Vec3::new(1.0, 0.0, 0.0)
-        };
-
-        let objects = vec![object_1];
-
-        objects
+        Box::new(
+            map_objects
+                .chain(floor_iter)
+                .chain(players_objects)
+                .chain(enemy_objects)
+                .chain(bomb_objects)
+                .chain(power_up_objects)
+        )
     }
 
     /// The main tick function of multiplayer games, simulates every event since the last frame
@@ -661,7 +659,7 @@ impl GameState {
                 self.exit_pos
             );
             let exit_obj = Object {
-                mesh: Mesh::Static(resources.models[&ResourceName::Floor].clone()),
+                mesh: resources.models[&ResourceName::Floor].clone(),
                 texture: None,
                 color: Vec3::new(0.2, 0.8, 0.2),
                 transform: Transform {
@@ -824,6 +822,20 @@ impl GameState {
 
     #[cfg(debug_assertions)]
     pub fn create_test_scene(resources: &Resources) -> Self {
+        let test_objs: Vec<Object> = {
+            let object_1 = Object {
+                mesh: resources.models[&ResourceName::Test].clone(),
+                texture: None,//Some(resources.textures_index[&ResourceName::Test]),
+                transform: Transform {
+                    translation: Vec3::new(0.0, -1.0, 0.0),
+                    scale: Vec3::splat(1.0),
+                    rotation: Vec3::ZERO
+                },
+                color: Vec3::new(1.0, 0.0, 0.0)
+            };
+            vec![object_1]
+        };
+
         Self {
             mode: GameMode::TestScene,
             campaign_progress: None,
@@ -839,7 +851,7 @@ impl GameState {
             camera: Transform {
                 translation: Vec3::new(0.0, -1.0, 0.0),
                 scale: Vec3::ONE,
-                rotation: Vec3::new(-1.25, 0.0, 0.0),
+                rotation: Vec3::new(-1.25, -1.0, 0.0),
             },
             light: LightInfo {
                 ambient_light_color: Vec4::ONE.with_w(0.8),
@@ -850,7 +862,27 @@ impl GameState {
             render_info: StateRenderInfo {
                 drawn_first: true,
                 ..Default::default()
+            },
+            #[cfg(debug_assertions)]
+            test_objs
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn tick_test(
+        &mut self,
+        delta_time: f32,
+        inputs: &Vec<Input>,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+        settings: &mut Settings
+    ) -> (Option<AppState>, u8){
+        for object in self.test_objs.iter_mut() {
+            if let Mesh::Animated(animated_mesh) = &mut object.mesh {
+                animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
             }
         }
+        self.camera.keyboard_move(&inputs[0], delta_time);
+        (None, 0)
     }
 }

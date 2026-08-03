@@ -39,7 +39,7 @@ impl Map {
     /// Creates the internal object for a Breakable MapElement
     fn create_breakable(ressources: &Resources) -> Object {
         Object {
-            mesh: Mesh::Static(ressources.models[&ResourceName::Breakable].clone()),
+            mesh: ressources.models[&ResourceName::Breakable].clone(),
             texture: Some(ressources.textures_index[&ResourceName::Breakable]),
             transform: Default::default(),
             color: Default::default(),
@@ -49,7 +49,7 @@ impl Map {
     /// Creates the internal object for an Unbreakable MapElement
     fn create_unbreakable(ressources: &Resources) -> Object {
         Object {
-            mesh: Mesh::Static(ressources.models[&ResourceName::Unbreakable].clone()),
+            mesh: ressources.models[&ResourceName::Unbreakable].clone(),
             texture: Some(ressources.textures_index[&ResourceName::Unbreakable]),
             transform: Default::default(),
             color: Default::default(),
@@ -90,7 +90,7 @@ impl Map {
     /// Creates and places the object for the floor
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
         Object {
-            mesh: Mesh::Static(ressources.models[&ResourceName::Floor].clone()),
+            mesh: ressources.models[&ResourceName::Floor].clone(),
             texture: Some(ressources.textures_index[&ResourceName::Floor]),
             transform: Transform {
                 translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),

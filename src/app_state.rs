@@ -46,6 +46,7 @@ pub enum AppStateEnum {
         difficulty: GameDifficulty,
     },
     MultiplayerEndScreen,
+    #[cfg(debug_assertions)]
     TestScene
 }
 
@@ -169,6 +170,7 @@ impl AppState {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn test_scene(resources: &Resources) -> Self {
         Self {
             state: AppStateEnum::TestScene,
@@ -295,7 +297,10 @@ impl AppState {
                 .as_ref()
                 .unwrap()
                 .multiplayer_end_screen_tick(inputs),
-            AppStateEnum::TestScene => (None, 0)
+            #[cfg(debug_assertions)]
+            AppStateEnum::TestScene => {
+                self.game.as_mut().unwrap().tick_test(delta, inputs, resources, audio_manager, settings)
+            }
         }
     }
 
@@ -313,6 +318,7 @@ impl AppState {
             AppStateEnum::Settings { .. } => false,
             AppStateEnum::StageClear { .. } => true,
             AppStateEnum::MultiplayerEndScreen => false,
+            #[cfg(debug_assertions)]
             AppStateEnum::TestScene => false
         }
     }
