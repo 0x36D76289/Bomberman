@@ -1,6 +1,6 @@
 #version 460
 
-const int MAX_JOINTS = 50;
+const int MAX_JOINTS = 100;
 const int MAX_WEIGHTS = 3;
 
 layout(location = 0) in vec3 in_position;
@@ -53,4 +53,12 @@ void main() {
     out_position_world = position_world.xyz;
     out_normal_world = normalize(mat3(push.normal_matrix) * total_normal.xyz);
     out_uv = in_uv;
+
+    // vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
+    // gl_Position = ubo.projection * ubo.view * position_world;
+
+    // out_color = push.color;
+    // out_position_world = position_world.xyz;
+    // out_normal_world = normalize(mat3(push.normal_matrix) * in_normal);
+    // out_uv = in_uv;
 }

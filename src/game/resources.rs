@@ -6,7 +6,7 @@ use vulkano::{
     memory::allocator::StandardMemoryAllocator,
 };
 
-use crate::graphics::mesh::FbxImport;
+use crate::graphics::{animation::Animation, mesh::FbxImport};
 use crate::graphics::{StaticMesh, Vulkan, load_texture, mesh::Mesh, object::TextureIndex};
 
 /// The list of objects a Game might require
@@ -31,8 +31,8 @@ pub enum ResourceName {
 #[derive(Debug, Clone)]
 pub struct Resources {
     pub textures: Vec<Arc<ImageView>>,
-    pub textures_index: HashMap<ResourceName, TextureIndex>,
-    pub models: HashMap<ResourceName, Mesh>,
+    pub textures_index: HashMap<ResourceName, Vec<TextureIndex>>,
+    pub models: HashMap<ResourceName, Vec<Mesh>>,
 }
 
 
@@ -43,7 +43,7 @@ enum ModelFileType {
 
 struct ModelFile {
     file_type: ModelFileType,
-    file_bytes: &'static [u8]
+    file_bytes: &'static [u8],
 }
 
 impl ModelFile {
@@ -144,16 +144,17 @@ impl Resources {
         #[cfg(debug_assertions)]
         models.insert(
             ResourceName::Test,
-            ModelFile::new(ModelFileType::Fbx, include_bytes!("../assets/animation_test.fbx"))
+            ModelFile::new(ModelFileType::Fbx, include_bytes!("../assets/Arm Stretching.fbx"))
         );
 
         let (textures, textures_index) = Resources::load_textures(textures, vulkan);
-        let models = Resources::load_models(models, vulkan.memory_allocator.clone());
+        let (models, animations) = Resources::load_models(models, vulkan.memory_allocator.clone());
 
         Self {
             textures,
             textures_index,
             models,
+            animations
         }
     }
 
@@ -196,27 +197,29 @@ impl Resources {
     fn load_models(
         models: HashMap<ResourceName, ModelFile>,
         memory_allocator: Arc<StandardMemoryAllocator>,
-    ) -> HashMap<ResourceName, Mesh> {
-        let mut model_map: HashMap<ResourceName, Mesh> = HashMap::new();
+    ) -> (HashMap<ResourceName, Vec<Mesh>>, HashMap<String, Animation>) {
+        let mut model_map: HashMap<ResourceName, Vec<Mesh>> = HashMap::new();
 
         for model in models {
-            let mesh = match model.1.file_type {
+            let meshes = match model.1.file_type {
                 ModelFileType::Obj => {
+                    // TODO: (not important) change the parsing to separate the objects in the vector
                     let obj_mesh = StaticMesh::load_from_obj(model.1.file_bytes, memory_allocator.clone()).unwrap();
-                    Mesh::Static(obj_mesh)
+                    vec![Mesh::Static(obj_mesh)]
                 }
                 // naive extraction: we take the first model we find and insert it into the model map
                 ModelFileType::Fbx => {
-                    let mut meshes = FbxImport::from_bytes(model.1.file_bytes, memory_allocator.clone()).unwrap();
-                    match (!meshes.animated_meshes.is_empty(), !meshes.static_meshes.is_empty()) {
-                        (true, _) => Mesh::Animated(meshes.animated_meshes.remove(0)),
-                        (false, true) => Mesh::Static(meshes.static_meshes.remove(0)),
-                        (false, false) => panic!("Tried to import an FBX file but found no mesh")
+                    let meshes = FbxImport::from_bytes(model.1.file_bytes, memory_allocator.clone()).unwrap();
+                    if meshes.static_meshes.is_empty() && meshes.animated_meshes.is_empty() {
+                        panic!("Tried to import an FBX file but found no mesh")
                     }
+                    meshes.animated_meshes.into_iter().map(|m| Mesh::Animated(m))
+                        .chain(meshes.static_meshes.into_iter().map(|m| Mesh::Static(m)))
+                        .collect()
                 }
             };
 
-            model_map.insert(model.0, mesh);
+            model_map.insert(model.0, meshes);
         }
 
         model_map

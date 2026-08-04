@@ -659,8 +659,8 @@ impl GameState {
                 self.exit_pos
             );
             let exit_obj = Object {
-                mesh: resources.models[&ResourceName::Floor].clone(),
-                texture: None,
+                meshes: resources.models[&ResourceName::Floor].clone(),
+                textures: vec![None],
                 color: Vec3::new(0.2, 0.8, 0.2),
                 transform: Transform {
                     translation: Vec3::new(self.exit_pos.x, -0.4, self.exit_pos.y),
@@ -824,14 +824,12 @@ impl GameState {
     pub fn create_test_scene(resources: &Resources) -> Self {
         let test_objs: Vec<Object> = {
             let object_1 = Object {
-                mesh: resources.models[&ResourceName::Test].clone(),
-                texture: None,//Some(resources.textures_index[&ResourceName::Test]),
                 transform: Transform {
                     translation: Vec3::new(0.0, -1.0, 0.0),
-                    scale: Vec3::splat(1.0),
+                    scale: Vec3::splat(0.05),
                     rotation: Vec3::ZERO
                 },
-                color: Vec3::new(1.0, 0.0, 0.0)
+                ..Object::from_resource(ResourceName::Unbreakable, resources)
             };
             vec![object_1]
         };
@@ -878,8 +876,10 @@ impl GameState {
         settings: &mut Settings
     ) -> (Option<AppState>, u8){
         for object in self.test_objs.iter_mut() {
-            if let Mesh::Animated(animated_mesh) = &mut object.mesh {
-                animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
+            for mesh in object.meshes.iter_mut() {
+                if let Mesh::Animated(animated_mesh) = mesh {
+                    animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
+                }
             }
         }
         self.camera.keyboard_move(&inputs[0], delta_time);

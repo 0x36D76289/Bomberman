@@ -82,14 +82,15 @@ impl Enemy {
     ) -> Object {
         let dir_vec = direction.to_vec2();
         Object {
-            mesh: resources.models[&ResourceName::Player].clone(), // TODO: Using player model for now
-            texture: Some(resources.textures_index[&ResourceName::Player]),
+            // meshes: resources.models[&ResourceName::Player].clone(), // TODO: Using player model for now
+            // textures: Some(resources.textures_index[&ResourceName::Player]),
             color: Self::behavior_color(behavior),
             transform: Transform {
                 translation: Vec3::new(position.x, 0.0, position.y),
                 scale: Vec3::splat(0.35),
                 rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
             },
+            ..Object::from_resource(ResourceName::Player, resources) // TODO: Using player model for now
         }
     }
 

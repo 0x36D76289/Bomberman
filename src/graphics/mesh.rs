@@ -142,8 +142,12 @@ impl AnimatedMesh {
         let mut buffer_write = buffer.write().unwrap();
 
         let joint_transforms = self.get_joint_tranforms();
-        for i in 0..50 {
-            buffer_write.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
+        for i in 0..100 {
+            if i < joint_transforms.len() {
+                buffer_write.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
+            } else {
+                buffer_write.joint_transforms[i] = Mat4::IDENTITY.to_cols_array_2d();
+            }
         }
 
     }
@@ -211,7 +215,7 @@ impl FbxImport {
             println!("Mesh: {name}");
 
             match mesh.skin_deformers.is_empty() || animations.is_empty() {
-            // match true {
+            //match true {
                 true => { // static mesh
                     let (vertices, indices) = Self::extract_static_vertices(mesh);
 
