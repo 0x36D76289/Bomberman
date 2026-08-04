@@ -350,8 +350,8 @@ impl FbxImport {
             pub joint_weights: [f32; 3],
         }
 
+        // getting the joints ids and weights for each bones
         let mut cp_weights = vec![SkinWeight::default(); mesh.num_vertices];
-
         if let Some(skin) = mesh.skin_deformers.first() {
             for (cluster_id, cluster) in skin.clusters.iter().enumerate() {
                 let bone_id = cluster_id as u32;
@@ -370,6 +370,18 @@ impl FbxImport {
                     }
                 }
             }
+        }
+        // normalize the weights of each bones to a sum of one
+        for weight in cp_weights.iter_mut() {
+            let sum: f32 = weight.joint_weights.iter().sum();
+            if sum == 0.0 {
+                continue;
+            }
+            let mul_factor = 1.0 / sum;
+            weight
+                .joint_weights
+                .iter_mut()
+                .for_each(|weight| *weight *= mul_factor);
         }
 
         let mut vertices = Vec::with_capacity(mesh.num_indices);
