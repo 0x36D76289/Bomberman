@@ -57,7 +57,7 @@ impl Resources {
         // load the object files
         resources.load_models(&MODEL_DIR, vulkan);
         resources.copy_model("quad", &["floor", "power_speed", "power_power", "power_bomb", "power_slide"]);
-        resources.copy_model("cube", &["breakable", "unbreakable", "wall"]);
+        resources.copy_model("cub_tex", &["breakable", "unbreakable", "wall"]);
 
         resources
     }

@@ -126,30 +126,35 @@ impl AnimatedMesh {
     // }
 
     pub fn get_joint_tranforms(&self) -> Vec<Mat4> {
-        let mut joint_transforms = vec![Mat4::IDENTITY; self.joint_count as usize + 1];
+        let mut joint_transforms = vec![Mat4::IDENTITY; 100];
         AnimatedMesh::add_joints_to_array(&self.root_joint, &mut joint_transforms);
         joint_transforms
     }
 
     fn add_joints_to_array(head_joint: &Joint, joint_transforms: &mut Vec<Mat4>) {
-        joint_transforms[head_joint.id as usize] = head_joint.animated_transform;
-        for joint in head_joint.children.iter() {
-            AnimatedMesh::add_joints_to_array(joint, joint_transforms);
+        // joint_transforms[head_joint.id as usize] = head_joint.animated_transform;
+        // for joint in head_joint.children.iter() {
+        //     AnimatedMesh::add_joints_to_array(joint, joint_transforms);
+        // }
+
+        let id = head_joint.id as usize;
+        
+        if id < joint_transforms.len() {
+            joint_transforms[id] = head_joint.animated_transform;
+        }
+
+        for child_joint in head_joint.children.iter() {
+            AnimatedMesh::add_joints_to_array(child_joint, joint_transforms);
         }
     }
 
     pub fn joint_transforms_to_ubo_buffer(&self, buffer: &Subbuffer<JointsUbo>) {
         let mut buffer_write = buffer.write().unwrap();
-
         let joint_transforms = self.get_joint_tranforms();
-        for i in 0..100 {
-            if i < joint_transforms.len() {
-                buffer_write.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
-            } else {
-                buffer_write.joint_transforms[i] = Mat4::IDENTITY.to_cols_array_2d();
-            }
-        }
 
+        for i in 0..100 {
+            buffer_write.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
+        }
     }
 }
 
@@ -446,48 +451,86 @@ impl FbxImport {
         Some(Self::build_joint_recursive(root_node, skin))
     }
 
+    // fn build_joint_recursive(node: &Node, skin: &SkinDeformer) -> (Joint, usize) {
+    //     let mut n_joint = 0;
+
+    //     let joint_id = skin
+    //         .clusters
+    //         .iter()
+    //         .position(|c| {
+    //             c.bone_node.as_ref().map_or(false, |n| {
+    //                 n.element.element_id == node.element.element_id
+    //             })
+    //         })
+    //         .unwrap_or(0) as u32;
+
+    //     let inverse_bind_transform = skin
+    //         .clusters
+    //         .get(joint_id as usize)
+    //         .map(|c| ufbx_matrix_to_glam(&c.geometry_to_bone))
+    //         .unwrap_or(Mat4::IDENTITY);
+
+    //     let local_bind_transform = ufbx_matrix_to_glam(&node.node_to_parent);
+
+    //     let mut children = Vec::new();
+    //     for child_node in &node.children {
+    //         if skin.clusters.iter().any(|c| {
+    //             c.bone_node.as_ref().map_or(false, |n| {
+    //                 n.element.element_id == child_node.element.element_id
+    //             })
+    //         }) {
+    //             let (joint, n) = Self::build_joint_recursive(child_node, skin);
+    //             children.push(joint);
+    //             n_joint += n + 1;
+    //         }
+    //     }
+
+    //     (Joint {
+    //         id: joint_id,
+    //         name: node.element.name.to_string(),
+    //         animated_transform: Mat4::IDENTITY,
+    //         local_bind_transform,
+    //         inverse_bind_transform,
+    //         children
+    //     }, n_joint)
+    // }
+
     fn build_joint_recursive(node: &Node, skin: &SkinDeformer) -> (Joint, usize) {
-        let mut n_joint = 0;
+        let mut joint_count = 0;
 
-        let joint_id = skin
-            .clusters
-            .iter()
-            .position(|c| {
-                c.bone_node.as_ref().map_or(false, |n| {
-                    n.element.element_id == node.element.element_id
-                })
-            })
-            .unwrap_or(0) as u32;
+        let joint_id_opt = skin.clusters.iter().position(|c| {
+            c.bone_node.as_ref().map_or(false, |n| n.element.element_id == node.element.element_id)
+        });
 
-        let inverse_bind_transform = skin
-            .clusters
-            .get(joint_id as usize)
-            .map(|c| ufbx_matrix_to_glam(&c.geometry_to_bone))
-            .unwrap_or(Mat4::IDENTITY);
+        let inverse_bind_transform = {
+            if let Some(id) = joint_id_opt {
+                skin.clusters.get(id)
+                    .map(|c| ufbx_matrix_to_glam(&c.geometry_to_bone))
+                    .unwrap_or(Mat4::IDENTITY)
+            } else {
+                Mat4::IDENTITY
+            }
+        };
 
         let local_bind_transform = ufbx_matrix_to_glam(&node.node_to_parent);
 
         let mut children = Vec::new();
         for child_node in &node.children {
-            if skin.clusters.iter().any(|c| {
-                c.bone_node.as_ref().map_or(false, |n| {
-                    n.element.element_id == child_node.element.element_id
-                })
-            }) {
+            if child_node.bone.is_some() {
                 let (joint, n) = Self::build_joint_recursive(child_node, skin);
                 children.push(joint);
-                n_joint += n + 1;
+                joint_count += n + 1;
             }
         }
 
         (Joint {
-            id: joint_id,
+            id: joint_id_opt.unwrap_or(usize::MAX) as u32,
             name: node.element.name.to_string(),
             animated_transform: Mat4::IDENTITY,
             local_bind_transform,
             inverse_bind_transform,
             children
-        }, n_joint)
+        }, joint_count)
     }
 
     fn extract_animations(scene: &SceneRoot) -> Vec<Animation> {

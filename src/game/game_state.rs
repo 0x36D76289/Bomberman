@@ -875,13 +875,13 @@ impl GameState {
         audio_manager: &mut AudioManager,
         settings: &mut Settings
     ) -> (Option<AppState>, u8){
-        for object in self.test_objs.iter_mut() {
-            for mesh in object.meshes.iter_mut() {
-                if let Mesh::Animated(animated_mesh) = mesh {
-                    animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
-                }
-            }
-        }
+        // for object in self.test_objs.iter_mut() {
+        //     for mesh in object.meshes.iter_mut() {
+        //         if let Mesh::Animated(animated_mesh) = mesh {
+        //             animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
+        //         }
+        //     }
+        // }
         self.camera.keyboard_move(&inputs[0], delta_time);
         (None, 0)
     }
