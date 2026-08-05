@@ -79,19 +79,19 @@ impl PowerUp {
         let (power_up_type, object) = match random_range(0..=3) {
             0 => (
                 PowerUpType::Speed,
-                Object::from_resource(ResourceName::PowerSpeed, resources)
+                Object::from_resource("power_speed", resources)
             ),
             1 => (
                 PowerUpType::Power,
-                Object::from_resource(ResourceName::PowerPower, resources)
+                Object::from_resource("power_power", resources)
             ),
             2 => (
                 PowerUpType::Bomb,
-                Object::from_resource(ResourceName::PowerBomb, resources)
+                Object::from_resource("power_bomb", resources)
             ),
             _ => (
                 PowerUpType::Slide,
-                Object::from_resource(ResourceName::PowerSlide, resources)
+                Object::from_resource("power_slide", resources)
             ),
         };
 

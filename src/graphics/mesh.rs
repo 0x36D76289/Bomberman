@@ -215,7 +215,6 @@ impl FbxImport {
             println!("Mesh: {name}");
 
             match mesh.skin_deformers.is_empty() || animations.is_empty() {
-            //match true {
                 true => { // static mesh
                     let (vertices, indices) = Self::extract_static_vertices(mesh);
 
@@ -292,7 +291,7 @@ impl FbxImport {
                         index_buffer: Arc::new(index_buffer),
                         root_joint,
                         joint_count: joint_count as u32,
-                        animator: Animator::new(animations.first().cloned())
+                        animator: Animator::new(animations.clone().into_iter().max_by(|a, b| a.length.cmp(&b.length)))
                     };
 
                     animated_meshes.push(animated_mesh);

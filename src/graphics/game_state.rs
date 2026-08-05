@@ -124,18 +124,17 @@ impl Renderer {
             .unwrap();
 
         for object in state.objects_to_render() {
-            let mut push_constant = GamePush {
+            let push_constant = GamePush {
                 model_matrix: object.transform.mat4().to_cols_array_2d(),
                 normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
                 color: object.color.to_array(),
-                tex_index: -1//object.textures.unwrap_or(-1),
+                tex_index: object.texture.unwrap_or(-1),
             };
 
-            for (i, mesh) in object.meshes.iter().enumerate() {
+            for mesh in object.meshes.iter() {
                 match mesh {
                     Mesh::Animated(_) => {continue;}
                     Mesh::Static(mesh) => {
-                        push_constant.tex_index = object.textures[i].unwrap_or(-1);
                         command_buffer
                             .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
                             .unwrap()
@@ -227,19 +226,18 @@ impl Renderer {
             .unwrap();
 
         for object in state.objects_to_render() {
-             let mut push_constant = GamePush {
+             let push_constant = GamePush {
                 model_matrix: object.transform.mat4().to_cols_array_2d(),
                 normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
                 color: object.color.to_array(),
-                tex_index: -1//object.textures.unwrap_or(-1),
+                tex_index: object.texture.unwrap_or(-1),
             };
 
-            for (i, mesh) in object.meshes.iter().enumerate() {
+            for mesh in object.meshes.iter() {
                 match mesh {
                     Mesh::Static(_) => {continue;}
                     Mesh::Animated(mesh) => {
                         mesh.joint_transforms_to_ubo_buffer(&joints_ubo);
-                        push_constant.tex_index = object.textures[i].unwrap_or(-1);
                         command_buffer
                             .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
                             .unwrap()

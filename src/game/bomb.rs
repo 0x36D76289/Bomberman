@@ -99,7 +99,7 @@ impl Bomb {
             scale: Vec3::splat(0.5),
             rotation: Vec3::ZERO,
         };
-        Object::from_resource(ResourceName::Bomb, resources).with_transform(transform)
+        Object::from_resource("bomb", resources).with_transform(transform)
         // Object {
         //     meshes: resources.models[&ResourceName::Bomb].clone(),
         //     textures: Some(resources.textures_index[&ResourceName::Bomb]),

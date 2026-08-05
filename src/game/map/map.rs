@@ -38,7 +38,7 @@ pub struct LevelData {
 impl Map {
     /// Creates the internal object for a Breakable MapElement
     fn create_breakable(ressources: &Resources) -> Object {
-        Object::from_resource(ResourceName::Breakable, ressources)
+        Object::from_resource("breakable", ressources)
         // Object {
         //     meshes: ressources.models[&ResourceName::Breakable].clone(),
         //     textures: Some(ressources.textures_index[&ResourceName::Breakable]),
@@ -49,7 +49,7 @@ impl Map {
 
     /// Creates the internal object for an Unbreakable MapElement
     fn create_unbreakable(ressources: &Resources) -> Object {
-        Object::from_resource(ResourceName::Unbreakable, ressources)
+        Object::from_resource("unbreakable", ressources)
         // Object {
         //     meshes: ressources.models[&ResourceName::Unbreakable].clone(),
         //     textures: Some(ressources.textures_index[&ResourceName::Unbreakable]),
@@ -96,7 +96,7 @@ impl Map {
             scale: Vec3::new(width as f32, 1.0, height as f32),
             rotation: Vec3::ZERO,
         };
-        Object::from_resource(ResourceName::Floor, ressources).with_transform(transform)
+        Object::from_resource("floor", ressources).with_transform(transform)
         // Object {
         //     meshes: ressources.models[&ResourceName::Floor].clone(),
         //     textures: Some(ressources.textures_index[&ResourceName::Floor]),

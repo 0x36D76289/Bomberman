@@ -659,8 +659,8 @@ impl GameState {
                 self.exit_pos
             );
             let exit_obj = Object {
-                meshes: resources.models[&ResourceName::Floor].clone(),
-                textures: vec![None],
+                meshes: resources.model("floor"),
+                texture: None,
                 color: Vec3::new(0.2, 0.8, 0.2),
                 transform: Transform {
                     translation: Vec3::new(self.exit_pos.x, -0.4, self.exit_pos.y),
@@ -826,10 +826,10 @@ impl GameState {
             let object_1 = Object {
                 transform: Transform {
                     translation: Vec3::new(0.0, -1.0, 0.0),
-                    scale: Vec3::splat(0.05),
+                    scale: Vec3::splat(0.02),
                     rotation: Vec3::ZERO
                 },
-                ..Object::from_resource(ResourceName::Unbreakable, resources)
+                ..Object::from_resource("Arm Stretching", resources)
             };
             vec![object_1]
         };

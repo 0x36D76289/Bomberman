@@ -18,3 +18,4 @@ anyhow = "1.0"
 once_cell = "1.21.3"
 gilrs = { version = "0.11.0", features = ["serde-serialize"] }
 ufbx = "0.11.2"
+include_dir = "0.7.4"

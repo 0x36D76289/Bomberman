@@ -38,6 +38,9 @@ void main() {
     vec4 total_local_pos = vec4(0.0);
     vec4 total_normal = vec4(0.0);
     for (int i = 0; i < MAX_WEIGHTS; ++i) {
+        if (in_joint_weights[i] == 0.0)
+            break;
+
         vec4 local_pos = joints.joint_transforms[in_joint_indices[i]] * vec4(in_position, 1.0);
         total_local_pos += local_pos * in_joint_weights[i];
 
