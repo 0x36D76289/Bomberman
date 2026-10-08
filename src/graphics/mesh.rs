@@ -217,8 +217,6 @@ impl FbxImport {
                 continue;
             }
 
-            println!("Mesh: {name}");
-
             match mesh.skin_deformers.is_empty() || animations.is_empty() {
                 true => { // static mesh
                     let (vertices, indices) = Self::extract_static_vertices(mesh);
@@ -346,8 +344,6 @@ impl FbxImport {
             ufbx::triangulate_face_vec(&mut face_buffer, mesh, *face);
             indices.extend_from_slice(&face_buffer);
         }
-        
-        println!("fbx_import: imported one static mesh with {} vertices and {} indices", vertices.len(), indices.len());
 
         (vertices, indices)
     }
@@ -431,8 +427,6 @@ impl FbxImport {
             ufbx::triangulate_face_vec(&mut face_buffer, mesh, *face);
             indices.extend_from_slice(&face_buffer);
         }
-
-        println!("fbx_import: imported one animated mesh with {} vertices and {} indices", vertices.len(), indices.len());
 
         (vertices, indices)
     }
@@ -583,8 +577,6 @@ impl FbxImport {
                 
                 keyframes.push(KeyFrame { time_stamp, pose });
             }
-
-            println!("fbx_import: imported one animation that lasts {} seconds", duration_secs);
 
             animations.push(Animation {
                 length: Duration::from_secs_f64(duration_secs),
