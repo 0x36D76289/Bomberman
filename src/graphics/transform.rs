@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use glam::{Mat4, Vec3, Vec4};
 
 use crate::input::{input::Input, input_state::InputState};
@@ -146,3 +148,12 @@ impl Transform {
         }
     }
 }
+
+// impl Mul for Transform {
+//     // This is equivalent of multiplying their matrix forms
+//     type Output = Self;
+
+//     fn mul(self, rhs: Self) -> Self {
+     
+//     }
+// }

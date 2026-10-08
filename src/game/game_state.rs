@@ -10,6 +10,9 @@ use crate::game::map::map_settings::MapSettings;
 use crate::game::player::Player;
 use crate::game::powerup::PowerUp;
 use crate::game::resources::{ResourceName, Resources};
+#[cfg(debug_assertions)]
+use crate::graphics::Vulkan;
+use crate::graphics::mesh::Mesh;
 use crate::graphics::object::Object;
 use crate::graphics::transform::Transform;
 use crate::graphics::{GlobalUbo, LightInfo, StateRenderInfo};
@@ -29,6 +32,8 @@ use std::vec::Vec;
 pub enum GameMode {
     Multiplayer,
     Campaign,
+    #[cfg(debug_assertions)]
+    TestScene
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -174,7 +179,7 @@ pub enum GameTickResult {
 #[derive(Debug, Clone)]
 pub struct GameState {
     /// Whether this is a singleplayer or multiplayer game
-    mode: GameMode,
+    pub mode: GameMode,
     /// The live state of the current campaign, None in multiplayer
     campaign_progress: Option<CampaignProgress>,
     /// The list of players at game start
@@ -203,6 +208,9 @@ pub struct GameState {
     alive_players: Vec<u32>,
     // TODO: doc
     pub render_info: StateRenderInfo,
+
+    #[cfg(debug_assertions)]
+    test_objs: Vec<Object>
 }
 
 impl GameState {
@@ -215,7 +223,14 @@ impl GameState {
             return Err("Map creation fail".into());
         };
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
+        let mut players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
+        {
+            if let Some(object) = &mut players[0].object {
+                if let Mesh::Skinned(mesh) = &mut object.meshes[0] {
+                    mesh.animator.set_animation(Some(resources.animation("player_run")));
+                }
+            }
+        }
         let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
@@ -252,6 +267,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         })
     }
 
@@ -349,6 +366,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         })
     }
 
@@ -411,6 +430,8 @@ impl GameState {
             light,
             render_info,
             alive_players,
+            #[cfg(debug_assertions)]
+            test_objs: Vec::new()
         }
     }
 
@@ -446,7 +467,12 @@ impl GameState {
     }
 
     /// Creates a list of objects to render from the gamestate for the render function
-    pub fn objects_to_render(&self) -> impl Iterator<Item = &Object> {
+    pub fn objects_to_render(&self) -> Box<dyn Iterator<Item = &Object> + '_> {
+        #[cfg(debug_assertions)]
+        if self.mode == GameMode::TestScene {
+            return Box::new(self.test_objs.iter());
+        }
+
         let map_objects = self.map.iter().filter_map(|el| match el {
             MapElement::Empty => None,
             MapElement::Breakable(obj) => Some(obj),
@@ -460,12 +486,14 @@ impl GameState {
         let bomb_objects = self.bombs.iter().flat_map(|b| &b.objects);
         let power_up_objects = self.power_ups.iter().map(|p| &p.object);
 
-        map_objects
-            .chain(floor_iter)
-            .chain(players_objects)
-            .chain(enemy_objects)
-            .chain(bomb_objects)
-            .chain(power_up_objects)
+        Box::new(
+            map_objects
+                .chain(floor_iter)
+                .chain(players_objects)
+                .chain(enemy_objects)
+                .chain(bomb_objects)
+                .chain(power_up_objects)
+        )
     }
 
     /// The main tick function of multiplayer games, simulates every event since the last frame
@@ -475,6 +503,7 @@ impl GameState {
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> MpTickResult {
+
         let mut events = TickEvents::default();
         // tick bombs
         for i in 0..self.bombs.len() {
@@ -526,6 +555,11 @@ impl GameState {
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs, &player_poses)
             {
                 audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
+                if let Some(object) = &mut player.object {
+                    if let Mesh::Skinned(mesh) = &mut object.meshes[0] {
+                        mesh.animator.set_and_lock_animation(Some(resources.animation("player_bomb2")));
+                    }
+                }
                 self.bombs.push(bomb)
             }
         }
@@ -536,7 +570,23 @@ impl GameState {
                 &self.map,
                 &mut self.bombs,
             );
+
+            //update the animations
+            if let Some(object) = &mut player.object {
+                if let Mesh::Skinned(skinned_mesh) = &mut object.meshes[0] {
+                    skinned_mesh.animator.update(delta, &mut skinned_mesh.root_joint);
+                    
+                    if let Some(input) = self.game_inputs.get(i) {
+                        if input.left().is_down() || input.right().is_down() || input.up().is_down() || input.down().is_down() {
+                            skinned_mesh.animator.set_animation(Some(resources.animation("player_run")));
+                        } else {
+                            skinned_mesh.animator.set_animation(Some(resources.animation("player_idle")));
+                        }
+                    }
+                }
+            }
         }
+
         MpTickResult {
             winners: self.create_mp_ret(),
             events,
@@ -638,7 +688,7 @@ impl GameState {
                 self.exit_pos
             );
             let exit_obj = Object {
-                model: resources.models[&ResourceName::Floor].clone(),
+                meshes: resources.model("floor"),
                 texture: None,
                 color: Vec3::new(0.2, 0.8, 0.2),
                 transform: Transform {
@@ -692,6 +742,8 @@ impl GameState {
                 GameTickResult::None
             }
             GameMode::Campaign => self.campaign_tick(delta_time, resources, audio_manager),
+            #[cfg(debug_assertions)]
+            GameMode::TestScene => GameTickResult::None,
         };
 
         match result {
@@ -795,5 +847,83 @@ impl GameState {
     /// Gets an unmutable reference to the [GameState]'s [Map]
     pub fn get_map(&self) -> &Map {
         &self.map
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn create_test_scene(resources: &Resources) -> Self {
+        let test_objs: Vec<Object> = {
+            let object_1 = Object {
+                transform: Transform {
+                    translation: Vec3::new(0.0, -1.0, 0.0),
+                    scale: Vec3::splat(0.6),
+                    rotation: Vec3::ZERO
+                },
+                texture: resources.texture("player"),
+                ..Object::from_resource("player", resources)
+                .with_animation(resources.animation("player_idle"))
+            };
+
+            vec![object_1]
+        };
+
+        Self {
+            mode: GameMode::TestScene,
+            campaign_progress: None,
+            players: Vec::new(),
+            enemies: Vec::new(),
+            exit_pos: Vec2::ZERO,
+            exit_revealed: false,
+            game_inputs: Vec::new(),
+            nb_humans: 0,
+            bombs: Vec::new(),
+            power_ups: Vec::new(),
+            map: Map::empty(8, 8, resources),
+            camera: Transform {
+                translation: Vec3::new(0.0, -1.0, 0.0),
+                scale: Vec3::ONE,
+                rotation: Vec3::new(-1.25, -1.0, 0.0),
+            },
+            light: LightInfo {
+                ambient_light_color: Vec4::ONE.with_w(0.8),
+                direction_to_light: Vec3::new(0.0, -3.0, 1.0).normalize(),
+                directional_light_color: Vec4::ONE.with_w(0.6),
+            },
+            alive_players: Vec::new(),
+            render_info: StateRenderInfo {
+                drawn_first: true,
+                ..Default::default()
+            },
+            #[cfg(debug_assertions)]
+            test_objs
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn tick_test(
+        &mut self,
+        delta_time: f32,
+        inputs: &Vec<Input>,
+        resources: &Resources,
+        audio_manager: &mut AudioManager,
+        settings: &mut Settings
+    ) -> (Option<AppState>, u8){
+        for object in self.test_objs.iter_mut() {
+            for mesh in object.meshes.iter_mut() {
+                if let Mesh::Skinned(animated_mesh) = mesh {
+                    animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
+                }
+            }
+        }
+
+        if inputs[0].back() == InputState::Pressed {
+            if let Mesh::Skinned(skinned_mesh) = &mut self.test_objs[0].meshes[0] {
+                let anim = resources.animation("player_bomb");
+                let len = anim.length;
+                skinned_mesh.animator.set_animation(Some(anim));
+                skinned_mesh.animator.lock(len);
+            }
+        }
+        self.camera.keyboard_move(&inputs[0], delta_time);
+        (None, 0)
     }
 }

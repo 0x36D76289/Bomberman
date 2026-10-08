@@ -101,10 +101,10 @@ impl AudioManager {
             BackgroundMusic::Menu,
             include_bytes!("../assets/sounds/menu_loop.ogg").to_vec(),
         );
-        self.background_music.insert(
-            BackgroundMusic::Game,
-            include_bytes!("../assets/sounds/eirik_suhrke-a_new_morning.ogg").to_vec(),
-        );
+        // self.background_music.insert(
+        //     BackgroundMusic::Game,
+        //     include_bytes!("../assets/sounds/eirik_suhrke-a_new_morning.ogg").to_vec(),
+        // );
         self.background_music.insert(
             BackgroundMusic::Boss,
             include_bytes!("../assets/sounds/boss1.ogg").to_vec(),

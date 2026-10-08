@@ -1,3 +1,5 @@
+use std::println;
+
 use crate::{
     audio::AudioManager,
     game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
@@ -44,6 +46,8 @@ pub enum AppStateEnum {
         difficulty: GameDifficulty,
     },
     MultiplayerEndScreen,
+    #[cfg(debug_assertions)]
+    TestScene
 }
 
 impl AppState {
@@ -166,6 +170,15 @@ impl AppState {
         }
     }
 
+    #[cfg(debug_assertions)]
+    pub fn test_scene(resources: &Resources) -> Self {
+        Self {
+            state: AppStateEnum::TestScene,
+            game: Some(GameState::create_test_scene(resources)),
+            ..Default::default()
+        }
+    }
+
     /// The main game's logic, is triggered once per frame and handles any action the game needs to
     /// execute during [delta](f32) amount of time
     pub fn tick(
@@ -284,6 +297,10 @@ impl AppState {
                 .as_ref()
                 .unwrap()
                 .multiplayer_end_screen_tick(inputs),
+            #[cfg(debug_assertions)]
+            AppStateEnum::TestScene => {
+                self.game.as_mut().unwrap().tick_test(delta, inputs, resources, audio_manager, settings)
+            }
         }
     }
 
@@ -301,6 +318,8 @@ impl AppState {
             AppStateEnum::Settings { .. } => false,
             AppStateEnum::StageClear { .. } => true,
             AppStateEnum::MultiplayerEndScreen => false,
+            #[cfg(debug_assertions)]
+            AppStateEnum::TestScene => false
         }
     }
 }

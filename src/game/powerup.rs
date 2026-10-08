@@ -2,13 +2,11 @@ use glam::{USizeVec2, Vec2, Vec3, usize};
 use rand::random_range;
 
 use crate::{
-    audio::{AudioManager, SoundEffect},
-    game::{
+    audio::{AudioManager, SoundEffect}, game::{
         collision::Collision,
         player::Player,
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
 };
 
 /// The various types of [PowerUp]s, they each provide a different bonus
@@ -78,45 +76,36 @@ impl PowerUp {
 impl PowerUp {
     /// The main [PowerUp] constructor
     pub fn new(y: usize, x: usize, resources: &Resources) -> Self {
-        let (power_up_type, model, texture) = match random_range(0..=3) {
+        let (power_up_type, object) = match random_range(0..=3) {
             0 => (
                 PowerUpType::Speed,
-                resources.models[&ResourceName::PowerSpeed].clone(),
-                resources.textures_index[&ResourceName::PowerSpeed],
+                Object::from_resource("power_speed", resources)
             ),
             1 => (
                 PowerUpType::Power,
-                resources.models[&ResourceName::PowerPower].clone(),
-                resources.textures_index[&ResourceName::PowerPower],
+                Object::from_resource("power_power", resources)
             ),
             2 => (
                 PowerUpType::Bomb,
-                resources.models[&ResourceName::PowerBomb].clone(),
-                resources.textures_index[&ResourceName::PowerBomb],
+                Object::from_resource("power_bomb", resources)
             ),
             _ => (
                 PowerUpType::Slide,
-                resources.models[&ResourceName::PowerSlide].clone(),
-                resources.textures_index[&ResourceName::PowerSlide],
+                Object::from_resource("power_slide", resources)
             ),
         };
 
         Self {
             power_up_type,
-            object: Object {
-                model,
-                texture: Some(texture),
-                transform: Transform {
-                    translation: Vec3 {
-                        x: x as f32 + 0.5,
-                        y: -0.1,
-                        z: y as f32 + 0.5,
-                    },
-                    scale: Vec3::splat(0.9),
-                    rotation: Vec3::ZERO,
+            object: object.with_transform(Transform {
+                translation: Vec3 {
+                    x: x as f32 + 0.5,
+                    y: -0.1,
+                    z: y as f32 + 0.5,
                 },
-                color: Vec3::ONE,
-            },
+                scale: Vec3::splat(0.9),
+                rotation: Vec3::ZERO,
+            }),
             pos: USizeVec2 { x, y },
             despawn: false,
         }

@@ -5,15 +5,13 @@ use rand::random_range;
 
 use super::{collision::Collision, enemy::Enemy};
 use crate::{
-    audio::{AudioManager, SoundEffect},
-    game::{
+    audio::{AudioManager, SoundEffect}, game::{
         direction::Direction,
         map::{map::Map, map_element::MapElement},
         player::{Alive, Player},
         powerup::PowerUp,
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
 };
 
 /// The different states a bomb can be in
@@ -96,16 +94,22 @@ impl Bomb {
 
     /// The creation of the 3d model at bomb creation
     fn create_object(x: usize, y: usize, resources: &Resources) -> Object {
-        Object {
-            model: resources.models[&ResourceName::Bomb].clone(),
-            texture: Some(resources.textures_index[&ResourceName::Bomb]),
-            color: Vec3::ONE,
-            transform: Transform {
-                translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
-                scale: Vec3::splat(0.5),
-                rotation: Vec3::ZERO,
-            },
-        }
+        let transform = Transform {
+            translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
+            scale: Vec3::splat(0.5),
+            rotation: Vec3::ZERO,
+        };
+        Object::from_resource("bomb", resources).with_transform(transform)
+        // Object {
+        //     meshes: resources.models[&ResourceName::Bomb].clone(),
+        //     textures: Some(resources.textures_index[&ResourceName::Bomb]),
+        //     color: Vec3::ONE,
+        //     transform: Transform {
+        //         translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
+        //         scale: Vec3::splat(0.5),
+        //         rotation: Vec3::ZERO,
+        //     },
+        // }
     }
 
     /// updates the model's position, used when sliding

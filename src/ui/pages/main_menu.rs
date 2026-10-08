@@ -95,7 +95,7 @@ impl UiState {
             selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
             ..Default::default()
         };
-        let quit_button = Button {
+        let mut quit_button = Button {
             canvas: Canvas {
                 center: Vec2::new(0.0, 0.7),
                 text: Some("Quit Game".to_string()),
@@ -113,6 +113,28 @@ impl UiState {
             ..Default::default()
         };
 
+        #[cfg(debug_assertions)]
+        let test_scene_button = {
+            quit_button.neighbors.down = 5;
+            Button {
+                canvas: Canvas {
+                    center: Vec2::new(0.0, 0.9),
+                    text: Some("Test Scene".to_string()),
+                    text_color: Some(Vec4::ONE),
+                    text_size: Some(1.2),
+                    ..Default::default()
+                },
+                neighbors: ButtonNeighbors {
+                    up: 4,
+                    down: 5,
+                    left: 5,
+                    right: 5,
+                },
+                selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
+                ..Default::default()
+            }
+        };
+
         Self {
             canvases: vec![title],
             buttons: vec![
@@ -121,6 +143,8 @@ impl UiState {
                 multi_button,
                 settings_button,
                 quit_button,
+                #[cfg(debug_assertions)]
+                test_scene_button,
             ],
             selected: 0,
             render_info: Default::default(),
@@ -166,6 +190,8 @@ impl UiState {
                 ),
                 3 => (Some(AppState::settings()), 0),
                 4 => (None, 1), // Quit
+                #[cfg(debug_assertions)]
+                5 => (Some(AppState::test_scene(resources)), 1),
                 _ => (None, 0),
             };
         }

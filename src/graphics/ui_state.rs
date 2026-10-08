@@ -138,7 +138,7 @@ impl Renderer {
 
                     let push_constant = GuiPush {
                         color: canvas.text_color.unwrap_or(Vec4::ONE).into(),
-                        tex_index: resources.textures_index[&ResourceName::FontAtlas],
+                        tex_index: resources.texture("font_atlas").unwrap(),
                     };
                     let vertex_buffer_len = vertex_buffer.len() as u32;
 

@@ -9,8 +9,7 @@ use crate::{
             map_settings::{MapSettings, MapType},
         },
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
+    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
 };
 
 /// Represents the entire play area with a list of tiles and spawnpoints
@@ -39,22 +38,24 @@ pub struct LevelData {
 impl Map {
     /// Creates the internal object for a Breakable MapElement
     fn create_breakable(ressources: &Resources) -> Object {
-        Object {
-            model: ressources.models[&ResourceName::Breakable].clone(),
-            texture: Some(ressources.textures_index[&ResourceName::Breakable]),
-            transform: Default::default(),
-            color: Default::default(),
-        }
+        Object::from_resource("breakable", ressources)
+        // Object {
+        //     meshes: ressources.models[&ResourceName::Breakable].clone(),
+        //     textures: Some(ressources.textures_index[&ResourceName::Breakable]),
+        //     transform: Default::default(),
+        //     color: Default::default(),
+        // }
     }
 
     /// Creates the internal object for an Unbreakable MapElement
     fn create_unbreakable(ressources: &Resources) -> Object {
-        Object {
-            model: ressources.models[&ResourceName::Unbreakable].clone(),
-            texture: Some(ressources.textures_index[&ResourceName::Unbreakable]),
-            transform: Default::default(),
-            color: Default::default(),
-        }
+        Object::from_resource("unbreakable", ressources)
+        // Object {
+        //     meshes: ressources.models[&ResourceName::Unbreakable].clone(),
+        //     textures: Some(ressources.textures_index[&ResourceName::Unbreakable]),
+        //     transform: Default::default(),
+        //     color: Default::default(),
+        // }
     }
 
     /// Sets a [MapElement]'s internal position to match its index in the content vector
@@ -90,20 +91,26 @@ impl Map {
 
     /// Creates and places the object for the floor
     fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
-        Object {
-            model: ressources.models[&ResourceName::Floor].clone(),
-            texture: Some(ressources.textures_index[&ResourceName::Floor]),
-            transform: Transform {
-                translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
-                scale: Vec3::new(width as f32, 1.0, height as f32),
-                rotation: Vec3::ZERO,
-            },
-            color: Vec3::ONE,
-        }
+        let transform = Transform {
+            translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
+            scale: Vec3::new(width as f32, 1.0, height as f32),
+            rotation: Vec3::ZERO,
+        };
+        Object::from_resource("floor", ressources).with_transform(transform)
+        // Object {
+        //     meshes: ressources.models[&ResourceName::Floor].clone(),
+        //     textures: Some(ressources.textures_index[&ResourceName::Floor]),
+        //     transform: Transform {
+        //         translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
+        //         scale: Vec3::new(width as f32, 1.0, height as f32),
+        //         rotation: Vec3::ZERO,
+        //     },
+        //     color: Vec3::ONE,
+        // }
     }
 
     /// Constructor: creates an empty x*y map
-    fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
+    pub fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
         Map {
             width: width as usize,
             height: height as usize,

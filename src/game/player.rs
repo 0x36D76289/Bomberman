@@ -4,9 +4,7 @@ use crate::{
         collision::Collision,
         map::{map::Map, map_element::MapElement},
         resources::{ResourceName, Resources},
-    },
-    graphics::{object::Object, transform::Transform},
-    input::input::Input,
+    }, graphics::{animation::Animation, mesh::Mesh, object::Object, transform::Transform}, input::input::Input,
 };
 
 use super::direction::Direction;
@@ -74,16 +72,24 @@ impl Player {
     /// Creates the [Player]'s 3d model
     fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
         let dir_vec = direction.to_vec2();
-        Object {
-            model: resources.models[&ResourceName::Player].clone(),
-            texture: Some(resources.textures_index[&ResourceName::Player]),
-            color: Vec3::ONE,
-            transform: Transform {
-                translation: Vec3::new(position.x, 0.0, position.y),
-                scale: Vec3::splat(0.35),
-                rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
-            },
-        }
+        let transform = Transform {
+            translation: Vec3::new(position.x, -1.5, position.y),
+            scale: Vec3::splat(0.35),
+            rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
+        };
+        Object::from_resource("player", resources)
+            .with_transform(transform)
+            .with_animation(resources.animation("player_idle3"))
+        // Object {
+        //     meshes: resources.models[&ResourceName::Player].clone(),
+        //     textures: Some(resources.textures_index[&ResourceName::Player]),
+        //     color: Vec3::ONE,
+        //     transform: Transform {
+        //         translation: Vec3::new(position.x, 0.0, position.y),
+        //         scale: Vec3::splat(1.0),//Vec3::splat(0.35),
+        //         rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
+        //     },
+        // }
     }
 
     /// Debug utility to make testing easier
@@ -236,7 +242,7 @@ impl Player {
         match &mut self.object {
             None => (),
             Some(obj) => {
-                obj.transform.translation = Vec3::new(self.position.x, 0.0, self.position.y);
+                obj.transform.translation = Vec3::new(self.position.x, obj.transform.translation.y, self.position.y);
                 let (x, y) = input.as_vec2().into();
                 if x != 0.0 || y != 0.0 {
                     obj.transform.rotation.y = x.atan2(y);
@@ -261,6 +267,14 @@ impl Player {
         self.speed_level = 0;
         self.bombs_remaining = 1;
         self.can_kick_bomb = false;
+    }
+
+    pub fn set_animation(&mut self, animation: Animation) {
+        if let Some(object) = &mut self.object {
+            if let Mesh::Skinned(skinned_mesh) = &mut object.meshes[0] {
+                skinned_mesh.animator.set_animation(Some(animation));
+            }
+        }
     }
 }
 
