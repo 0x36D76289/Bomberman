@@ -223,7 +223,14 @@ impl GameState {
             return Err("Map creation fail".into());
         };
         let nb_humans = settings.nb_humans;
-        let players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
+        let mut players = Self::create_players(&map, resources, nb_humans, settings.nb_bots);
+        {
+            if let Some(object) = &mut players[0].object {
+                if let Mesh::Skinned(mesh) = &mut object.meshes[0] {
+                    mesh.animator.set_animation(Some(resources.animation("player_run")));
+                }
+            }
+        }
         let alive_players = players.iter().map(|player| player.id).collect();
         let game_inputs = vec![Input::default(); players.len()];
 
@@ -496,6 +503,7 @@ impl GameState {
         resources: &Resources,
         audio_manager: &mut AudioManager,
     ) -> MpTickResult {
+
         let mut events = TickEvents::default();
         // tick bombs
         for i in 0..self.bombs.len() {
@@ -547,6 +555,11 @@ impl GameState {
                 && let Some(bomb) = player.create_bomb(&resources, &self.bombs, &player_poses)
             {
                 audio_manager.play_sound_effect(crate::audio::SoundEffect::PutBomb);
+                if let Some(object) = &mut player.object {
+                    if let Mesh::Skinned(mesh) = &mut object.meshes[0] {
+                        mesh.animator.set_and_lock_animation(Some(resources.animation("player_bomb2")));
+                    }
+                }
                 self.bombs.push(bomb)
             }
         }
@@ -557,7 +570,23 @@ impl GameState {
                 &self.map,
                 &mut self.bombs,
             );
+
+            //update the animations
+            if let Some(object) = &mut player.object {
+                if let Mesh::Skinned(skinned_mesh) = &mut object.meshes[0] {
+                    skinned_mesh.animator.update(delta, &mut skinned_mesh.root_joint);
+                    
+                    if let Some(input) = self.game_inputs.get(i) {
+                        if input.left().is_down() || input.right().is_down() || input.up().is_down() || input.down().is_down() {
+                            skinned_mesh.animator.set_animation(Some(resources.animation("player_run")));
+                        } else {
+                            skinned_mesh.animator.set_animation(Some(resources.animation("player_idle")));
+                        }
+                    }
+                }
+            }
         }
+
         MpTickResult {
             winners: self.create_mp_ret(),
             events,
@@ -826,11 +855,14 @@ impl GameState {
             let object_1 = Object {
                 transform: Transform {
                     translation: Vec3::new(0.0, -1.0, 0.0),
-                    scale: Vec3::splat(0.02),
+                    scale: Vec3::splat(0.6),
                     rotation: Vec3::ZERO
                 },
-                ..Object::from_resource("Arm Stretching", resources)
+                texture: resources.texture("player"),
+                ..Object::from_resource("player", resources)
+                .with_animation(resources.animation("player_idle"))
             };
+
             vec![object_1]
         };
 
@@ -875,13 +907,22 @@ impl GameState {
         audio_manager: &mut AudioManager,
         settings: &mut Settings
     ) -> (Option<AppState>, u8){
-        // for object in self.test_objs.iter_mut() {
-        //     for mesh in object.meshes.iter_mut() {
-        //         if let Mesh::Animated(animated_mesh) = mesh {
-        //             animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
-        //         }
-        //     }
-        // }
+        for object in self.test_objs.iter_mut() {
+            for mesh in object.meshes.iter_mut() {
+                if let Mesh::Skinned(animated_mesh) = mesh {
+                    animated_mesh.animator.update(delta_time, &mut animated_mesh.root_joint);
+                }
+            }
+        }
+
+        if inputs[0].back() == InputState::Pressed {
+            if let Mesh::Skinned(skinned_mesh) = &mut self.test_objs[0].meshes[0] {
+                let anim = resources.animation("player_bomb");
+                let len = anim.length;
+                skinned_mesh.animator.set_animation(Some(anim));
+                skinned_mesh.animator.lock(len);
+            }
+        }
         self.camera.keyboard_move(&inputs[0], delta_time);
         (None, 0)
     }

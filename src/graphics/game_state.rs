@@ -133,7 +133,7 @@ impl Renderer {
 
             for mesh in object.meshes.iter() {
                 match mesh {
-                    Mesh::Animated(_) => {continue;}
+                    Mesh::Skinned(_) => {continue;}
                     Mesh::Static(mesh) => {
                         command_buffer
                             .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
@@ -171,59 +171,68 @@ impl Renderer {
             )
             .unwrap();
 
-        let joints_ubo = {
-            let ubo = JointsUbo {
-                joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100] // 100 is the MAX_JOINTS in game_animation.vert
-            };
+        // let joints_ubo = {
+        //     let ubo = JointsUbo {
+        //         joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100] // 100 is the MAX_JOINTS in game_animation.vert
+        //     };
 
-            Buffer::from_data(
-                vulkan.memory_allocator.clone(),
-                BufferCreateInfo {
-                    usage: BufferUsage::UNIFORM_BUFFER,
-                    ..Default::default()
-                },
-                AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                ubo,
-            )
-            .unwrap()
+        //     Buffer::from_data(
+        //         vulkan.memory_allocator.clone(),
+        //         BufferCreateInfo {
+        //             usage: BufferUsage::UNIFORM_BUFFER,
+        //             ..Default::default()
+        //         },
+        //         AllocationCreateInfo {
+        //             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+        //             ..Default::default()
+        //         },
+        //         ubo,
+        //     )
+        //     .unwrap()
+        // };
+
+        // let descriptor_set = {
+        //     let uniform_buffer = {
+        //         let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+        //         *buffer.write().unwrap() = global_ubo;
+
+        //         buffer
+        //     };
+
+        //     let layout = &animated_pipeline.layout().set_layouts()[0];
+
+        //     DescriptorSet::new_variable(
+        //         vulkan.descriptor_set_allocator.clone(),
+        //         layout.clone(),
+        //         resources.textures.len() as u32,
+        //         [
+        //             WriteDescriptorSet::buffer(0, uniform_buffer),
+        //             WriteDescriptorSet::buffer(1, joints_ubo.clone()),
+        //             WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
+        //             WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
+        //         ],
+        //         [],
+        //     )
+        //     .unwrap()
+        // };
+
+        // command_buffer
+        //     .bind_descriptor_sets(
+        //         PipelineBindPoint::Graphics,
+        //         animated_pipeline.layout().clone(),
+        //         0,
+        //         descriptor_set,
+        //     )
+        //     .unwrap();
+
+        let uniform_buffer = {
+            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+            *buffer.write().unwrap() = global_ubo;
+
+            buffer
         };
 
-        let descriptor_set = {
-            let uniform_buffer = {
-                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-                *buffer.write().unwrap() = global_ubo;
-
-                buffer
-            };
-
-            let layout = &animated_pipeline.layout().set_layouts()[0];
-
-            DescriptorSet::new_variable(
-                vulkan.descriptor_set_allocator.clone(),
-                layout.clone(),
-                resources.textures.len() as u32,
-                [
-                    WriteDescriptorSet::buffer(0, uniform_buffer),
-                    WriteDescriptorSet::buffer(1, joints_ubo.clone()),
-                    WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
-                    WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
-                ],
-                [],
-            )
-            .unwrap()
-        };
-
-        command_buffer
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                animated_pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .unwrap();
+        let layout = &animated_pipeline.layout().set_layouts()[0];
 
         for object in state.objects_to_render() {
              let push_constant = GamePush {
@@ -236,9 +245,43 @@ impl Renderer {
             for mesh in object.meshes.iter() {
                 match mesh {
                     Mesh::Static(_) => {continue;}
-                    Mesh::Animated(mesh) => {
-                        mesh.joint_transforms_to_ubo_buffer(&joints_ubo);
+                    Mesh::Skinned(mesh) => {
+                        let joints_ubo = {
+                            let mut ubo = JointsUbo {
+                                joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100]
+                            };
+                            let joint_transforms = mesh.get_joint_transforms(); // <-- Récupérer directement les matrices
+                            for i in 0..100 {
+                                ubo.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
+                            }
+                            
+                            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+                            *buffer.write().unwrap() = ubo;
+                            buffer
+                        };
+
+                        let descriptor_set = DescriptorSet::new_variable(
+                            vulkan.descriptor_set_allocator.clone(),
+                            layout.clone(),
+                            resources.textures.len() as u32,
+                            [
+                                WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
+                                WriteDescriptorSet::buffer(1, joints_ubo),
+                                WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
+                                WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
+                            ],
+                            [],
+                        )
+                        .unwrap();
+
                         command_buffer
+                            .bind_descriptor_sets(
+                                PipelineBindPoint::Graphics,
+                                animated_pipeline.layout().clone(),
+                                0,
+                                descriptor_set,
+                            )
+                            .unwrap()
                             .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
                             .unwrap()
                             .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())

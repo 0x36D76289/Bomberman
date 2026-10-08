@@ -83,13 +83,13 @@ pub struct AnimationVertex {
     #[name("in_uv")]
     pub uv: [f32; 2],
 
-    #[format(R32G32B32_UINT)]
+    #[format(R32G32B32A32_UINT)]
     #[name("in_joint_indices")]
-    pub joint_ids: [u32; 3],
+    pub joint_ids: [u32; 4],
 
-    #[format(R32G32B32_SFLOAT)]
+    #[format(R32G32B32A32_SFLOAT)]
     #[name("in_joint_weights")]
-    pub joint_weights: [f32; 3],
+    pub joint_weights: [f32; 4],
 }
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]

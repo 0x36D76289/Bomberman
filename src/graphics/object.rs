@@ -1,4 +1,4 @@
-use crate::{game::resources::{ResourceName, Resources}, graphics::{StaticMesh, mesh::Mesh, transform::Transform}};
+use crate::{game::resources::{ResourceName, Resources}, graphics::{StaticMesh, animation::Animation, mesh::Mesh, transform::Transform}};
 use glam::Vec3;
 use std::sync::Arc;
 
@@ -27,6 +27,15 @@ impl Object {
 
     pub fn with_transform(mut self, transform: Transform) -> Self {
         self.transform = transform;
+        self
+    }
+
+    pub fn with_animation(mut self, animation: Animation) -> Self {
+        if !self.meshes.is_empty() {
+            if let Mesh::Skinned(skinned_mesh) = &mut self.meshes[0] {
+                skinned_mesh.animator.set_animation(Some(animation));
+            }
+        }
         self
     }
 }

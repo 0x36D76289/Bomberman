@@ -91,16 +91,44 @@ impl JointTransform {
 pub struct Animator {
     current_anim: Option<Animation>,
     animation_time: Duration,
-    current_frame: usize
+    current_frame: usize,
+    lock: Duration
 }
 
 impl Animator {
     pub fn new(animation: Option<Animation>) -> Self {
         Self {
             current_anim: animation,
-            animation_time: Duration::new(0, 0),
-            current_frame: 0
+            animation_time: Duration::ZERO,
+            current_frame: 0,
+            lock: Duration::ZERO
         }
+    }
+
+    pub fn set_animation(&mut self, animation: Option<Animation>) {
+        if animation == self.current_anim || self.lock != Duration::ZERO {
+            return;
+        }
+        self.current_anim = animation;
+        self.animation_time = Duration::ZERO;
+        self.current_frame = 0;
+    }
+
+    pub fn lock(&mut self, duration: Duration) {
+        self.lock = duration;
+    }
+
+    pub fn set_and_lock_animation(&mut self, animation: Option<Animation>) {
+        if animation == self.current_anim || self.lock != Duration::ZERO {
+            return;
+        }
+
+        if let Some(anim) = &animation {
+            self.lock(anim.length);
+        }
+        self.current_anim = animation;
+        self.animation_time = Duration::ZERO;
+        self.current_frame = 0;
     }
 
     pub fn update(&mut self, delta_time: f32, root_joint: &mut Joint) {
@@ -108,10 +136,12 @@ impl Animator {
             return;
         }
 
-        self.increase_animation_time(
-            Duration::try_from_secs_f32(delta_time)
-                .unwrap_or(Duration::new(0, 0))
-        );
+        let time_passed = Duration::try_from_secs_f32(delta_time)
+            .unwrap_or(Duration::new(0, 0));
+
+        self.increase_animation_time(time_passed);
+
+        self.lock = self.lock.saturating_sub(time_passed);
 
         let current_pose = self.calc_current_anim_pos();
         Self::apply_pose_to_joints(&current_pose, root_joint, Mat4::IDENTITY);
@@ -134,6 +164,10 @@ impl Animator {
             self.current_frame += 1;
         }
     } 
+
+    pub fn get_animation_time(&self) -> Duration {
+        self.animation_time
+    }
 
     fn calc_current_anim_pos(&self) -> HashMap<String, Mat4> {
         let current_anim = self.current_anim.as_ref().unwrap();
@@ -171,11 +205,11 @@ impl Animator {
 
     fn apply_pose_to_joints(current_pose: &HashMap<String, Mat4>, joint: &mut Joint, parent_transform: Mat4) {
         let current_local_transform = match current_pose.get(&joint.name) {
-            Some(transform) => transform,
-            None => {return;}
+            Some(transform) => *transform,
+            None => joint.local_bind_transform,
         };
 
-        let mut current_transform = parent_transform.mul_mat4(current_local_transform);
+        let mut current_transform = parent_transform.mul_mat4(&current_local_transform);
         for child in joint.children.iter_mut() {
             Self::apply_pose_to_joints(current_pose, child, current_transform);
         }

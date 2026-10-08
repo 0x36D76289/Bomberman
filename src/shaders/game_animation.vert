@@ -1,13 +1,13 @@
 #version 460
 
 const int MAX_JOINTS = 100;
-const int MAX_WEIGHTS = 3;
+const int MAX_WEIGHTS = 4;
 
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec2 in_uv;
-layout(location = 3) in uvec3 in_joint_indices;
-layout(location = 4) in vec3 in_joint_weights;
+layout(location = 3) in uvec4 in_joint_indices;
+layout(location = 4) in vec4 in_joint_weights;
 
 layout(location = 0) out vec3 out_color;
 layout(location = 1) out vec3 out_position_world;
@@ -35,18 +35,18 @@ layout(push_constant) uniform GamePush {
 } push;
 
 void main() {
-    vec4 total_local_pos = vec4(0.0);
-    vec4 total_normal = vec4(0.0);
-    for (int i = 0; i < MAX_WEIGHTS; ++i) {
-        if (in_joint_weights[i] == 0.0)
-            break;
+    // vec4 total_local_pos = vec4(0.0);
+    // vec4 total_normal = vec4(0.0);
+    // for (int i = 0; i < MAX_WEIGHTS; ++i) {
+    //     if (in_joint_weights[i] <= 0.0)
+    //         break;
 
-        vec4 local_pos = joints.joint_transforms[in_joint_indices[i]] * vec4(in_position, 1.0);
-        total_local_pos += local_pos * in_joint_weights[i];
+    //     vec4 local_pos = joints.joint_transforms[in_joint_indices[i]] * vec4(in_position, 1.0);
+    //     total_local_pos += local_pos * in_joint_weights[i];
 
-        vec4 world_normal = joints.joint_transforms[in_joint_indices[i]] * vec4(in_normal, 0.0);
-        total_normal += world_normal * in_joint_weights[i];
-    }
+    //     vec4 world_normal = joints.joint_transforms[in_joint_indices[i]] * vec4(in_normal, 0.0);
+    //     total_normal += world_normal * in_joint_weights[i];
+    // }
 
 
     // vec4 position_world = push.model_matrix * total_local_pos;
@@ -56,12 +56,27 @@ void main() {
     // out_position_world = position_world.xyz;
     // out_normal_world = normalize(mat3(push.normal_matrix) * total_normal.xyz);
     // out_uv = in_uv;
+    mat4 skin_matrix = mat4(0.0);
+    float weight_sum = 0.0;
 
-    vec4 position_world = push.model_matrix * vec4(in_position, 1.0);
+    for (int i = 0; i < MAX_WEIGHTS; ++i) {
+        skin_matrix += joints.joint_transforms[in_joint_indices[i]] * in_joint_weights[i];
+        weight_sum += in_joint_weights[i];
+    }
+
+    if (weight_sum == 0.0) {
+        skin_matrix = mat4(1.0);
+    }
+
+    vec4 local_pos = skin_matrix * vec4(in_position, 1.0);
+    //local_pos.w = 1.0; 
+
+    vec4 position_world = push.model_matrix * local_pos;
     gl_Position = ubo.projection * ubo.view * position_world;
 
     out_color = push.color;
     out_position_world = position_world.xyz;
-    out_normal_world = normalize(mat3(push.normal_matrix) * in_normal);
+    
+    out_normal_world = normalize(mat3(push.normal_matrix) * mat3(skin_matrix) * in_normal);
     out_uv = in_uv;
 }

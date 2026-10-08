@@ -42,7 +42,8 @@ impl Resources {
     pub fn load_resources(vulkan: &Vulkan) -> Self {
         // embed the texture and object files directory into the game executable
         static TEXTURES_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/assets/textures");
-        static MODEL_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/assets/objects");
+        static MODELS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/assets/objects");
+        static ANIMATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/assets/animations");
 
         let mut resources = Self {
             textures: Vec::new(),
@@ -55,9 +56,12 @@ impl Resources {
         resources.load_textures(&TEXTURES_DIR, vulkan);
 
         // load the object files
-        resources.load_models(&MODEL_DIR, vulkan);
+        resources.load_models(&MODELS_DIR, vulkan);
         resources.copy_model("quad", &["floor", "power_speed", "power_power", "power_bomb", "power_slide"]);
-        resources.copy_model("cub_tex", &["breakable", "unbreakable", "wall"]);
+        resources.copy_model("cube", &["breakable", "unbreakable", "wall"]);
+
+        // load the animation files
+        resources.load_animations(&ANIMATIONS_DIR, vulkan);
 
         resources
     }
@@ -104,7 +108,6 @@ impl Resources {
 
     fn load_models(&mut self, models_dir: &Dir, vulkan: &Vulkan) {
         let model_map = &mut self.models;
-        let animation_map = &mut self.animations;
 
         let memory_allocator = vulkan.memory_allocator.clone();
 
@@ -123,13 +126,43 @@ impl Resources {
                             model_map.insert(file_stem, vec![Mesh::Static(obj_mesh)]);
                         } else if file_extension == "fbx" {
                             let meshes = FbxImport::from_bytes(file.contents(), memory_allocator.clone()).unwrap();
-                            if meshes.static_meshes.is_empty() && meshes.animated_meshes.is_empty() {
+                            if meshes.static_meshes.is_empty() && meshes.skinned_meshes.is_empty() {
                                 panic!("Tried to import {} but found no mesh", file.path().to_str().unwrap())
                             }
-                            let meshes = meshes.animated_meshes.into_iter().map(|m| Mesh::Animated(m))
+                            let meshes = meshes.skinned_meshes.into_iter().map(|m| Mesh::Skinned(m))
                                 .chain(meshes.static_meshes.into_iter().map(|m| Mesh::Static(m)))
                                 .collect();
                             model_map.insert(file_stem, meshes);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn load_animations(&mut self, animations_dir: &Dir, vulkan: &Vulkan) {
+        let animations_map = &mut self.animations;
+
+        let memory_allocator = vulkan.memory_allocator.clone();
+
+        for entry in animations_dir.entries() {
+            match entry {
+                DirEntry::Dir(_) => {continue;}
+                DirEntry::File(file) => {
+                    if let Some(file_extension) = file.path().extension() {
+                        let file_stem = file.path().file_stem().unwrap().to_str();
+                        let file_stem = match file_stem {
+                            None => {continue;}
+                            Some(file_stem) => file_stem.to_string()
+                        };
+                        if file_extension == "fbx" {
+                            let meshes = FbxImport::from_bytes(file.contents(), memory_allocator.clone()).unwrap();
+                            if meshes.animations.is_empty() {
+                                panic!("Tried to import {} but found no animation", file.path().to_str().unwrap())
+                            }
+                            // using the longest anim found because a fbx file can contain multiple animations
+                            let longest_anim = meshes.animations.clone().into_iter().max_by(|a, b| a.length.cmp(&b.length));
+                            animations_map.insert(file_stem, longest_anim.unwrap());
                         }
                     }
                 }
@@ -158,6 +191,13 @@ impl Resources {
             Some(self.textures_index[name])
         } else {
             None
+        }
+    }
+
+    pub fn animation(&self, name: &str) -> Animation {
+        match self.animations.get(name) {
+            Some(animation) => animation.clone(),
+            None => panic!("animation '{name}' not found")
         }
     }
 }
