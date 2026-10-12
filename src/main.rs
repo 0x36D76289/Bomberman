@@ -1,3 +1,6 @@
+#![deny(unsafe_code)]
+#![allow(clippy::module_inception)]
+
 mod app;
 mod app_state;
 mod audio;
@@ -7,28 +10,31 @@ mod input;
 mod settings;
 mod ui;
 
+use crate::settings::settings::Settings;
 use app::App;
 use game::resources::Resources;
+use std::sync::OnceLock;
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::settings::{path::init_settings_path, settings::Settings};
+static RESOURCES: OnceLock<Resources> = OnceLock::new();
 
-/// A global with the resources (assets) used in game
-pub static mut GLOBAL_RESOURCES: Option<Resources> = None;
+pub fn resources() -> &'static Resources {
+    RESOURCES.get().expect("resources are not loaded yet")
+}
 
-/// The start point
 fn main() {
-    let event_loop = EventLoop::new().unwrap();
+    if let Err(e) = run() {
+        eprintln!("Bomberman: {e:#}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> anyhow::Result<()> {
+    let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    init_settings_path();
-    let settings = Settings::load_settings();
+    let mut app = App::init(Settings::load_settings(), &event_loop, &RESOURCES)?;
+    event_loop.run_app(&mut app)?;
 
-    let mut app = App::init(settings, &event_loop).unwrap();
-
-    unsafe {
-        GLOBAL_RESOURCES = Some(app.get_resources().clone());
-    }
-
-    event_loop.run_app(&mut app).unwrap();
+    Ok(())
 }

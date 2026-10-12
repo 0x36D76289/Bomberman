@@ -1,362 +1,411 @@
-use glam::Vec2;
-
 use crate::{
-    app_state::AppState,
+    app_state::{Ctx, Transition},
+    audio::SoundEffect,
+    graphics::text::FontId,
     input::{
-        input::{Input, default_binds},
-        input_state::InputState,
-        input_vec::MenuInput,
+        controller::{create_bind, is_bindable_action, uses_controller},
+        event::UNBOUND_NAME,
+        input::{BIND_LEN, default_binds},
     },
     settings::settings::Settings,
     ui::{
         UiState,
-        button::{Button, ButtonNeighbors},
-        canvas::Canvas,
-        consts::{
-            BACKGROUND_COLOR, BUTTON_COLOR, OUTLINE_COLOR, SELECTED_BUTTON_COLOR,
-            SELECTED_TEXT_COLOR, TEXT_COLOR, TEXT_SIZE,
-        },
-        utils::spread,
+        draw::{Align, TextStyle},
+        layout::Rect,
+        style,
+        textures::{Icon, UiTex},
+        ui::{Ui, id, idx},
+        widgets::{Action, ButtonStyle},
     },
 };
+use glam::{Vec2, Vec4};
 
-/// The ordered list of buttons in the settings ui page
-enum SettingsButtons {
-    Resolution,
-    Filtering,
-    Fullscreen,
-    Framecap,
-    MusicVol,
-    SfxVol,
-    Binds,
+const BIND_NAMES: [&str; BIND_LEN] = [
+    "Haut",
+    "Bas",
+    "Gauche",
+    "Droite",
+    "Bombe / Valider",
+    "Pause / Retour",
+    "Détoner",
+];
+const BIND_TIMEOUT: f32 = 6.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tab {
+    Video,
+    Audio,
+    Controls,
 }
 
-/// The amount of values in the enum, used for layout
-const BUTTON_COUNT: u8 = 7;
-
-/// The shortcut to unified button creation on the settings page
-fn create_button(index: u8, text: &str) -> Button {
-    Button {
-        canvas: Canvas {
-            center: Vec2 {
-                x: 0.0,
-                y: spread(BUTTON_COUNT + 2, index + 2),
-            },
-            width: 1.0,
-            height: 2.0 / (BUTTON_COUNT + 2) as f32,
-            color: BUTTON_COLOR,
-            texture: None,
-            text: Some(text.to_string()),
-            text_color: Some(TEXT_COLOR),
-            text_size: Some(TEXT_SIZE),
-        },
-        outline_color: Some(OUTLINE_COLOR),
-        neighbors: ButtonNeighbors {
-            up: ((index + BUTTON_COUNT - 1) % BUTTON_COUNT) as usize,
-            down: ((index + 1) % BUTTON_COUNT) as usize,
-            left: index as usize,
-            right: index as usize,
-        },
-        selected_color: SELECTED_BUTTON_COLOR,
-        selected_text_color: Some(SELECTED_TEXT_COLOR),
-        selected_texture: None,
-    }
+#[derive(Debug, Clone)]
+pub struct SettingsPage {
+    pub in_game: bool,
+    tab: Tab,
+    player: usize,
+    waiting: Option<(usize, f32)>,
+    confirm_remove: bool,
 }
 
-impl UiState {
-    /// The general settings ui page constructor
-    pub fn settings() -> Self {
-        let mut canvases = Vec::new();
+fn step_value<T: Copy + PartialEq>(list: &[T], current: T, direction: i32) -> T {
+    list[(list.iter().position(|v| *v == current).unwrap_or(0) as i32 + direction)
+        .clamp(0, list.len() as i32 - 1) as usize]
+}
 
-        canvases.push(Canvas {
-            center: Vec2 { x: 0.0, y: 0.0 },
-            width: 2.0,
-            height: 2.0,
-            color: BACKGROUND_COLOR,
-            texture: None,
-            text: None,
-            text_color: None,
-            text_size: None,
-        });
-
-        canvases.push(Canvas {
-            center: Vec2 {
-                x: 0.0,
-                y: spread(BUTTON_COUNT + 2, 0),
-            },
-            width: 0.0,
-            height: 0.0,
-            color: TEXT_COLOR,
-            texture: None,
-            text: Some("Settings".to_string()),
-            text_color: Some(TEXT_COLOR),
-            text_size: Some(TEXT_SIZE * 2.0),
-        });
-
-        let mut buttons = Vec::new();
-
-        buttons.push(create_button(0, "Resolution"));
-        buttons.push(create_button(1, "Filtering"));
-        buttons.push(create_button(2, "Fullscreen"));
-        buttons.push(create_button(3, "Framerate Limit"));
-        buttons.push(create_button(4, "Music Volume"));
-        buttons.push(create_button(5, "SFX Volume"));
-        buttons.push(create_button(6, "Binds"));
-        buttons[0].toggle();
-
+impl SettingsPage {
+    pub fn new(in_game: bool) -> Self {
         Self {
-            canvases,
-            buttons,
-            selected: 0,
-            render_info: Default::default(),
+            in_game,
+            tab: Tab::Video,
+            player: 0,
+            waiting: None,
+            confirm_remove: false,
         }
     }
 
-    /// Updates the resolution from a preset list
-    fn update_resolution(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::Resolution as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Resolution".to_string());
-            return;
-        }
-
-        self.buttons[index].canvas.text = Some(format!(
-            "{}x{}",
-            settings.resolution.0, settings.resolution.1
-        ));
-        if direction == 0 {
-            return;
-        }
-
-        const RESOLUTION_COUNT: usize = 17;
-        const RESOLUTIONS: [(u32, u32); RESOLUTION_COUNT] = [
-            (160, 120),
-            (256, 192),
-            (320, 240),
-            (400, 300),
-            (512, 384),
-            (640, 480),
-            (800, 600),
-            (960, 720),
-            (1024, 768),
-            (1280, 960),
-            (1600, 1200),
-            (1920, 1440),
-            (2560, 1920),
-            (2880, 2160),
-            (3200, 2400),
-            (4096, 3072),
-            (6400, 4800),
-        ];
-
-        let res_index = RESOLUTIONS.binary_search(&settings.resolution);
-        if res_index.is_err() {
-            println!("err");
-            settings.resolution = Settings::default().resolution;
-            settings.save();
-            return;
-        }
-
-        let res_index = res_index.unwrap();
-        let res_index =
-            (res_index as isize + direction as isize).clamp(0, RESOLUTION_COUNT as isize - 1);
-        settings.resolution = RESOLUTIONS[res_index as usize];
-        settings.save();
-    }
-
-    /// Updates the filtering of the game
-    fn update_filtering(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::Filtering as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Filtering".to_string());
-            return;
-        }
-        self.buttons[index].canvas.text = Some(format!("{}", settings.filtering));
-        if direction != 0 {
-            settings.filtering = !settings.filtering;
-            settings.save();
-        }
-    }
-
-    /// Updates the fullscreen display of the game
-    fn update_fullscreen(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::Fullscreen as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Fullscreen".to_string());
-            return;
-        }
-        self.buttons[index].canvas.text = Some(format!("{}", settings.fullscreen));
-        if direction != 0 {
-            settings.fullscreen = !settings.fullscreen;
-            settings.save();
-        }
-    }
-
-    /// Updates the maximum framerate from a preset list of values + vsync and uncapped
-    fn update_framerate(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::Framecap as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Framerate Limit".to_string());
-            return;
-        }
-
-        //render
-        let val = settings.framerate_limit;
-        self.buttons[index].canvas.text = Some(if val < 0 {
-            "Uncapped".to_string()
-        } else if val == 0 {
-            "VSync".to_string()
+    pub fn tick(&mut self, state: &mut UiState, ctx: &mut Ctx) -> Transition {
+        let mut ui = super::begin(state, ctx);
+        let screen = ui.screen();
+        if self.in_game {
+            ui.fill(style::OVERLAY);
         } else {
-            format!("{}", settings.framerate_limit)
-        });
-
-        if direction == 0 {
-            return;
+            ui.backdrop();
         }
+        ui.header("PARAMÈTRES");
 
-        // find pos
-        const FRAMECAP_COUNT: usize = 10;
-        const FRAMECAPS: [i32; FRAMECAP_COUNT] = [0, 24, 30, 60, 90, 120, 144, 240, 360, -1];
-        let sup_index = if val < 0 {
-            FRAMECAP_COUNT - 1
-        } else if val > FRAMECAPS[FRAMECAP_COUNT - 2] {
-            FRAMECAP_COUNT - 1
-        } else {
-            let mut ret = 0;
-            for i in 0..(FRAMECAP_COUNT - 1) {
-                ret = i;
-                if val <= FRAMECAPS[i] {
-                    break;
+        let content = Rect::new((screen.x - 1100.0) / 2.0, 250.0, 1100.0, 600.0);
+        let mut transition = (None, 0);
+
+        if !(self.waiting.is_some() || self.confirm_remove) {
+            let tabs = Rect::new(content.x, 150.0, content.w, 80.0).columns(3, 24.0);
+            for (i, (tab, name, icon)) in [
+                (Tab::Video, "Vidéo", Icon::Gear),
+                (Tab::Audio, "Audio", Icon::Music),
+                (Tab::Controls, "Commandes", Icon::Gamepad),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if ui
+                    .button(
+                        idx("tab", i),
+                        tabs[i],
+                        name,
+                        Some(icon),
+                        if self.tab == tab {
+                            ButtonStyle::Go
+                        } else {
+                            ButtonStyle::Normal
+                        },
+                    )
+                    .clicked
+                {
+                    self.tab = tab;
                 }
             }
-            ret
-        };
 
-        // save new
-        let new = (sup_index as isize + direction as isize).rem_euclid(FRAMECAP_COUNT as isize);
-        settings.framerate_limit = FRAMECAPS[new as usize];
-        settings.save();
-    }
-
-    /// Updates the music volume
-    fn update_music_volume(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::MusicVol as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Music Volume".to_string());
-            return;
-        }
-
-        const TICKS: usize = 21;
-        let mut str: String = "-".to_string().repeat(TICKS);
-        let vol = (settings.volume_music.clamp(0.0, 1.0) * (TICKS - 1) as f32) as usize;
-        str.replace_range(vol..=vol, "|");
-        self.buttons[index].canvas.text = Some(str);
-
-        if direction != 0 {
-            settings.volume_music += direction as f32 * (1.0 / (TICKS as f32 - 1.0));
-            settings.volume_music = settings.volume_music.clamp(0.0, 1.0);
-            settings.save();
-        }
-    }
-
-    /// Updates the Sound Effects volume
-    fn update_sfx_volume(&mut self, settings: &mut Settings, direction: i8) {
-        let index = SettingsButtons::SfxVol as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("SFX Volume".to_string());
-            return;
-        }
-
-        // TODO: play a sound effect on change (explosion)
-        const TICKS: usize = 21;
-        let mut str: String = "-".to_string().repeat(TICKS);
-        let vol = (settings.volume_sfx.clamp(0.0, 1.0) * (TICKS - 1) as f32) as usize;
-        str.replace_range(vol..=vol, "|");
-        self.buttons[index].canvas.text = Some(str);
-
-        if direction != 0 {
-            settings.volume_sfx += direction as f32 * (1.0 / (TICKS as f32 - 1.0));
-            settings.volume_sfx = settings.volume_sfx.clamp(0.0, 1.0);
-            settings.save();
-        }
-    }
-
-    /// Changes the selected player in binds and opens the ui page if selected
-    fn update_binds(
-        &mut self,
-        settings: &mut Settings,
-        selected_player: &mut usize,
-        direction: i8,
-        open: bool,
-        ratio: f32,
-    ) -> Option<(Option<AppState>, u8)> {
-        let index = SettingsButtons::Binds as usize;
-        if self.selected != index {
-            self.buttons[index].canvas.text = Some("Binds".to_string());
-            return None;
-        }
-
-        let num = selected_player;
-
-        let existing_count = settings.binds.len();
-        *num =
-            (*num as isize + direction as isize).rem_euclid(existing_count as isize + 1) as usize;
-        self.buttons[index].canvas.text = Some(if *num != existing_count {
-            format!("Player {}", *num + 1)
-        } else {
-            format!("Player {} (+)", *num + 1)
-        });
-
-        if open {
-            if *num == existing_count {
-                settings.binds.push(default_binds());
-                settings.save();
+            if match self.tab {
+                Tab::Video => video(&mut ui, ctx.settings, content),
+                Tab::Audio => audio(&mut ui, ctx.settings, content),
+                Tab::Controls => self.controls(&mut ui, ctx, content),
+            } {
+                ctx.settings.save();
+                ctx.audio.set_volume(ctx.settings);
             }
-            return Some((Some(AppState::binds(*num, ratio)), 0));
+
+            if ui.back_button(Rect::new(content.x, screen.y - 150.0, 340.0, 84.0)) {
+                transition = (None, 1);
+            }
+            ui.prompts(&[
+                (Action::Navigate, "Déplacer"),
+                (Action::Change, "Modifier"),
+                (Action::Back, "Retour"),
+            ]);
+        } else if let Some((slot, time)) = &mut self.waiting {
+            *time += ctx.delta;
+
+            let rect = Rect::centered(screen / 2.0, Vec2::new(860.0, 340.0));
+
+            ui.fill(style::OVERLAY);
+            ui.dl.frame(UiTex::Panel, rect, Vec4::ONE, 0.6);
+            ui.dl.text(
+                &format!("Joueur {} - {}", self.player + 1, BIND_NAMES[*slot]),
+                Vec2::new(rect.center().x, rect.y + 80.0),
+                TextStyle::new(FontId::Title, 44.0, style::TEXT_DARK),
+            );
+
+            ui.dl.text(
+                "Appuie sur une touche ou un bouton...",
+                Vec2::new(rect.center().x, rect.y + 170.0),
+                TextStyle::new(FontId::Title, 40.0, style::YELLOW).outline(style::INK, 3.0),
+            );
+            ui.dl.text(
+                &format!(
+                    "Annulation dans {:.0} s",
+                    (BIND_TIMEOUT - *time).max(0.0).ceil()
+                ),
+                Vec2::new(rect.center().x, rect.y + 260.0),
+                TextStyle::new(FontId::Body, 24.0, style::TEXT_MUTED),
+            );
+
+            if let Some(event) = ctx.events.iter().find(|e| is_bindable_action(e)) {
+                if let Some(binds) = ctx.settings.binds.get_mut(self.player) {
+                    binds[*slot] = create_bind(event);
+                    ctx.settings.save();
+                }
+                ui.sound(SoundEffect::MenuConfirm);
+                self.waiting = None;
+            } else if *time > BIND_TIMEOUT || ui.input.mouse_pressed {
+                ui.sound(SoundEffect::MenuBack);
+                self.waiting = None;
+            }
+        } else if self.confirm_remove {
+            match ui.dialog(
+                "remove",
+                &format!("Retirer le joueur {} ?", self.player + 1),
+                "Ses touches seront supprimées.",
+                "Retirer",
+            ) {
+                Some(true) => {
+                    if ctx.settings.binds.len() > 1 && self.player < ctx.settings.binds.len() {
+                        ctx.settings.binds.remove(self.player);
+                        ctx.settings.save();
+                    }
+                    self.player = self.player.min(ctx.settings.binds.len() - 1);
+                    self.confirm_remove = false;
+                }
+                Some(false) => self.confirm_remove = false,
+                None => (),
+            }
         }
-        // if input create binds page with player count arg
-        // binds has keys, inputs, events, settings?
-        return None;
+        ui.end(ctx.audio);
+        transition
     }
 
-    /// The general settings ui page tick function
-    pub fn settings_tick(
-        &mut self,
-        inputs: &Vec<Input>,
-        settings: &mut Settings,
-        selected_player: &mut usize,
-        ratio: f32,
-    ) -> (Option<AppState>, u8) {
-        self.button_inputs(inputs);
+    fn controls(&mut self, ui: &mut Ui, ctx: &mut Ctx, content: Rect) -> bool {
+        let settings = &mut *ctx.settings;
+        let count = settings.binds.len();
 
-        let mut direction: i8 = 0;
-        if inputs.menu_left() == InputState::Pressed {
-            direction -= 1;
-        }
-        if inputs.menu_right() == InputState::Pressed {
-            direction += 1;
-        }
+        self.player = self.player.min(count.saturating_sub(1));
 
-        self.update_resolution(settings, direction);
-        self.update_filtering(settings, direction);
-        self.update_fullscreen(settings, direction);
-        self.update_framerate(settings, direction);
-        self.update_music_volume(settings, direction);
-        self.update_sfx_volume(settings, direction);
-        self.update_sfx_volume(settings, direction);
-        if let Some(ret) = self.update_binds(
-            settings,
-            selected_player,
-            direction,
-            inputs.menu_confirm() == InputState::Pressed,
-            ratio,
-        ) {
-            return ret;
+        let (top, rest) = content.take_top(84.0);
+        let step = ui.selector(
+            id("player"),
+            top,
+            "Joueur",
+            &format!(
+                "Joueur {}{}",
+                self.player + 1,
+                if uses_controller(&settings.binds[self.player]) {
+                    " (+ manette)"
+                } else {
+                    ""
+                }
+            ),
+        );
+        if step != 0 {
+            self.player = (self.player as i32 + step).rem_euclid(count as i32) as usize;
         }
 
-        if inputs.menu_back() == InputState::Pressed {
-            return (None, 1);
+        let (binds_area, actions) = rest.take_top(8.0 * 52.0 + 20.0);
+        let rows = binds_area
+            .inset(10.0)
+            .translate(Vec2::new(0.0, 10.0))
+            .rows(4, 12.0);
+        for (i, name) in BIND_NAMES.iter().enumerate() {
+            let key = settings.binds[self.player][i].to_string();
+
+            if ui
+                .card(
+                    idx("bind", i),
+                    rows[i % 4].columns(2, 24.0)[i / 4],
+                    false,
+                    |ui, r| {
+                        let rect = r.rect;
+                        ui.dl.text(
+                            name,
+                            Vec2::new(rect.x + 24.0, rect.center().y),
+                            TextStyle::new(FontId::Title, 26.0, style::TEXT_DARK)
+                                .align(Align::Left),
+                        );
+                        let key_rect =
+                            Rect::new(rect.right() - 220.0, rect.y + 10.0, 200.0, rect.h - 20.0);
+                        ui.dl.frame(UiTex::PanelGrey, key_rect, Vec4::ONE, 0.35);
+
+                        let color = if key == UNBOUND_NAME {
+                            style::RED
+                        } else {
+                            style::TEXT_DARK
+                        };
+                        ui.dl.text(
+                            &key,
+                            key_rect.center(),
+                            TextStyle::new(
+                                FontId::Body,
+                                24.0 * ((key_rect.w - 20.0)
+                                    / ui.dl
+                                        .text_width(
+                                            &key,
+                                            &TextStyle::new(FontId::Body, 24.0, color),
+                                        )
+                                        .max(1.0))
+                                .min(1.0),
+                                color,
+                            ),
+                        );
+                    },
+                )
+                .clicked
+            {
+                self.waiting = Some((i, 0.0));
+            }
         }
-        (None, 0)
+
+        let buttons = Rect::new(actions.x, actions.y + 24.0, actions.w, 76.0).columns(3, 24.0);
+        let mut changed = false;
+        if ui
+            .button(
+                id("add"),
+                buttons[0],
+                "Ajouter",
+                Some(Icon::Plus),
+                if count >= 8 {
+                    ButtonStyle::Disabled
+                } else {
+                    ButtonStyle::Normal
+                },
+            )
+            .clicked
+        {
+            settings.binds.push(default_binds());
+            self.player = settings.binds.len() - 1;
+            changed = true;
+        }
+        if ui
+            .button(
+                id("reset"),
+                buttons[1],
+                "Par défaut",
+                Some(Icon::Return),
+                ButtonStyle::Normal,
+            )
+            .clicked
+        {
+            settings.binds[self.player] = Settings::player_binds(self.player);
+            changed = true;
+        }
+        if ui
+            .button(
+                id("remove"),
+                buttons[2],
+                "Retirer",
+                Some(Icon::Trashcan),
+                if count <= 1 {
+                    ButtonStyle::Disabled
+                } else {
+                    ButtonStyle::Danger
+                },
+            )
+            .clicked
+        {
+            self.confirm_remove = true;
+        }
+        changed
     }
+}
+
+fn video(ui: &mut Ui, settings: &mut Settings, content: Rect) -> bool {
+    let rows = Rect {
+        h: 5.0 * 84.0 + 4.0 * 18.0,
+        ..content
+    }
+    .rows(5, 18.0);
+
+    let mut changed = false;
+    let step = ui.selector(
+        id("resolution"),
+        rows[0],
+        "Taille de la fenêtre",
+        &format!("{} x {}", settings.resolution.0, settings.resolution.1),
+    );
+    if step != 0 {
+        settings.resolution = step_value(
+            &[
+                (800, 600),
+                (1024, 768),
+                (1280, 720),
+                (1280, 800),
+                (1366, 768),
+                (1600, 900),
+                (1680, 1050),
+                (1920, 1080),
+                (2560, 1440),
+                (3840, 2160),
+            ],
+            settings.resolution,
+            step,
+        );
+        changed = true;
+    }
+
+    changed |= ui.toggle(
+        id("fullscreen"),
+        rows[1],
+        "Plein écran",
+        &mut settings.fullscreen,
+    );
+    changed |= ui.toggle(
+        id("pixel_art"),
+        rows[2],
+        "Effet pixel",
+        &mut settings.pixel_art,
+    );
+    changed |= ui.toggle(
+        id("filtering"),
+        rows[3],
+        "Textures lissées",
+        &mut settings.filtering,
+    );
+
+    let step = ui.selector(
+        id("fps"),
+        rows[4],
+        "Images par seconde",
+        &match settings.framerate_limit {
+            0 => "VSync".to_string(),
+            n if n < 0 => "Illimité".to_string(),
+            n => format!("{n} FPS"),
+        },
+    );
+    if step != 0 {
+        settings.framerate_limit = step_value(
+            &[0, 30, 60, 120, 144, 240, -1],
+            settings.framerate_limit,
+            step,
+        );
+        changed = true;
+    }
+
+    changed
+}
+
+fn audio(ui: &mut Ui, settings: &mut Settings, content: Rect) -> bool {
+    let rows = Rect {
+        h: 2.0 * 84.0 + 18.0,
+        ..content
+    }
+    .rows(2, 18.0);
+
+    let music = ui.slider(id("music"), rows[0], "Musique", &mut settings.volume_music);
+    let sounds = ui.slider(
+        id("sounds"),
+        rows[1],
+        "Effets sonores",
+        &mut settings.volume_sfx,
+    );
+    if sounds {
+        ui.sound(SoundEffect::BonusPickup);
+    }
+
+    music || sounds
 }

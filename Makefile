@@ -1,17 +1,41 @@
+NAME	= Bomberman
+DOCKER	?= docker
+
 all: release
 
-debug:
-	cargo build
-	ln -s -f target/debug/Bomberman Bomberman
+assets:
+	./scripts/fetch_assets.sh
 
-release:
-	cargo build -r
-	ln -s -f target/release/Bomberman Bomberman
+pack-assets:
+	./scripts/pack_assets.sh
+
+release: assets
+	cargo build --release
+	ln -sf target/release/$(NAME) $(NAME)
+
+run: release
+	./$(NAME)
+
+package: release
+	./scripts/package.sh
+
+install: package
+	./scripts/install.sh
+
+uninstall:
+	./scripts/install.sh --uninstall
 
 docker:
-	docker build --platform linux/amd64 --tag bomberman .
-	docker run --rm -v .:/bomberman bomberman
+	$(DOCKER) build --pull --tag bomberman .
+	$(DOCKER) run --rm -e CARGO_TARGET_DIR=target/docker -v "$(CURDIR)":/bomberman bomberman
 
 clean:
 	cargo clean
-	rm Bomberman
+	rm -f $(NAME)
+
+fclean: clean
+	rm -rf assets dist
+
+re: fclean all
+
+.PHONY: all release assets pack-assets run package install uninstall docker clean fclean re

@@ -1,85 +1,100 @@
-use glam::{Vec2, Vec3, i16, usize};
-use rand::random_range;
+use glam::{Vec2, Vec3};
+use rand::{RngExt, SeedableRng, random_range, rngs::StdRng, seq::SliceRandom};
 
 use crate::{
     game::{
         direction::Direction,
+        enemy::EnemyKind,
+        grid::tile_transform,
         map::{
             map_element::{MapElement, SpawnPoint},
             map_settings::{MapSettings, MapType},
         },
-        resources::{ResourceName, Resources},
-    }, graphics::{mesh::Mesh, object::Object, transform::Transform},
+        powerup::PowerUpType,
+        resources::{FLOOR_SIZE, ResourceName, Resources},
+        theme::Theme,
+    },
+    graphics::{object::Object, transform::Transform},
 };
 
-/// Represents the entire play area with a list of tiles and spawnpoints
+const LEVELS: [&str; 5] = [
+    include_str!("../../levels/1.level"),
+    include_str!("../../levels/2.level"),
+    include_str!("../../levels/3.level"),
+    include_str!("../../levels/4.level"),
+    include_str!("../../levels/5.level"),
+];
+
+pub const LEVEL_COUNT: u32 = LEVELS.len() as u32;
+
+const DECOR_MARGIN_X: i32 = 14;
+const DECOR_MARGIN_Y: i32 = 10;
+
 #[derive(Debug, Clone)]
 pub struct Map {
-    /// The width of the map (including walls)
     pub width: usize,
-    /// The height of the map (including walls)
     pub height: usize,
-    /// The internal representation of the map, each tile is at pos y * width + x
     content: Vec<MapElement>,
-    /// The list of player spawn points
     pub spawns: Vec<SpawnPoint>,
-    /// A single object that is rendered below the map
     pub floor: Object,
+    pub theme: Theme,
+    pub decor: Vec<Object>,
+    pub exit: Option<(usize, usize)>,
+    pub hidden_bonuses: Vec<((usize, usize), PowerUpType)>,
+    pub random_bonuses: bool,
 }
 
-/// The representation of a level of the campaign with a [Map], enemy spawns, and the level exit
+struct LevelHeader {
+    name: String,
+    theme: Theme,
+    time_limit: f32,
+    bonuses: Vec<PowerUpType>,
+}
+
 pub struct LevelData {
     pub map: Map,
     pub player_spawn: Vec2,
-    pub enemy_spawns: Vec<Vec2>,
+    pub enemy_spawns: Vec<(Vec2, Option<EnemyKind>)>,
     pub exit_pos: Vec2,
+    pub name: String,
+    pub time_limit: f32,
 }
 
 impl Map {
-    /// Creates the internal object for a Breakable MapElement
-    fn create_breakable(ressources: &Resources) -> Object {
-        Object::from_resource("breakable", ressources)
-        // Object {
-        //     meshes: ressources.models[&ResourceName::Breakable].clone(),
-        //     textures: Some(ressources.textures_index[&ResourceName::Breakable]),
-        //     transform: Default::default(),
-        //     color: Default::default(),
-        // }
+    fn create_breakable(resources: &Resources, theme: Theme) -> Object {
+        resources.object(
+            ResourceName::Crate,
+            Transform::default(),
+            theme.crate_tint(),
+        )
     }
 
-    /// Creates the internal object for an Unbreakable MapElement
-    fn create_unbreakable(ressources: &Resources) -> Object {
-        Object::from_resource("unbreakable", ressources)
-        // Object {
-        //     meshes: ressources.models[&ResourceName::Unbreakable].clone(),
-        //     textures: Some(ressources.textures_index[&ResourceName::Unbreakable]),
-        //     transform: Default::default(),
-        //     color: Default::default(),
-        // }
+    fn create_unbreakable(resources: &Resources, theme: Theme) -> Object {
+        resources.object(
+            theme.block_model(),
+            Transform::default(),
+            theme.block_tint(),
+        )
     }
 
-    /// Sets a [MapElement]'s internal position to match its index in the content vector
+    pub fn create_exit(resources: &Resources, pos: Vec2) -> Object {
+        let (x, y) = (pos.x as usize, pos.y as usize);
+        resources.object(
+            ResourceName::Exit,
+            tile_transform(x, y, 0.0, 1.6),
+            Vec3::splat(0.35),
+        )
+    }
+
     fn fix_object(elem: &mut MapElement, x: usize, y: usize) {
-        match elem {
-            MapElement::Empty | MapElement::Exit(_) => (),
-            MapElement::Breakable(obj) => {
-                obj.transform = Transform {
-                    translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
-                    scale: Vec3::splat(0.9),
-                    rotation: Vec3::ZERO,
-                }
-            }
-            MapElement::Unbreakable(obj) => {
-                obj.transform = Transform {
-                    translation: Vec3::new(x as f32 + 0.5, 0.0, y as f32 + 0.5),
-                    scale: Vec3::ONE,
-                    rotation: Vec3::ZERO,
-                }
-            }
-        }
+        let (obj, scale) = match elem {
+            MapElement::Empty | MapElement::Exit(_) => return,
+            MapElement::Breakable(obj) => (obj, 0.9),
+            MapElement::Unbreakable(obj) => (obj, 1.0),
+        };
+        obj.transform = tile_transform(x, y, 0.0, scale);
     }
 
-    /// Aligns each object with their position in the vector
     fn fix_objects(mut self) -> Self {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -89,40 +104,76 @@ impl Map {
         self
     }
 
-    /// Creates and places the object for the floor
-    fn create_floor(width: u8, height: u8, ressources: &Resources) -> Object {
-        let transform = Transform {
-            translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
-            scale: Vec3::new(width as f32, 1.0, height as f32),
-            rotation: Vec3::ZERO,
-        };
-        Object::from_resource("floor", ressources).with_transform(transform)
-        // Object {
-        //     meshes: ressources.models[&ResourceName::Floor].clone(),
-        //     textures: Some(ressources.textures_index[&ResourceName::Floor]),
-        //     transform: Transform {
-        //         translation: Vec3::new(width as f32 / 2.0, 0.0, height as f32 / 2.0),
-        //         scale: Vec3::new(width as f32, 1.0, height as f32),
-        //         rotation: Vec3::ZERO,
-        //     },
-        //     color: Vec3::ONE,
-        // }
+    fn create_floor(width: usize, height: usize, resources: &Resources, theme: Theme) -> Object {
+        resources.object(
+            ResourceName::Floor(theme),
+            Transform {
+                translation: Vec3::new((width / 2) as f32, 0.0, (height / 2) as f32),
+                scale: Vec3::ONE,
+                rotation: Vec3::ZERO,
+            },
+            theme.floor_tint(),
+        )
     }
 
-    /// Constructor: creates an empty x*y map
-    pub fn empty(width: u8, height: u8, ressources: &Resources) -> Self {
+    fn create_decor(
+        width: usize,
+        height: usize,
+        resources: &Resources,
+        theme: Theme,
+    ) -> Vec<Object> {
+        let kinds = theme.decor();
+        let mut rng = StdRng::seed_from_u64((width * 1000 + height) as u64 + theme as u64);
+        let mut decor = Vec::new();
+        let max = FLOOR_SIZE as i32 / 2 - 1;
+        let (w, h) = (width as i32, height as i32);
+
+        for y in (-DECOR_MARGIN_Y).max(-max)..(h + DECOR_MARGIN_Y).min(max) {
+            for x in (-DECOR_MARGIN_X).max(-max)..(w + DECOR_MARGIN_X).min(max) {
+                if ((-1..=w).contains(&x) && (-1..=h).contains(&y)) || !rng.random_bool(0.3) {
+                    continue;
+                }
+                decor.push(resources.object(
+                    ResourceName::Decor(kinds[rng.random_range(0..kinds.len())]),
+                    Transform {
+                        translation: Vec3::new(
+                            x as f32 + rng.random_range(0.3..0.7),
+                            0.0,
+                            y as f32 + rng.random_range(0.3..0.7),
+                        ),
+                        scale: Vec3::splat(rng.random_range(0.8..1.2)),
+                        rotation: Vec3::new(0.0, rng.random_range(0.0..std::f32::consts::TAU), 0.0),
+                    },
+                    theme.decor_tint(),
+                ));
+            }
+        }
+        decor
+    }
+
+    fn empty(width: u8, height: u8, resources: &Resources, theme: Theme) -> Self {
         Map {
             width: width as usize,
             height: height as usize,
             spawns: vec![],
             content: vec![MapElement::Empty; width as usize * height as usize],
-            floor: Self::create_floor(width, height, ressources),
+            floor: Self::create_floor(width as usize, height as usize, resources, theme),
+            theme,
+            decor: Vec::new(),
+            exit: None,
+            hidden_bonuses: Vec::new(),
+            random_bonuses: true,
         }
     }
 
-    /// Creates unbreakable blocks at every (x,y) such that x and y are odd (unfixed)
-    fn grid(mut self, ressources: &Resources) -> Self {
-        let unbreakable_object = Self::create_unbreakable(ressources);
+    fn finish(mut self, resources: &Resources) -> Self {
+        self.floor = Self::create_floor(self.width, self.height, resources, self.theme);
+        self.decor = Self::create_decor(self.width, self.height, resources, self.theme);
+        self.fix_objects()
+    }
+
+    fn grid(mut self, resources: &Resources) -> Self {
+        let unbreakable_object = Self::create_unbreakable(resources, self.theme);
 
         for y in (1..self.height).step_by(2) {
             for x in (1..self.width).step_by(2) {
@@ -133,25 +184,22 @@ impl Map {
         self
     }
 
-    /// Replaces every empty map element with a breakable object (unfixed)
-    fn fill_break(mut self, ressources: &Resources) -> Self {
-        let breakable_object = Self::create_breakable(ressources);
-
-        let mut content_clone = self.content.clone();
-        for (i, elem) in content_clone.iter_mut().enumerate() {
-            if let MapElement::Empty = elem {
-                self.content[i] = MapElement::Breakable(breakable_object.clone())
+    fn fill_break(mut self, resources: &Resources) -> Self {
+        let breakable = Self::create_breakable(resources, self.theme);
+        for elem in &mut self.content {
+            if *elem == MapElement::Empty {
+                *elem = MapElement::Breakable(breakable.clone());
             }
         }
         self
     }
 
-    /// Expands the map by adding a ring of unbreakable blocks around it (unfixed)
-    fn walls(self, ressources: &Resources) -> Self {
-        let unbreakable_object = Self::create_unbreakable(ressources);
-
+    fn walls(self, resources: &Resources) -> Self {
         let mut content =
-            vec![MapElement::Unbreakable(unbreakable_object); (self.width + 2) * (self.height + 2)];
+            vec![
+                MapElement::Unbreakable(Self::create_unbreakable(resources, self.theme));
+                (self.width + 2) * (self.height + 2)
+            ];
 
         for y in 0..self.height {
             for x in 0..self.width {
@@ -173,13 +221,29 @@ impl Map {
                 })
                 .collect(),
             content,
-            floor: Self::create_floor(self.width as u8 + 2, self.height as u8 + 2, ressources),
+            ..self
         }
     }
 
-    /// Adds 4 spawns in the corners of a map
+    fn corner_tiles(&self) -> [usize; 12] {
+        let (w, h) = (self.width, self.height);
+        [
+            0,
+            1,
+            w,
+            w - 1,
+            w - 2,
+            2 * w - 1,
+            (h - 1) * w,
+            (h - 1) * w + 1,
+            (h - 2) * w,
+            h * w - 1,
+            h * w - 2,
+            (h - 1) * w - 1,
+        ]
+    }
+
     fn corners(mut self) -> Self {
-        // Set spawns
         self.spawns.push(SpawnPoint {
             x: 0,
             y: 0,
@@ -200,64 +264,30 @@ impl Map {
             y: self.height as i32 - 1,
             direction: Direction::Left,
         });
-        // Top left corner
-        self.content[0] = MapElement::Empty;
-        self.content[1] = MapElement::Empty;
-        self.content[self.width] = MapElement::Empty;
-        // Top right corner
-        self.content[self.width - 1] = MapElement::Empty;
-        self.content[self.width - 2] = MapElement::Empty;
-        self.content[2 * self.width - 1] = MapElement::Empty;
-        // Bottom left corner
-        self.content[(self.height - 1) * self.width] = MapElement::Empty;
-        self.content[((self.height - 1) * self.width) + 1] = MapElement::Empty;
-        self.content[(self.height - 2) * self.width] = MapElement::Empty;
-        // Bottom right corner
-        self.content[((self.height - 1) * self.width) + (self.width - 1)] = MapElement::Empty;
-        self.content[((self.height - 1) * self.width) + (self.width - 2)] = MapElement::Empty;
-        self.content[((self.height - 2) * self.width) + (self.width - 1)] = MapElement::Empty;
-
+        for i in self.corner_tiles() {
+            self.content[i] = MapElement::Empty;
+        }
         self
     }
 
-    /// Adds a spawn in the center of each quarter of the map
-    /// as well as one at (width/2, 0) and at (width/2, height-1)
     fn arena(mut self) -> Self {
-        // Top and bottom
-        self.add_spawn(self.width as i16 / 2, 0, 1, Some(Direction::Down));
-        self.add_spawn(
-            self.width as i16 / 2,
-            self.height as i16 - 1,
-            1,
-            Some(Direction::Up),
-        );
-        // middle ring
-        let quarter_x = (self.width - 1) / 4;
-        let quarter_y = (self.height - 1) / 4 + 1;
-
-        self.add_spawn(quarter_x as i16, quarter_y as i16, 1, Some(Direction::Up));
-        self.add_spawn(
-            (self.width - quarter_x - 1) as i16,
-            quarter_y as i16,
-            1,
-            Some(Direction::Up),
-        );
-        self.add_spawn(
-            quarter_x as i16,
-            (self.height - quarter_y - 1) as i16,
-            1,
-            Some(Direction::Down),
-        );
-        self.add_spawn(
-            (self.width - quarter_x - 1) as i16,
-            (self.height - quarter_y - 1) as i16,
-            1,
-            Some(Direction::Down),
-        );
+        let w = self.width as i16;
+        let h = self.height as i16;
+        let qx = (w - 1) / 4;
+        let qy = (h - 1) / 4 + 1;
+        for (x, y, direction) in [
+            (w / 2, 0, Direction::Down),
+            (w / 2, h - 1, Direction::Up),
+            (qx, qy, Direction::Up),
+            (w - qx - 1, qy, Direction::Up),
+            (qx, h - qy - 1, Direction::Down),
+            (w - qx - 1, h - qy - 1, Direction::Down),
+        ] {
+            self.add_spawn(x, y, 1, Some(direction));
+        }
         self
     }
 
-    /// Replaces a percentage of the breakable blocks with air (random)
     fn cheese(mut self, cheesiness: u8) -> Self {
         for i in 0..self.content.len() {
             if let MapElement::Breakable(_) = self.content[i]
@@ -269,7 +299,6 @@ impl Map {
         self
     }
 
-    /// Replaces breakable blocks with air around position x, y
     fn clear_range(&mut self, x: i16, y: i16, size: i16) {
         for y in (y - size).max(0)..=(y + size).min(self.height as i16 - 1) {
             for x in (x - size).max(0)..=(x + size).min(self.width as i16 - 1) {
@@ -281,7 +310,6 @@ impl Map {
         }
     }
 
-    /// Adds a spawnpoint, if direction is [None] then a random one is selected
     fn add_spawn(&mut self, x: i16, y: i16, spawn_size: u8, direction: Option<Direction>) {
         if let Some(direction) = direction {
             self.spawns.push(SpawnPoint {
@@ -295,221 +323,253 @@ impl Map {
         self.clear_range(x, y, spawn_size as i16);
     }
 
-    /// Adds spawns at random points towards the map that aren't less that safe_range away from
-    /// each other on both axis
-    fn add_spawns_random(&mut self, safe_range: u8, spawn_size: u8) -> bool {
-        if (self.width < 4) || (self.height < 4) {
-            return false;
+    fn add_spawn_random(&mut self, safe_range: u8, spawn_size: u8) {
+        let candidates: Vec<(i16, i16, u32)> = (0..self.height as i16)
+            .flat_map(|y| (0..self.width as i16).map(move |x| (x, y)))
+            .filter(|(x, y)| x % 2 != y % 2)
+            .filter(|(x, y)| {
+                !self
+                    .spawns
+                    .iter()
+                    .any(|s| s.x == *x as i32 && s.y == *y as i32)
+            })
+            .map(|(x, y)| {
+                (
+                    x,
+                    y,
+                    self.spawns
+                        .iter()
+                        .map(|s| {
+                            (s.x - x as i32)
+                                .unsigned_abs()
+                                .max((s.y - y as i32).unsigned_abs())
+                        })
+                        .min()
+                        .unwrap_or(u32::MAX),
+                )
+            })
+            .collect();
+        let safe: Vec<&(i16, i16, u32)> = candidates
+            .iter()
+            .filter(|(_, _, gap)| *gap > safe_range as u32)
+            .collect();
+        if let Some((x, y, _)) = if safe.is_empty() {
+            let best = candidates.iter().map(|(_, _, gap)| *gap).max();
+            let farthest: Vec<&(i16, i16, u32)> = candidates
+                .iter()
+                .filter(|(_, _, gap)| Some(*gap) == best)
+                .collect();
+            farthest
+                .get(random_range(0..farthest.len().max(1)))
+                .copied()
+        } else {
+            Some(safe[random_range(0..safe.len())])
+        } {
+            self.add_spawn(*x, *y, spawn_size, None);
         }
-        let mut x: i16 = 0;
-        let mut y: i16 = 0;
-        while (x % 2) == (y % 2) {
-            x = random_range(0..self.width) as i16;
-            y = random_range(0..self.height) as i16;
-        }
-
-        for spawn in self.spawns.clone() {
-            let spawn_range_x: u8 = (spawn.x as i16 - x).abs() as u8;
-            let spawn_range_y: u8 = (spawn.y as i16 - y).abs() as u8;
-
-            if spawn_range_x <= safe_range && spawn_range_y <= safe_range {
-                return false;
-            }
-        }
-        self.add_spawn(x, y, spawn_size, None);
-        true
     }
 
-    /// Adds spawns/spawnpoints at random throughout a map
     fn random(mut self, settings: &MapSettings) -> Option<Self> {
-        let mut attempts = settings.attempts;
-        let mut spawns = settings.spawns;
-        while (attempts != 0) && (spawns != 0) {
-            if self.add_spawns_random(settings.safe_range, settings.spawn_size) {
-                spawns -= 1;
-            } else {
-                attempts -= 1;
-            }
-        }
-        if attempts == 0 {
+        if self.width < 4 || self.height < 4 {
             return None;
+        }
+        for _ in 0..settings.spawns {
+            self.add_spawn_random(settings.safe_range, settings.spawn_size);
         }
         Some(self)
     }
 
-    /// The teams generator clears a small range at the center and 2 spawns in each corner of
-    /// the map
     fn teams(mut self, resources: &Resources) -> Self {
-        // Spawns
-        // First player of each team
-        self.add_spawn(3, 0, 0, Some(Direction::Right));
+        let w = self.width as i16;
+        let h = self.height as i16;
+        for (x, y, direction) in [
+            (3, 0, Direction::Right),
+            (w - 4, 0, Direction::Left),
+            (3, h - 1, Direction::Right),
+            (w - 4, h - 1, Direction::Left),
+            (0, 3, Direction::Down),
+            (w - 1, 3, Direction::Down),
+            (0, h - 4, Direction::Up),
+            (w - 1, h - 4, Direction::Up),
+        ] {
+            self.add_spawn(x, y, 0, Some(direction));
+        }
 
-        self.add_spawn(self.width as i16 - 4, 0, 0, Some(Direction::Left));
-
-        self.add_spawn(3, self.height as i16 - 1, 0, Some(Direction::Right));
-
-        self.add_spawn(
-            self.width as i16 - 4,
-            self.height as i16 - 1,
-            0,
-            Some(Direction::Left),
-        );
-        // Second player of each team
-        // spawn order set so that teams are more balanced
-        self.add_spawn(0, 3, 0, Some(Direction::Down));
-        self.add_spawn(self.width as i16 - 1, 3, 0, Some(Direction::Down));
-        self.add_spawn(0, self.height as i16 - 4, 0, Some(Direction::Up));
-        self.add_spawn(
-            self.width as i16 - 1,
-            self.height as i16 - 4,
-            0,
-            Some(Direction::Up),
-        );
-
-        // Clear center
-        self.clear_range(self.width as i16 / 2, self.height as i16 / 2, 2);
-
-        // Set corners
-        let breakable_object = Self::create_breakable(resources);
-
-        self.clear_range(1, 1, 1);
-        self.content[0 * self.width + 0] = MapElement::Breakable(breakable_object.clone());
-        self.content[1 * self.width + 0] = MapElement::Breakable(breakable_object.clone());
-        self.content[0 * self.width + 1] = MapElement::Breakable(breakable_object.clone());
-
-        self.clear_range(self.width as i16 - 2, 1, 1);
-        self.content[self.width - 1] = MapElement::Breakable(breakable_object.clone());
-        self.content[self.width - 2] = MapElement::Breakable(breakable_object.clone());
-        self.content[2 * self.width - 1] = MapElement::Breakable(breakable_object.clone());
-
-        self.clear_range(1, self.height as i16 - 2, 1);
-        self.content[(self.height - 1) * self.width] =
-            MapElement::Breakable(breakable_object.clone());
-        self.content[((self.height - 1) * self.width) + 1] =
-            MapElement::Breakable(breakable_object.clone());
-        self.content[(self.height - 2) * self.width] =
-            MapElement::Breakable(breakable_object.clone());
-
-        self.clear_range(self.width as i16 - 2, self.height as i16 - 2, 1);
-        self.content[((self.height - 1) * self.width) + (self.width - 1)] =
-            MapElement::Breakable(breakable_object.clone());
-        self.content[((self.height - 1) * self.width) + (self.width - 2)] =
-            MapElement::Breakable(breakable_object.clone());
-        self.content[((self.height - 2) * self.width) + (self.width - 1)] =
-            MapElement::Breakable(breakable_object.clone());
+        self.clear_range(w / 2, h / 2, 2);
+        for (x, y) in [(1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2)] {
+            self.clear_range(x, y, 1);
+        }
+        let breakable = Self::create_breakable(resources, self.theme);
+        for i in self.corner_tiles() {
+            self.content[i] = MapElement::Breakable(breakable.clone());
+        }
 
         self
     }
 
-    /// Return neighbouring empty cells
-    pub fn get_neighbours(self, position: Vec2) -> Vec<Vec2> {
-        Direction::iterator()
-            .map(|dir| position + dir.to_vec2())
-            .filter(|neighbour_pos| self.get_elem_pos(*neighbour_pos) == &MapElement::Empty)
-            .collect()
-    }
-
-    /// Creates a new [Map] object following MapSettings, may fail
-    pub fn new(settings: MapSettings, ressources: &Resources) -> Option<Self> {
-        let mut ret = Self::empty(settings.width, settings.height, ressources)
-            .grid(ressources)
-            .fill_break(ressources)
+    pub fn new(settings: MapSettings, resources: &Resources) -> Option<Self> {
+        let mut ret = Self::empty(settings.width, settings.height, resources, settings.theme)
+            .grid(resources)
+            .fill_break(resources)
             .cheese(settings.cheesiness);
 
         ret = match settings.map_type {
             MapType::Corners => Some(ret.corners()),
             MapType::Arena => Some(ret.corners().arena()),
-            MapType::Teams => Some(ret.teams(ressources)),
+            MapType::Teams => Some(ret.teams(resources)),
             MapType::Random => ret.random(&settings),
         }?;
 
         if settings.walls {
-            ret = ret.walls(ressources);
+            ret = ret.walls(resources);
         }
-        Some(ret.fix_objects())
+        Some(ret.finish(resources))
     }
 
-    /// Loads a map layout from a file according to the current level
-    pub fn from_file(level: u32, resources: &Resources) -> Option<LevelData> {
-        const LEVEL_1_DATA: &str = include_str!("../../assets/levels/1-1.level");
-        const LEVEL_2_DATA: &str = include_str!("../../assets/levels/1-2.level");
+    pub fn backdrop(resources: &Resources, theme: Theme) -> Self {
+        let mut map = Self::empty(21, 13, resources, theme)
+            .grid(resources)
+            .fill_break(resources)
+            .cheese(45)
+            .walls(resources)
+            .finish(resources);
+        map.content
+            .iter_mut()
+            .filter(|el| matches!(el, MapElement::Breakable(_)))
+            .enumerate()
+            .for_each(|(i, el)| {
+                if i % 3 == 0 {
+                    *el = MapElement::Empty;
+                }
+            });
+        map.fix_objects()
+    }
 
-        let file_content = match level {
-            1 => LEVEL_1_DATA,
-            2 => LEVEL_2_DATA,
-            _ => return None,
+    fn parse_level(level: u32) -> Option<(LevelHeader, Vec<Vec<u8>>)> {
+        let mut header = LevelHeader {
+            name: format!("Niveau {level}"),
+            theme: Theme::Grass,
+            time_limit: 200.0,
+            bonuses: Vec::new(),
         };
+        let mut lines = Vec::new();
+        for line in LEVELS.get((level as usize).checked_sub(1)?)?.lines() {
+            if let Some(line) = line.strip_prefix('@') {
+                let (key, value) = line.split_once(' ').unwrap_or((line, ""));
+                match key {
+                    "name" => header.name = value.trim().to_string(),
+                    "theme" => header.theme = Theme::from_name(value).unwrap_or_default(),
+                    "time" => header.time_limit = value.trim().parse().unwrap_or(header.time_limit),
+                    "bonus" => {
+                        header.bonuses = value
+                            .split_whitespace()
+                            .filter_map(PowerUpType::from_name)
+                            .collect()
+                    }
+                    _ => (),
+                }
+            } else if !line.is_empty() {
+                lines.push(line.as_bytes().to_vec());
+            }
+        }
+        Some((header, lines))
+    }
 
-        let lines: Vec<&str> = file_content.lines().collect();
+    pub fn level_info(level: u32) -> Option<(String, Theme)> {
+        let (header, _) = Self::parse_level(level)?;
+        Some((header.name, header.theme))
+    }
+
+    pub fn from_file(
+        level: u32,
+        random_seed: Option<u64>,
+        resources: &Resources,
+    ) -> Option<LevelData> {
+        let (
+            LevelHeader {
+                name,
+                theme,
+                time_limit,
+                bonuses,
+            },
+            mut lines,
+        ) = Self::parse_level(level)?;
+
+        if let Some(seed) = random_seed {
+            randomize_layout(&mut lines, seed.wrapping_add(level as u64));
+        }
+
         let height = lines.len();
-        let width = lines.get(0)?.len();
+        let width = lines.first()?.len();
 
         let mut content = vec![MapElement::Empty; width * height];
-        let mut player_spawn = Vec2::ZERO;
+        let mut player_spawn = Vec2::new(1.5, 1.5);
         let mut enemy_spawns = Vec::new();
-        let mut exit_pos = Vec2::ZERO;
+        let mut exit_pos = None;
+        let mut bonus_tiles = Vec::new();
 
-        let breakable_obj = Self::create_breakable(resources);
-        let unbreakable_obj = Self::create_unbreakable(resources);
+        let breakable_obj = Self::create_breakable(resources, theme);
+        let unbreakable_obj = Self::create_unbreakable(resources, theme);
 
         for (y, line) in lines.iter().enumerate() {
-            for (x, char) in line.chars().enumerate() {
+            for (x, char) in line.iter().map(|c| *c as char).enumerate().take(width) {
                 let pos = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
                 content[y * width + x] = match char {
                     'X' => MapElement::Unbreakable(unbreakable_obj.clone()),
                     '#' => MapElement::Breakable(breakable_obj.clone()),
+                    '*' => {
+                        bonus_tiles.push((x, y));
+                        MapElement::Breakable(breakable_obj.clone())
+                    }
                     'P' => {
                         player_spawn = pos;
                         MapElement::Empty
                     }
-                    'E' => {
-                        enemy_spawns.push(pos);
-                        MapElement::Empty
-                    }
                     'O' => {
-                        exit_pos = pos;
+                        exit_pos = Some(pos);
                         MapElement::Breakable(breakable_obj.clone())
                     }
-                    _ => MapElement::Empty,
+                    'E' => {
+                        enemy_spawns.push((pos, None));
+                        MapElement::Empty
+                    }
+                    c => {
+                        if let Some(kind) = EnemyKind::from_level_char(c) {
+                            enemy_spawns.push((pos, Some(kind)));
+                        }
+                        MapElement::Empty
+                    }
                 };
             }
         }
-
-        let map = Map {
-            width,
-            height,
-            content,
-            spawns: vec![SpawnPoint::init(
-                player_spawn.x as i32,
-                player_spawn.y as i32,
-            )],
-            floor: Self::create_floor(width as u8, height as u8, resources),
-        }
-        .fix_objects();
+        let exit_pos = exit_pos?;
 
         Some(LevelData {
-            map,
+            map: Map {
+                width,
+                height,
+                content,
+                spawns: vec![SpawnPoint {
+                    x: player_spawn.x as i32,
+                    y: player_spawn.y as i32,
+                    direction: Direction::Down,
+                }],
+                floor: Self::create_floor(width, height, resources, theme),
+                theme,
+                decor: Vec::new(),
+                exit: Some((exit_pos.x as usize, exit_pos.y as usize)),
+                hidden_bonuses: bonus_tiles.into_iter().zip(bonuses).collect(),
+                random_bonuses: false,
+            }
+            .finish(resources),
             player_spawn,
             enemy_spawns,
             exit_pos,
+            name,
+            time_limit,
         })
     }
 
-    /// Makes a string representation of the map for debug purposes
-    #[cfg(debug_assertions)]
-    #[allow(unused)]
-    pub fn to_str(&self) -> String {
-        let mut str: String = Default::default();
-        for y in 0..self.height {
-            for x in 0..self.width {
-                str.push(self.content[y * self.width + x].value());
-            }
-            str.push('\n');
-        }
-        str
-    }
-
-    /// Obtains a reference for the [MapElement] at coords (x, y)
     pub fn get_elem(&self, x: usize, y: usize) -> &MapElement {
         if x >= self.width || y >= self.height {
             return &MapElement::Empty;
@@ -517,7 +577,6 @@ impl Map {
         &self.content[y * self.width + x]
     }
 
-    /// Obtains a reference for the [MapElement] at coords (x, y)
     pub fn get_elem_pos(&self, pos: Vec2) -> &MapElement {
         if pos.x < 0.0 || pos.y < 0.0 {
             return &MapElement::Empty;
@@ -525,29 +584,32 @@ impl Map {
         self.get_elem(pos.x as usize, pos.y as usize)
     }
 
-    /// Returns true if the position is walkable (empty or exit tile)
-    pub fn is_walkable(&self, pos: Vec2) -> bool {
-        matches!(
-            self.get_elem_pos(pos),
-            MapElement::Empty | MapElement::Exit(_)
-        )
+    pub fn get_elem_mut_pos(&mut self, pos: Vec2) -> Option<&mut MapElement> {
+        if pos.x < 0.0 || pos.y < 0.0 || pos.x as usize >= self.width {
+            return None;
+        }
+        self.content
+            .get_mut(pos.y as usize * self.width + pos.x as usize)
     }
 
-    /// Returns true if the tile coordinates are walkable (empty or exit tile)
+    fn tile(&self, x: i32, y: i32) -> Option<&MapElement> {
+        if x < 0 || y < 0 || x >= self.width as i32 || y >= self.height as i32 {
+            return None;
+        }
+        Some(&self.content[y as usize * self.width + x as usize])
+    }
+
+    pub fn is_breakable_tile(&self, x: i32, y: i32) -> bool {
+        matches!(self.tile(x, y), Some(MapElement::Breakable(_)))
+    }
+
     pub fn is_walkable_tile(&self, x: i32, y: i32) -> bool {
-        if x < 0 || y < 0 {
-            return false;
-        }
-        if x >= self.width as i32 || y >= self.height as i32 {
-            return false;
-        }
         matches!(
-            self.get_elem(x as usize, y as usize),
-            MapElement::Empty | MapElement::Exit(_)
+            self.tile(x, y),
+            Some(MapElement::Empty | MapElement::Exit(_))
         )
     }
 
-    /// Finds a random empty tile center, keeping distance from avoided positions
     pub fn find_random_empty(
         &self,
         avoid: &[Vec2],
@@ -557,7 +619,6 @@ impl Map {
         if self.width == 0 || self.height == 0 {
             return None;
         }
-        let min_distance_sq = min_distance * min_distance;
         for _ in 0..attempts {
             let x = random_range(0..self.width) as i32;
             let y = random_range(0..self.height) as i32;
@@ -567,7 +628,7 @@ impl Map {
             let pos = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
             if avoid
                 .iter()
-                .any(|other| other.distance_squared(pos) <= min_distance_sq)
+                .any(|other| other.distance_squared(pos) <= min_distance * min_distance)
             {
                 continue;
             }
@@ -576,26 +637,100 @@ impl Map {
         None
     }
 
-    /// Replaces the [MapElement] at coords (x, y) and fixes it, fails if position is out of bounds
-    pub fn set_elem(&mut self, x: usize, y: usize, elem: MapElement) -> Result<(), ()> {
-        if x >= self.width || y >= self.height {
-            return Err(());
+    pub fn set_elem_pos(&mut self, pos: Vec2, mut elem: MapElement) {
+        let (x, y) = (pos.x as usize, pos.y as usize);
+        if pos.x < 0.0 || pos.y < 0.0 || x >= self.width || y >= self.height {
+            return;
         }
+        Self::fix_object(&mut elem, x, y);
         self.content[y * self.width + x] = elem;
-        Self::fix_object(&mut self.content[y * self.width + x], x, y);
-        Ok(())
     }
 
-    /// Replaces the [MapElement] at coords (x, y) and fixes it, fails if position is out of bounds
-    pub fn set_elem_pos(&mut self, pos: Vec2, elem: MapElement) -> Result<(), ()> {
-        if pos.x < 0.0 || pos.y < 0.0 {
-            return Err(());
-        }
-        self.set_elem(pos.x as usize, pos.y as usize, elem)
-    }
-
-    /// Lists every [MapElement] in the map
     pub fn iter(&self) -> impl Iterator<Item = &MapElement> {
         self.content.iter()
+    }
+}
+
+fn randomize_layout(lines: &mut [Vec<u8>], seed: u64) {
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut enemies = Vec::new();
+    let mut player = (1, 1);
+    let mut breakables = 0usize;
+    let mut hidden = 0usize;
+
+    for (y, line) in lines.iter_mut().enumerate() {
+        for (x, c) in line.iter_mut().enumerate() {
+            match *c {
+                b'X' => continue,
+                b'P' => player = (x, y),
+                b'#' | b'O' => breakables += 1,
+                b'*' => {
+                    breakables += 1;
+                    hidden += 1;
+                }
+                e if e == b'E' || EnemyKind::from_level_char(e as char).is_some() => {
+                    enemies.push(e)
+                }
+                _ => (),
+            }
+            if *c != b'P' {
+                *c = b' ';
+            }
+        }
+    }
+
+    let distance = |x: usize, y: usize| x.abs_diff(player.0) + y.abs_diff(player.1);
+    let mut free: Vec<(usize, usize)> = lines
+        .iter()
+        .enumerate()
+        .flat_map(|(y, line)| {
+            line.iter()
+                .enumerate()
+                .filter(|(_, c)| **c == b' ')
+                .map(move |(x, _)| (x, y))
+        })
+        .collect();
+    free.shuffle(&mut rng);
+
+    for enemy in enemies {
+        if let Some(i) = free.iter().position(|&(x, y)| distance(x, y) >= 6) {
+            let (x, y) = free.swap_remove(i);
+            lines[y][x] = enemy;
+        }
+    }
+    let mut placed = 0;
+    let mut exit_placed = false;
+    for (x, y) in free {
+        if placed >= breakables || distance(x, y) <= 2 {
+            continue;
+        }
+        if !exit_placed && distance(x, y) >= lines[0].len() / 2 && rng.random_bool(0.3) {
+            lines[y][x] = b'O';
+            exit_placed = true;
+        } else {
+            lines[y][x] = b'#';
+        }
+        placed += 1;
+    }
+    if !exit_placed
+        && let Some((x, y, _)) = lines
+            .iter()
+            .enumerate()
+            .flat_map(|(y, line)| line.iter().enumerate().map(move |(x, c)| (x, y, *c)))
+            .filter(|(_, _, c)| *c == b'#')
+            .max_by_key(|(x, y, _)| distance(*x, *y))
+    {
+        lines[y][x] = b'O';
+    }
+    let mut bricks: Vec<(usize, usize)> = lines
+        .iter()
+        .enumerate()
+        .flat_map(|(y, line)| line.iter().enumerate().map(move |(x, c)| (x, y, *c)))
+        .filter(|(_, _, c)| *c == b'#')
+        .map(|(x, y, _)| (x, y))
+        .collect();
+    bricks.shuffle(&mut rng);
+    for (x, y) in bricks.into_iter().take(hidden) {
+        lines[y][x] = b'*';
     }
 }

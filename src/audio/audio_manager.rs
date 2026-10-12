@@ -1,230 +1,199 @@
 use anyhow::Result;
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
-use std::collections::HashMap;
+use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::settings::settings::Settings;
+use crate::settings::{assets::read_asset, settings::Settings};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SoundEffect {
     BombExplosion,
     PutBomb,
+    NoBomb,
     PlayerDeath,
-    PlayerHurt,
     EnemyHit,
     EnemyDeath,
     BonusPickup,
+    WallBreak,
+    Kick,
+    DoorOpen,
+    Alarm,
+    MenuMove,
+    MenuConfirm,
+    MenuBack,
+    MenuSwitch,
+    LevelStart,
+    StageClear,
+    GameOver,
+    Victory,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackgroundMusic {
     Menu,
-    Game,
+    Select,
+    World1,
+    World2,
+    World3,
+    World4,
     Boss,
+    Arena,
+    Ending,
+}
+
+struct Output {
+    device: MixerDeviceSink,
+    music_sink: Player,
 }
 
 pub struct AudioManager {
-    _stream: OutputStream,
-    stream_handle: OutputStreamHandle,
-    sfx_sink: Sink,
-    music_sink: Sink,
-    sound_effects: HashMap<SoundEffect, Vec<u8>>,
-    background_music: HashMap<BackgroundMusic, Vec<u8>>,
-    master_volume: f32,
+    output: Option<Output>,
+    sound_effects: HashMap<SoundEffect, Arc<[u8]>>,
+    background_music: HashMap<BackgroundMusic, Arc<[u8]>>,
+    current_music: Option<BackgroundMusic>,
     sfx_volume: f32,
     music_volume: f32,
-    music_enabled: bool,
-    sfx_enabled: bool,
+}
+
+#[derive(Clone)]
+struct SharedBytes(Arc<[u8]>);
+
+impl AsRef<[u8]> for SharedBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl AudioManager {
     pub fn new(settings: &Settings) -> Result<Self> {
-        let (stream, stream_handle) = OutputStream::try_default()?;
-        let sfx_sink = Sink::try_new(&stream_handle)?;
-        let music_sink = Sink::try_new(&stream_handle)?;
+        let mut sound_effects = HashMap::new();
+        for (effect, path) in [
+            (SoundEffect::BombExplosion, "sounds/explosion.ogg"),
+            (SoundEffect::PutBomb, "sounds/put_bomb.ogg"),
+            (SoundEffect::NoBomb, "sounds/no_bomb.ogg"),
+            (SoundEffect::PlayerDeath, "sounds/player_death.ogg"),
+            (SoundEffect::EnemyHit, "sounds/kick.ogg"),
+            (SoundEffect::EnemyDeath, "sounds/enemy_death.ogg"),
+            (SoundEffect::BonusPickup, "sounds/bonus.ogg"),
+            (SoundEffect::WallBreak, "sounds/wall_break.ogg"),
+            (SoundEffect::Kick, "sounds/kick.ogg"),
+            (SoundEffect::DoorOpen, "sounds/door.ogg"),
+            (SoundEffect::Alarm, "sounds/alarm.ogg"),
+            (SoundEffect::MenuMove, "sounds/ui_tap.ogg"),
+            (SoundEffect::MenuConfirm, "sounds/ui_click.ogg"),
+            (SoundEffect::MenuBack, "sounds/menu_back.ogg"),
+            (SoundEffect::MenuSwitch, "sounds/ui_switch.ogg"),
+            (SoundEffect::LevelStart, "sounds/level_start.ogg"),
+            (SoundEffect::StageClear, "sounds/stage_clear.ogg"),
+            (SoundEffect::GameOver, "sounds/game_over.ogg"),
+            (SoundEffect::Victory, "sounds/victory.ogg"),
+        ] {
+            sound_effects.insert(effect, Arc::from(read_asset(path)?));
+        }
+        let mut background_music = HashMap::new();
+        for (music, path) in [
+            (BackgroundMusic::Menu, "music/menu.wav"),
+            (BackgroundMusic::Select, "music/select.ogg"),
+            (BackgroundMusic::World1, "music/world1.ogg"),
+            (BackgroundMusic::World2, "music/world2.wav"),
+            (BackgroundMusic::World3, "music/world3.ogg"),
+            (BackgroundMusic::World4, "music/world4.wav"),
+            (BackgroundMusic::Boss, "music/boss.ogg"),
+            (BackgroundMusic::Arena, "music/arena.wav"),
+            (BackgroundMusic::Ending, "music/ending.wav"),
+        ] {
+            background_music.insert(music, Arc::from(read_asset(path)?));
+        }
 
         let mut audio_manager = Self {
-            _stream: stream,
-            stream_handle,
-            sfx_sink,
-            music_sink,
-            sound_effects: HashMap::new(),
-            background_music: HashMap::new(),
-            master_volume: 1.0,
-            sfx_volume: 0.7,
+            output: match DeviceSinkBuilder::open_default_sink() {
+                Ok(mut device) => {
+                    device.log_on_drop(false);
+                    Some(Output {
+                        music_sink: Player::connect_new(device.mixer()),
+                        device,
+                    })
+                }
+                Err(_) => None,
+            },
+            sound_effects,
+            background_music,
+            current_music: None,
+            sfx_volume: 1.0,
             music_volume: 1.0,
-            music_enabled: true,
-            sfx_enabled: true,
         };
-
         audio_manager.set_volume(settings);
-        audio_manager.load_assets()?;
         Ok(audio_manager)
     }
 
     pub fn set_volume(&mut self, settings: &Settings) {
-        self.music_volume = settings.volume_music;
-        self.sfx_volume = settings.volume_sfx;
-        self.update_volumes();
-    }
-
-    fn load_assets(&mut self) -> Result<()> {
-        self.sound_effects.insert(
-            SoundEffect::BombExplosion,
-            include_bytes!("../assets/sounds/bomb_explosion.ogg").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::PutBomb,
-            include_bytes!("../assets/sounds/put_bomb.ogg").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::PlayerDeath,
-            include_bytes!("../assets/sounds/player_death.wav").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::PlayerHurt,
-            include_bytes!("../assets/sounds/player_hurt.wav").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::EnemyHit,
-            include_bytes!("../assets/sounds/enemy_hit_1.ogg").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::EnemyDeath,
-            include_bytes!("../assets/sounds/enemy_hit_1.ogg").to_vec(),
-        );
-        self.sound_effects.insert(
-            SoundEffect::BonusPickup,
-            include_bytes!("../assets/sounds/bonus.wav").to_vec(),
-        );
-
-        self.background_music.insert(
-            BackgroundMusic::Menu,
-            include_bytes!("../assets/sounds/menu_loop.ogg").to_vec(),
-        );
-        // self.background_music.insert(
-        //     BackgroundMusic::Game,
-        //     include_bytes!("../assets/sounds/eirik_suhrke-a_new_morning.ogg").to_vec(),
-        // );
-        self.background_music.insert(
-            BackgroundMusic::Boss,
-            include_bytes!("../assets/sounds/boss1.ogg").to_vec(),
-        );
-
-        println!("Loaded all audio assets from included bytes");
-        Ok(())
+        self.sfx_volume = settings.volume_sfx.clamp(0.0, 1.0);
+        self.music_volume = settings.volume_music.clamp(0.0, 1.0);
+        if let Some(output) = &self.output {
+            output.music_sink.set_volume(self.music_volume);
+        }
     }
 
     pub fn play_sound_effect(&self, effect: SoundEffect) {
-        if !self.sfx_enabled {
+        let (Some(output), Some(data)) = (&self.output, self.sound_effects.get(&effect)) else {
+            return;
+        };
+        if self.sfx_volume <= 0.0 {
             return;
         }
-
-        if let Some(data) = self.sound_effects.get(&effect) {
-            let cursor = std::io::Cursor::new(data.clone());
-            if let Ok(decoder) = Decoder::new(cursor) {
-                let volume = self.master_volume * self.sfx_volume;
-                let source = decoder.amplify(volume);
-
-                // Créer un nouveau sink pour ce son spécifique
-                if let Ok(sink) = Sink::try_new(&self.stream_handle) {
-                    sink.append(source);
-                    sink.detach(); // Le sink se clear tout seul
-                }
-            }
+        if let Ok(decoder) = Decoder::new(std::io::Cursor::new(SharedBytes(data.clone()))) {
+            let sink = Player::connect_new(output.device.mixer());
+            sink.set_volume(self.sfx_volume);
+            sink.append(decoder);
+            sink.detach();
         }
     }
 
     pub fn play_background_music(&mut self, music: BackgroundMusic) {
-        if !self.music_enabled {
+        if self.current_music == Some(music) {
+            self.resume_background_music();
             return;
         }
-
         self.stop_background_music();
+        self.current_music = Some(music);
 
-        if let Some(data) = self.background_music.get(&music) {
-            let cursor = std::io::Cursor::new(data.clone());
-            if let Ok(decoder) = Decoder::new(cursor) {
-                let volume = self.master_volume * self.music_volume;
-                let source = decoder.repeat_infinite().amplify(volume);
-                self.music_sink.append(source);
-            }
+        let (Some(output), Some(data)) = (&mut self.output, self.background_music.get(&music))
+        else {
+            return;
+        };
+        if let Ok(decoder) = Decoder::new_looped(std::io::Cursor::new(SharedBytes(data.clone()))) {
+            output.music_sink.set_volume(self.music_volume);
+            output.music_sink.append(decoder);
+            output.music_sink.play();
         }
     }
 
     pub fn stop_background_music(&mut self) {
-        self.music_sink.stop();
-        // Créer un nouveau sink pour la prochaine musique
-        if let Ok(new_sink) = Sink::try_new(&self.stream_handle) {
-            self.music_sink = new_sink;
+        if self.current_music.take().is_none() {
+            return;
+        }
+        if let Some(output) = &mut self.output {
+            output.music_sink.stop();
+            let sink = Player::connect_new(output.device.mixer());
+            sink.set_volume(self.music_volume);
+            output.music_sink = sink;
         }
     }
 
     pub fn pause_background_music(&self) {
-        self.music_sink.pause();
-    }
-
-    pub fn resume_background_music(&self) {
-        self.music_sink.play();
-    }
-
-    pub fn set_master_volume(&mut self, volume: f32) {
-        self.master_volume = volume.clamp(0.0, 1.0);
-        self.update_volumes();
-    }
-
-    pub fn set_sfx_volume(&mut self, volume: f32) {
-        self.sfx_volume = volume.clamp(0.0, 1.0);
-    }
-
-    pub fn set_music_volume(&mut self, volume: f32) {
-        self.music_volume = volume.clamp(0.0, 1.0);
-        self.update_volumes();
-    }
-
-    pub fn toggle_music(&mut self) {
-        self.music_enabled = !self.music_enabled;
-        if !self.music_enabled {
-            self.stop_background_music();
+        if let Some(output) = &self.output {
+            output.music_sink.pause();
         }
     }
 
-    pub fn toggle_sfx(&mut self) {
-        self.sfx_enabled = !self.sfx_enabled;
-    }
-
-    pub fn is_music_enabled(&self) -> bool {
-        self.music_enabled
-    }
-
-    pub fn is_sfx_enabled(&self) -> bool {
-        self.sfx_enabled
-    }
-
-    pub fn get_master_volume(&self) -> f32 {
-        self.master_volume
-    }
-
-    pub fn get_sfx_volume(&self) -> f32 {
-        self.sfx_volume
-    }
-
-    pub fn get_music_volume(&self) -> f32 {
-        self.music_volume
-    }
-
-    fn update_volumes(&self) {
-        let music_volume = self.master_volume * self.music_volume;
-        self.music_sink.set_volume(music_volume);
-    }
-
-    pub fn cleanup(&mut self) {
-        self.stop_background_music();
-        self.sfx_sink.stop();
+    pub fn resume_background_music(&self) {
+        if let Some(output) = &self.output {
+            output.music_sink.play();
+        }
     }
 }
 
 impl Drop for AudioManager {
     fn drop(&mut self) {
-        self.cleanup();
+        self.stop_background_music();
     }
 }

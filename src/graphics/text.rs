@@ -1,132 +1,171 @@
-use std::sync::Arc;
-
+use crate::graphics::object::TextureIndex;
+use anyhow::{Result, anyhow};
 use glam::Vec2;
-use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-};
+use std::collections::HashMap;
 
-use crate::graphics::GuiVertex;
-
-pub struct TextRenderer {
-    pub characters: [Character; 128],
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FontId {
+    Title,
+    Body,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Character {
-    pub top_left: Vec2,
-    pub top_right: Vec2,
-    pub bottom_left: Vec2,
-    pub bottom_right: Vec2,
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Glyph {
+    pub uv: [f32; 4],
+    pub size: Vec2,
+    pub offset: Vec2,
+    pub advance: f32,
 }
 
-const ATLAS_WIDTH: u32 = 126;
-const ATLAS_HEIGHT: u32 = 63;
-const CHAR_WIDTH: u32 = 7;
-const CHAR_HEIGHT: u32 = 9;
-const COL_NUMBER: u32 = ATLAS_WIDTH / CHAR_WIDTH;
+#[derive(Debug, Clone, Default)]
+pub struct Font {
+    pub texture: TextureIndex,
+    pub px: f32,
+    pub factor: f32,
+    pub grid: f32,
+    pub cap: f32,
+    pub ascent: f32,
+    pub line_height: f32,
+    pub glyphs: HashMap<char, Glyph>,
+}
 
-impl TextRenderer {
-    pub fn new() -> Self {
-        let mut characters = [Character::default(); 128];
+pub struct FontAtlas {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+    pub font: Font,
+}
 
-        for i in 0..96 {
-            let row = i as u32 / COL_NUMBER;
-            let col = i as u32 % COL_NUMBER;
+fn charset() -> impl Iterator<Item = char> {
+    (32u32..127)
+        .chain(160..256)
+        .chain([0x152, 0x153, 0x2019])
+        .filter_map(char::from_u32)
+}
 
-            let character = Character {
-                top_left: Vec2::new(
-                    (col * CHAR_WIDTH) as f32 / ATLAS_WIDTH as f32,
-                    (row * CHAR_HEIGHT) as f32 / ATLAS_HEIGHT as f32,
-                ),
-                top_right: Vec2::new(
-                    (col * CHAR_WIDTH) as f32 / ATLAS_WIDTH as f32,
-                    ((row + 1) * CHAR_HEIGHT) as f32 / ATLAS_HEIGHT as f32,
-                ),
-                bottom_left: Vec2::new(
-                    ((col + 1) * CHAR_WIDTH) as f32 / ATLAS_WIDTH as f32,
-                    (row * CHAR_HEIGHT) as f32 / ATLAS_HEIGHT as f32,
-                ),
-                bottom_right: Vec2::new(
-                    ((col + 1) * CHAR_WIDTH) as f32 / ATLAS_WIDTH as f32,
-                    ((row + 1) * CHAR_HEIGHT) as f32 / ATLAS_HEIGHT as f32,
-                ),
-            };
+pub fn build_font_atlas(ttf: &[u8], px: f32, factor: f32, grid: f32) -> Result<FontAtlas> {
+    let font = fontdue::Font::from_bytes(ttf, fontdue::FontSettings::default())
+        .map_err(|e| anyhow!("invalid font: {e}"))?;
+    let line = font
+        .horizontal_line_metrics(px)
+        .ok_or_else(|| anyhow!("font has no horizontal metrics"))?;
 
-            characters[i + 32] = character;
+    const WIDTH: u32 = 1024;
+    const PADDING: u32 = 3;
+    let rasterized: Vec<(char, fontdue::Metrics, Vec<u8>)> = charset()
+        .map(|c| {
+            let (metrics, bitmap) = font.rasterize(c, px);
+            (c, metrics, bitmap)
+        })
+        .collect();
+
+    let mut positions = Vec::with_capacity(rasterized.len());
+    let (mut x, mut y, mut row_height) = (PADDING, PADDING, 0);
+    for (_, metrics, _) in &rasterized {
+        let (w, h) = (metrics.width as u32, metrics.height as u32);
+        if x + w + PADDING > WIDTH {
+            x = PADDING;
+            y += row_height + PADDING;
+            row_height = 0;
         }
+        positions.push((x, y));
+        x += w + PADDING;
+        row_height = row_height.max(h);
+    }
+    let height = (y + row_height + PADDING).next_power_of_two();
 
-        Self { characters }
+    let mut pixels = vec![0u8; (WIDTH * height * 4) as usize];
+    let mut glyphs = HashMap::new();
+    for ((c, metrics, bitmap), (gx, gy)) in rasterized.iter().zip(positions) {
+        for row in 0..metrics.height {
+            for col in 0..metrics.width {
+                let i = (((gy + row as u32) * WIDTH + gx + col as u32) * 4) as usize;
+                pixels[i..i + 3].fill(255);
+                pixels[i + 3] = if bitmap[row * metrics.width + col] >= 128 {
+                    255
+                } else {
+                    0
+                };
+            }
+        }
+        let (w, h) = (metrics.width as f32, metrics.height as f32);
+        glyphs.insert(
+            *c,
+            Glyph {
+                uv: [
+                    gx as f32 / WIDTH as f32,
+                    gy as f32 / height as f32,
+                    (gx as f32 + w) / WIDTH as f32,
+                    (gy as f32 + h) / height as f32,
+                ],
+                size: Vec2::new(w, h),
+                offset: Vec2::new(metrics.xmin as f32, -(h + metrics.ymin as f32)),
+                advance: metrics.advance_width,
+            },
+        );
     }
 
-    pub fn render_str(
-        &self,
-        s: &str,
-        text_size: f32,
-        position: Vec2,
-        memory_allocator: Arc<StandardMemoryAllocator>,
-        ratio: f32,
-    ) -> Subbuffer<[GuiVertex]> {
-        let char_screen_width = text_size * CHAR_WIDTH as f32 * 0.01 / ratio.max(1.0);
-        let char_screen_height = text_size * CHAR_HEIGHT as f32 * 0.01 / (1.0 / ratio).max(1.0);
-        let spacing = 0.9;
+    Ok(FontAtlas {
+        width: WIDTH,
+        height,
+        pixels,
+        font: Font {
+            texture: -1,
+            px,
+            factor,
+            grid,
+            cap: glyphs.get(&'H').map_or(px * 0.7, |g: &Glyph| g.size.y),
+            ascent: line.ascent,
+            line_height: line.new_line_size,
+            glyphs,
+        },
+    })
+}
 
-        let text_width = s.len() as f32 * char_screen_width * spacing;
-        let mut x = position.x - text_width / 2.0;
-        let y = position.y - char_screen_height / 2.0;
+impl Font {
+    pub fn glyph(&self, c: char) -> Option<&Glyph> {
+        self.glyphs.get(&c).or_else(|| self.glyphs.get(&'?'))
+    }
 
-        let mut vertices = Vec::new();
-        for c in s.chars() {
-            let c = match c as u8 {
-                32..127 => self.characters[c as usize],
-                _ => self.characters[127],
-            };
-
-            let left = x + char_screen_width;
-            let right = x;
-            let top = y;
-            let bottom = y + char_screen_height;
-            let top_left = GuiVertex {
-                position: [left, top],
-                uv: c.bottom_left.into(),
-            };
-            let bottom_left = GuiVertex {
-                position: [left, bottom],
-                uv: c.bottom_right.into(),
-            };
-            let bottom_right = GuiVertex {
-                position: [right, bottom],
-                uv: c.top_right.into(),
-            };
-            let top_right = GuiVertex {
-                position: [right, top],
-                uv: c.top_left.into(),
-            };
-            vertices.extend_from_slice(&[
-                top_right,
-                top_left,
-                bottom_left,
-                bottom_left,
-                bottom_right,
-                top_right,
-            ]);
-
-            x += char_screen_width * spacing
+    pub fn em(&self, size: f32) -> f32 {
+        let em = size * self.factor;
+        if self.grid > 0.0 {
+            (em / self.grid).round().max(1.0) * self.grid
+        } else {
+            em
         }
+    }
 
-        Buffer::from_iter(
-            memory_allocator.clone(),
-            BufferCreateInfo {
-                usage: BufferUsage::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            vertices,
-        )
-        .unwrap()
+    pub fn scale(&self, size: f32) -> f32 {
+        self.em(size) / self.px
+    }
+
+    pub fn line_width(&self, text: &str, size: f32) -> f32 {
+        text.chars()
+            .filter_map(|c| self.glyph(c))
+            .map(|g| g.advance * self.scale(size))
+            .sum()
+    }
+
+    pub fn wrap(&self, text: &str, size: f32, max_width: f32) -> Vec<String> {
+        let mut lines = Vec::new();
+        for paragraph in text.split('\n') {
+            let mut line = String::new();
+            for word in paragraph.split(' ') {
+                let candidate = if line.is_empty() {
+                    word.to_string()
+                } else {
+                    format!("{line} {word}")
+                };
+                if !line.is_empty() && self.line_width(&candidate, size) > max_width {
+                    lines.push(std::mem::take(&mut line));
+                    line = word.to_string();
+                } else {
+                    line = candidate;
+                }
+            }
+            lines.push(line);
+        }
+        lines
     }
 }

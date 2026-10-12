@@ -1,7 +1,5 @@
 use glam::Vec2;
 
-/// The [Direction] enum represents the directions of the game
-/// It is used for movement, collisions, and orientating objects
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Up,
@@ -11,18 +9,21 @@ pub enum Direction {
 }
 
 impl Direction {
-    /// Returns all the [Direction]s as an iterator
+    const ALL: [Direction; 4] = [
+        Direction::Up,
+        Direction::Down,
+        Direction::Left,
+        Direction::Right,
+    ];
+
     pub fn iterator() -> impl Iterator<Item = &'static Direction> {
-        static DIRECTIONS: [Direction; 4] = [
-            Direction::Up,
-            Direction::Down,
-            Direction::Left,
-            Direction::Right,
-        ];
-        DIRECTIONS.iter()
+        Self::ALL.iter()
     }
 
-    /// Converts a Direction to the corresponding normalized [vector](Vec2) in game logic
+    pub fn random() -> Self {
+        Self::ALL[rand::random_range(0..Self::ALL.len())]
+    }
+
     pub fn to_vec2(self) -> Vec2 {
         match self {
             Direction::Up => Vec2::new(0.0, -1.0),
@@ -32,15 +33,17 @@ impl Direction {
         }
     }
 
-    /// Transforms an input and output positions into a sensible Direction to go from the first to the latter, made for AI pathfinding
-    pub fn get_direction(start: &Vec2, goal: &Vec2) -> Direction {
-        let delta = *goal - *start;
-        match (delta.x, delta.y) {
-            (x, _) if x > 0.0 => Direction::Right,
-            (x, _) if x < 0.0 => Direction::Left,
-            (_, y) if y > 0.0 => Direction::Down,
-            (_, y) if y < 0.0 => Direction::Up,
-            (_, _) => Direction::Up,
+    pub fn yaw(self) -> f32 {
+        let v = self.to_vec2();
+        v.x.atan2(v.y)
+    }
+
+    pub fn opposite(self) -> Direction {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
         }
     }
 }

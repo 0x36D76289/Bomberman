@@ -2,6 +2,8 @@ FROM rust:latest
 
 RUN apt-get update && apt-get install -y \
     make \
+    curl \
+    unzip \
     pkg-config \
     alsa-utils \
     libasound2-dev \
@@ -9,8 +11,6 @@ RUN apt-get update && apt-get install -y \
     libvulkan-dev \
     cmake \
     && rm -rf /var/lib/apt/lists/*
-
-RUN rustup default stable
 
 RUN mkdir /bomberman
 

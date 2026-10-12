@@ -24,30 +24,24 @@ impl Graphics {
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
         let vulkan = Vulkan::init(event_loop)?;
 
-        let renderer = Renderer::new(&vulkan);
-
-        Ok(Graphics { vulkan, renderer })
+        Ok(Graphics {
+            renderer: Renderer::new(&vulkan),
+            vulkan,
+        })
     }
 }
 
 impl Vulkan {
     pub fn init(event_loop: &EventLoop<()>) -> Result<Self, Box<dyn Error>> {
-        let library = VulkanLibrary::new()?;
+        let instance = Instance::new(
+            VulkanLibrary::new()?,
+            InstanceCreateInfo {
+                flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
+                enabled_extensions: Surface::required_extensions(event_loop)?,
+                ..Default::default()
+            },
+        )?;
 
-        let instance = {
-            let required_extensions = Surface::required_extensions(event_loop)?;
-
-            Instance::new(
-                library,
-                InstanceCreateInfo {
-                    flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
-                    enabled_extensions: required_extensions,
-                    ..Default::default()
-                },
-            )?
-        };
-
-        // selecting a physical device (eg. graphic card) and creating a Device and a queue from it that we will use to do all future operations
         let (device, queue) = {
             let mut device_extensions = DeviceExtensions {
                 khr_swapchain: true,
@@ -63,7 +57,8 @@ impl Vulkan {
                         .enumerate()
                         .position(|(i, q)| {
                             q.queue_flags.intersects(QueueFlags::GRAPHICS)
-                                && p.presentation_support(i as u32, event_loop).unwrap()
+                                && p.presentation_support(i as u32, event_loop)
+                                    .unwrap_or(false)
                         })
                         .map(|i| (p, i as u32))
                 })
@@ -75,13 +70,7 @@ impl Vulkan {
                     PhysicalDeviceType::Other => 4,
                     _ => 5,
                 })
-                .unwrap();
-
-            println!(
-                "Using physical device: {} (type: {:?})",
-                physical_device.properties().device_name,
-                physical_device.properties().device_type
-            );
+                .ok_or("no GPU supporting Vulkan presentation was found")?;
 
             if physical_device.api_version() < Version::V1_3 {
                 device_extensions.khr_dynamic_rendering = true;
@@ -110,40 +99,33 @@ impl Vulkan {
             (device, queues.next().unwrap())
         };
 
-        // creating allocators for vulkan
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-
-        let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
-            device.clone(),
-            Default::default(),
-        ));
-
-        let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
-            device.clone(),
-            StandardCommandBufferAllocatorCreateInfo {
-                secondary_buffer_count: 32,
-                ..Default::default()
-            },
-        ));
-
-        let uniform_buffer_allocator = SubbufferAllocator::new(
-            memory_allocator.clone(),
-            SubbufferAllocatorCreateInfo {
-                buffer_usage: BufferUsage::UNIFORM_BUFFER,
-                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-        );
 
         Ok(Self {
             instance,
-            device,
             queue,
+            descriptor_set_allocator: Arc::new(StandardDescriptorSetAllocator::new(
+                device.clone(),
+                Default::default(),
+            )),
+            command_buffer_allocator: Arc::new(StandardCommandBufferAllocator::new(
+                device.clone(),
+                StandardCommandBufferAllocatorCreateInfo {
+                    secondary_buffer_count: 32,
+                    ..Default::default()
+                },
+            )),
+            uniform_buffer_allocator: SubbufferAllocator::new(
+                memory_allocator.clone(),
+                SubbufferAllocatorCreateInfo {
+                    buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    ..Default::default()
+                },
+            ),
             memory_allocator,
-            descriptor_set_allocator,
-            command_buffer_allocator,
-            uniform_buffer_allocator,
+            device,
         })
     }
 }

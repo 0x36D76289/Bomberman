@@ -1,10 +1,12 @@
+use crate::game::player::Powers;
 use serde::{Deserialize, Serialize};
 
-/// Difficulty selection for the campaign
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum GameDifficulty {
     Easy,
+    #[default]
     Normal,
     Hard,
 }
@@ -12,31 +14,26 @@ pub enum GameDifficulty {
 impl GameDifficulty {
     pub fn label(self) -> &'static str {
         match self {
-            GameDifficulty::Easy => "Easy",
+            GameDifficulty::Easy => "Facile",
             GameDifficulty::Normal => "Normal",
-            GameDifficulty::Hard => "Hard",
+            GameDifficulty::Hard => "Difficile",
         }
     }
 }
 
-impl Default for GameDifficulty {
-    fn default() -> Self {
-        GameDifficulty::Normal
-    }
-}
-
-/// The structure containing the singleplayer campaign data
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SaveState {
-    /// The current level
     pub level: u32,
-    /// The amount of lives remaining
     pub lives: u32,
-    /// The score of the ongoing campaign
     pub score: u32,
-    /// The difficulty of the ongoing campaign
     #[serde(default)]
     pub difficulty: GameDifficulty,
+    #[serde(default)]
+    pub random_layout: bool,
+    #[serde(default)]
+    pub seed: u64,
+    #[serde(default)]
+    pub powers: Powers,
 }
 
 impl Default for SaveState {
@@ -46,6 +43,20 @@ impl Default for SaveState {
             lives: 3,
             score: 0,
             difficulty: GameDifficulty::Normal,
+            random_layout: false,
+            seed: 0,
+            powers: Powers::default(),
+        }
+    }
+}
+
+impl SaveState {
+    pub fn new_game(difficulty: GameDifficulty, random_layout: bool) -> Self {
+        Self {
+            difficulty,
+            random_layout,
+            seed: rand::random(),
+            ..Default::default()
         }
     }
 }

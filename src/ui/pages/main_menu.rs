@@ -1,200 +1,166 @@
-use glam::{Vec2, Vec4};
-
 use crate::{
-    app_state::AppState,
-    audio::AudioManager,
-    game::{game_state::GameState, resources::Resources},
-    input::input::Input,
-    settings::settings::Settings,
+    app_state::{AppState, Ctx, Transition},
+    game::{map::map::Map, theme::Theme},
+    graphics::text::FontId,
+    settings::save::SaveState,
     ui::{
         UiState,
-        button::{Button, ButtonNeighbors},
-        canvas::Canvas,
+        draw::{Align, TextStyle},
+        layout::Rect,
+        style,
+        textures::{Icon, UiTex},
+        ui::id,
+        widgets::{Action, ButtonStyle},
     },
 };
+use glam::{Vec2, Vec4};
 
-impl UiState {
-    /// The main menu ui constructor
-    pub fn main_menu() -> Self {
-        let title = Canvas {
-            center: Vec2::new(0.0, -0.4),
-            text: Some("BOMBERMAN".to_string()),
-            text_color: Some(Vec4::ONE),
-            text_size: Some(2.0),
-            ..Default::default()
-        };
+const COLUMN_WIDTH: f32 = 560.0;
 
-        let mut continue_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, -0.1),
-                text: Some("Continue".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.2),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 1,
-                left: 0,
-                right: 0,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
-        continue_button.toggle();
+fn save_summary(save: &SaveState) -> (String, String) {
+    (
+        format!(
+            "Niveau {} - {}",
+            save.level,
+            Map::level_info(save.level)
+                .map(|(_, theme)| theme.display_name())
+                .unwrap_or(Theme::Grass.display_name())
+        ),
+        format!(
+            "{} - {} pts - {} {}",
+            save.difficulty.label(),
+            save.score,
+            save.lives,
+            if save.lives == 1 { "vie" } else { "vies" }
+        ),
+    )
+}
 
-        let new_game_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.1),
-                text: Some("New Game".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.2),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 2,
-                left: 1,
-                right: 1,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
+pub fn tick(state: &mut UiState, ctx: &mut Ctx) -> Transition {
+    let mut ui = super::begin(state, ctx);
+    let screen = ui.screen();
+    let save = ctx.settings.single_player_save;
 
-        let multi_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.3),
-                text: Some("Multiplayer".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.2),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 1,
-                down: 3,
-                left: 2,
-                right: 2,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
-        let settings_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.5),
-                text: Some("Settings".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.2),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 2,
-                down: 4,
-                left: 3,
-                right: 3,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
-        let mut quit_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.7),
-                text: Some("Quit Game".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.2),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 3,
-                down: 4,
-                left: 4,
-                right: 4,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
+    ui.fill(Vec4::new(0.05, 0.02, 0.12, 0.25));
 
-        #[cfg(debug_assertions)]
-        let test_scene_button = {
-            quit_button.neighbors.down = 5;
-            Button {
-                canvas: Canvas {
-                    center: Vec2::new(0.0, 0.9),
-                    text: Some("Test Scene".to_string()),
-                    text_color: Some(Vec4::ONE),
-                    text_size: Some(1.2),
-                    ..Default::default()
+    let left = style::MARGIN + COLUMN_WIDTH / 2.0 + 40.0;
+
+    ui.dl.rect(
+        Rect::new(0.0, 0.0, left + COLUMN_WIDTH / 2.0 + 60.0, screen.y),
+        Vec4::new(0.08, 0.04, 0.18, 0.55),
+    );
+
+    ui.title("BOMBERMAN", Vec2::new(left, 170.0), 108.0);
+    ui.dl.text(
+        "LA QUÊTE DE LA MÈCHE D'OR",
+        Vec2::new(left, 262.0),
+        TextStyle::new(FontId::Title, 28.0, style::WHITE).outline(style::INK, 3.0),
+    );
+
+    let mut transition = (None, 0);
+    let buttons = [
+        ("continue", "Continuer", Icon::Next),
+        ("new", "Nouvelle partie", Icon::Singleplayer),
+        ("multi", "Multijoueur", Icon::Multiplayer),
+        ("settings", "Paramètres", Icon::Gear),
+        ("credits", "Crédits", Icon::Trophy),
+        ("quit", "Quitter", Icon::Power),
+    ];
+
+    let mut quitting = ui.state.memory_flag(id("quitting"));
+
+    if !quitting {
+        ui.default_focus(id(if save.is_some() { "continue" } else { "new" }));
+
+        for ((name, text, icon), rect) in buttons.iter().zip(
+            Rect::new(
+                left - COLUMN_WIDTH / 2.0,
+                330.0,
+                COLUMN_WIDTH,
+                6.0 * 92.0 - 16.0,
+            )
+            .rows(buttons.len(), 16.0),
+        ) {
+            let r = ui.button(
+                id(name),
+                rect,
+                text,
+                Some(*icon),
+                match *name {
+                    "continue" if save.is_none() => ButtonStyle::Disabled,
+                    "continue" => ButtonStyle::Go,
+                    "quit" => ButtonStyle::Danger,
+                    _ => ButtonStyle::Normal,
                 },
-                neighbors: ButtonNeighbors {
-                    up: 4,
-                    down: 5,
-                    left: 5,
-                    right: 5,
-                },
-                selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-                ..Default::default()
+            );
+
+            if *name == "continue"
+                && r.focused
+                && let Some(save) = &save
+            {
+                let (line1, line2) = save_summary(save);
+                let card = Rect::new(rect.right() + 40.0, rect.y - 10.0, 520.0, rect.h + 20.0);
+
+                ui.dl.frame(UiTex::Panel, card, Vec4::ONE, 0.5);
+                ui.dl.text(
+                    &line1,
+                    Vec2::new(card.x + 30.0, card.y + 34.0),
+                    TextStyle::new(FontId::Title, 28.0, style::TEXT_DARK).align(Align::Left),
+                );
+                ui.dl.text(
+                    &line2,
+                    Vec2::new(card.x + 30.0, card.y + 70.0),
+                    TextStyle::new(FontId::Body, 24.0, style::TEXT_MUTED).align(Align::Left),
+                );
             }
-        };
-
-        Self {
-            canvases: vec![title],
-            buttons: vec![
-                continue_button,
-                new_game_button,
-                multi_button,
-                settings_button,
-                quit_button,
-                #[cfg(debug_assertions)]
-                test_scene_button,
-            ],
-            selected: 0,
-            render_info: Default::default(),
-        }
-    }
-
-    /// The main menu ui tick function
-    pub fn main_menu_tick(
-        &mut self,
-        inputs: &Vec<Input>,
-        audio_manager: &mut AudioManager,
-        resources: &Resources,
-        settings: &Settings,
-    ) -> (Option<AppState>, u8) {
-        if self.button_inputs(inputs) {
-            return match self.selected {
-                0 => {
-                    // Continue
-                    let save = settings.single_player_save;
-                    audio_manager.play_background_music(crate::audio::BackgroundMusic::Game);
-                    match GameState::new_campaign(
-                        save.level,
-                        save.lives,
-                        save.score,
-                        save.difficulty,
-                    ) {
-                        Some(game_state) => (Some(AppState::game(game_state)), 1),
-                        None => {
-                            println!(
-                                "Error: Failed to load saved game. Starting new game selection."
-                            );
-                            (Some(AppState::difficulty_select()), 1)
-                        }
+            if r.clicked {
+                transition = match *name {
+                    "continue" => (
+                        save.and_then(|s| AppState::level_start(ctx.settings, s, false)),
+                        0,
+                    ),
+                    "new" => (Some(AppState::new_game()), 0),
+                    "multi" => (
+                        Some(AppState::lobby(
+                            ctx.resources,
+                            ctx.inputs.len().min(8) as u8,
+                        )),
+                        0,
+                    ),
+                    "settings" => (Some(AppState::settings(false)), 0),
+                    "credits" => (Some(AppState::credits()), 0),
+                    _ => {
+                        quitting = true;
+                        (None, 0)
                     }
-                }
-                1 => (Some(AppState::difficulty_select()), 1),
-                2 => (
-                    Some(AppState::game_settings(
-                        resources,
-                        settings.binds.len() as u8,
-                    )),
-                    0,
-                ),
-                3 => (Some(AppState::settings()), 0),
-                4 => (None, 1), // Quit
-                #[cfg(debug_assertions)]
-                5 => (Some(AppState::test_scene(resources)), 1),
-                _ => (None, 0),
-            };
+                };
+            }
         }
-        (None, 0)
+        if ui.back_pressed() {
+            quitting = true;
+        }
     }
+
+    ui.dl.text(
+        "42 Paris de la secte du Rust",
+        Vec2::new(style::MARGIN, screen.y - 52.0),
+        TextStyle::new(FontId::Body, 22.0, style::fade(style::WHITE, 0.7)).align(Align::Left),
+    );
+    ui.prompts(&[(Action::Navigate, "Déplacer"), (Action::Confirm, "Valider")]);
+
+    if quitting {
+        match ui.dialog(
+            "quit",
+            "Quitter le jeu ?",
+            "Ta progression est sauvegardée après chaque niveau.",
+            "Quitter",
+        ) {
+            Some(true) => transition = (None, 1),
+            Some(false) => quitting = false,
+            None => (),
+        }
+    }
+    ui.state.set_memory_flag(id("quitting"), quitting);
+    ui.end(ctx.audio);
+    transition
 }
