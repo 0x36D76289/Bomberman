@@ -18,3 +18,8 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 fontdue = "0.9"
 ciborium = "0.2.2"
 ufbx = "0.11.5"
+
+# needs cargo-bundle
+# build with 'cargo bundle'
+[package.metadata.bundle]
+identifier = "io.github.0x36D76289.Bomberman"
