@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use vulkano::{
     DeviceSize,
     buffer::{Buffer, BufferCreateInfo, BufferUsage},
@@ -9,16 +8,13 @@ use vulkano::{
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
 };
 
-pub fn load_texture(
-    png_bytes: &[u8],
+pub fn load_texture_rgba(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
     command_buffer: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     memory_allocator: Arc<StandardMemoryAllocator>,
 ) -> Arc<ImageView> {
-    let decoder = png::Decoder::new(png_bytes);
-    let mut reader = decoder.read_info().unwrap();
-    let info = reader.info();
-    let extent = [info.width, info.height, 1];
-
     let upload_buffer = Buffer::new_slice(
         memory_allocator.clone(),
         BufferCreateInfo {
@@ -30,20 +26,18 @@ pub fn load_texture(
                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()
         },
-        (info.width * info.height * 4) as DeviceSize,
+        (width * height * 4) as DeviceSize,
     )
     .unwrap();
 
-    reader
-        .next_frame(&mut upload_buffer.write().unwrap())
-        .unwrap();
+    upload_buffer.write().unwrap().copy_from_slice(pixels);
 
     let image = Image::new(
         memory_allocator.clone(),
         ImageCreateInfo {
             image_type: ImageType::Dim2d,
             format: Format::R8G8B8A8_UNORM,
-            extent,
+            extent: [width, height, 1],
             usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
             ..Default::default()
         },

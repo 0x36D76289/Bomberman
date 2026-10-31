@@ -1,280 +1,390 @@
+use super::direction::Direction;
 use crate::{
     game::{
-        bomb::{BOMB_RADIUS, Bomb, BombState},
+        bomb::{BOMB_TIMER_DEFAULT, Bomb, BombState},
         collision::Collision,
+        grid::{Tile, center_of, step, tile_of},
         map::{map::Map, map_element::MapElement},
+        movement::walk,
+        powerup::Curse,
         resources::{ResourceName, Resources},
-    }, graphics::{animation::Animation, mesh::Mesh, object::Object, transform::Transform}, input::input::Input,
+    },
+    graphics::{object::AnimatedObject, transform::Transform},
+    input::{input::Input, input_state::InputState},
 };
-
-use super::direction::Direction;
 use glam::{Vec2, Vec3};
+use serde::{Deserialize, Serialize};
 
-/// The size of the player, used for every collision
-const PLAYER_RADIUS: f32 = 0.4;
-/// The speed the player moves at at every level of the powerup
-/// It is measured in tiles/second
-const PLAYER_SPEEDS: [f32; 4] = [2.0, 3.5, 5.0, 6.0];
+const BASE_SPEED: f32 = 3.0;
+const SPEED_STEP: f32 = 0.4;
+pub const MAX_SPEED_LEVEL: u8 = 7;
 
-/// The [Player](player::Player) represents a human player or a bot in multiplayer games
-#[allow(unused)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlayerAnimation {
+    Idle,
+    Run,
+    Bomb,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Powers {
+    pub bombs: u8,
+    pub fire: u8,
+    pub speed: u8,
+    pub kick: bool,
+    pub remote: bool,
+    pub wall_pass: bool,
+    pub bomb_pass: bool,
+}
+
+impl Default for Powers {
+    fn default() -> Self {
+        Self {
+            bombs: 1,
+            fire: 2,
+            speed: 0,
+            kick: false,
+            remote: false,
+            wall_pass: false,
+            bomb_pass: false,
+        }
+    }
+}
+
+impl Powers {
+    pub fn lose_specials(&mut self) {
+        self.kick = false;
+        self.remote = false;
+        self.wall_pass = false;
+        self.bomb_pass = false;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Player {
-    /// The player's unique identifier, it is also its index in the
-    /// [GameState](super::game_state::GameState)'s players vector
     pub id: u32,
-    /// The current position of the [Player]
     pub position: Vec2,
-    /// The direction the [Player] is facing, used for collisions and to orientate the model
     pub direction: Direction,
-    /// Whether the [Player] is alive or dead, dead players don't tick
     pub alive: bool,
-    /// How far the [Player]'s [Bomb]s can currently explode
-    pub power_level: u8,
-    /// What speed value to use from [PLAYER_SPEEDS], can go over the size of the array safely.
-    /// Increments with every speed powerup
-    pub speed_level: u8,
-    /// How many [Bomb]s can the [Player] currently place down. Decrements on every
-    /// [Bomb] placed but re-increments on every explosion. Also increases with the bomb powerup
+    pub powers: Powers,
     pub bombs_remaining: u32,
-    /// Whether the [Player] is human or bot operated
+    pub invincible: f32,
+    pub curse: Option<(Curse, f32)>,
+    pub base_color: Vec3,
+    pub team: Option<u32>,
     pub is_human: bool,
-    /// Turns [true] when the [Player] picks up the speed powerup, lets the [Player] push bombs
-    /// by colliding with them and pressing in their direction
-    pub can_kick_bomb: bool,
-    /// The [Player]'s 3d model. [None] if dead
-    pub object: Option<Object>,
+    pub object: Option<AnimatedObject>,
+    pub moving: bool,
+    horizontal_last: bool,
+    animation: PlayerAnimation,
+    bomb_animation: f32,
 }
 
 impl Player {
-    /// The main [Player] constructor
     pub fn new(
         id: u32,
         position: Vec2,
         direction: Direction,
         resources: &Resources,
         is_human: bool,
+        powers: Powers,
     ) -> Self {
+        let position = center_of(tile_of(position));
         Player {
             id,
             position,
             direction,
             alive: true,
-            power_level: 2,
-            speed_level: 0,
-            bombs_remaining: 1,
+            powers,
+            bombs_remaining: powers.bombs as u32,
+            invincible: 0.0,
+            curse: None,
+            base_color: Vec3::ONE,
+            team: None,
             is_human,
-            can_kick_bomb: false,
             object: Some(Self::create_object(resources, position, direction)),
+            moving: false,
+            horizontal_last: false,
+            animation: PlayerAnimation::Idle,
+            bomb_animation: 0.0,
         }
     }
 
-    /// Creates the [Player]'s 3d model
-    fn create_object(resources: &Resources, position: Vec2, direction: Direction) -> Object {
-        let dir_vec = direction.to_vec2();
-        let transform = Transform {
-            translation: Vec3::new(position.x, -1.5, position.y),
-            scale: Vec3::splat(0.35),
-            rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
-        };
-        Object::from_resource("player", resources)
-            .with_transform(transform)
-            .with_animation(resources.animation("player_idle3"))
-        // Object {
-        //     meshes: resources.models[&ResourceName::Player].clone(),
-        //     textures: Some(resources.textures_index[&ResourceName::Player]),
-        //     color: Vec3::ONE,
-        //     transform: Transform {
-        //         translation: Vec3::new(position.x, 0.0, position.y),
-        //         scale: Vec3::splat(1.0),//Vec3::splat(0.35),
-        //         rotation: Vec3::new(0.0, dir_vec.x.atan2(dir_vec.y), 0.0),
-        //     },
-        // }
+    fn create_object(
+        resources: &Resources,
+        position: Vec2,
+        direction: Direction,
+    ) -> AnimatedObject {
+        let mut mesh = resources.player_mesh.clone();
+        mesh.animator
+            .set_animation(Some(resources.player_animations.idle.clone()));
+        mesh.animator.update(0.0, &mut mesh.root_joint);
+        AnimatedObject {
+            mesh,
+            texture: Some(resources.textures_index[&ResourceName::Player]),
+            color: Vec3::ONE,
+            tint_whites: true,
+            transform: Transform {
+                translation: Vec3::new(position.x, -1.5, position.y),
+                scale: Vec3::splat(0.35),
+                rotation: Vec3::new(0.0, direction.yaw(), 0.0),
+            },
+        }
     }
 
-    /// Debug utility to make testing easier
-    /// Ressucitates the [Player] and gives it every powerup
-    #[cfg(debug_assertions)]
-    #[allow(unused)]
-    pub fn make_op(&mut self, resources: &Resources) {
+    pub fn animate(&mut self, resources: &Resources, delta: f32, planted: bool) {
+        let animations = &resources.player_animations;
+        if planted {
+            self.bomb_animation = animations.bomb.length.as_secs_f32();
+        }
+        self.bomb_animation = (self.bomb_animation - delta).max(0.0);
+        let state = if planted || self.bomb_animation > 0.0 {
+            PlayerAnimation::Bomb
+        } else if self.moving {
+            PlayerAnimation::Run
+        } else {
+            PlayerAnimation::Idle
+        };
+        let Some(object) = &mut self.object else {
+            return;
+        };
+        let animator = &mut object.mesh.animator;
+        if planted || state != self.animation {
+            animator.set_animation(None);
+            animator.set_animation(Some(
+                match state {
+                    PlayerAnimation::Bomb => &animations.bomb,
+                    PlayerAnimation::Run => &animations.run,
+                    PlayerAnimation::Idle => &animations.idle,
+                }
+                .clone(),
+            ));
+            self.animation = state;
+        }
+        animator.update(delta, &mut object.mesh.root_joint);
+    }
+
+    pub fn fireproof(&self) -> bool {
+        self.invincible > 0.0
+    }
+
+    pub fn cursed_with(&self, curse: Curse) -> bool {
+        self.curse.is_some_and(|(c, _)| c == curse)
+    }
+
+    pub fn tick_status(&mut self, delta: f32) {
+        self.invincible = (self.invincible - delta).max(0.0);
+        if let Some((_, left)) = &mut self.curse {
+            *left -= delta;
+        }
+        self.curse = self.curse.filter(|(_, left)| *left > 0.0);
+        let (timer, color) = match self.curse {
+            _ if self.invincible > 0.0 => (self.invincible, Vec3::new(1.8, 1.5, 0.4)),
+            Some((_, left)) => (left, Vec3::new(0.6, 0.2, 0.9)),
+            None => (0.0, self.base_color),
+        };
+        if let Some(obj) = &mut self.object {
+            obj.color = if timer > 0.0 && ((timer * 8.0) as u32).is_multiple_of(2) {
+                color
+            } else {
+                self.base_color
+            };
+        }
+    }
+
+    pub fn create_bomb(
+        &mut self,
+        resources: &Resources,
+        bombs: &[Bomb],
+        map: &Map,
+    ) -> Option<Bomb> {
+        if self.bombs_remaining == 0 || self.cursed_with(Curse::Constipation) {
+            return None;
+        }
+        let tile = tile_of(self.position);
+        if matches!(map.get_elem_pos(self.position), MapElement::Breakable(_)) {
+            return None;
+        }
+        if bombs
+            .iter()
+            .any(|bomb| bomb.state != BombState::Exploding && tile_of(bomb.position) == tile)
+        {
+            return None;
+        }
+        self.bombs_remaining -= 1;
+        Some(Bomb::new(
+            self.id,
+            tile.0 as usize,
+            tile.1 as usize,
+            if self.cursed_with(Curse::WeakFire) {
+                1
+            } else {
+                self.powers.fire
+            },
+            if self.cursed_with(Curse::ShortFuse) {
+                1.0
+            } else {
+                BOMB_TIMER_DEFAULT
+            },
+            self.powers.remote,
+            resources,
+        ))
+    }
+
+    fn wishes(&mut self, input: Input) -> Vec<Direction> {
+        let pressed = |state: InputState| state == InputState::Pressed;
+        if pressed(input.left()) || pressed(input.right()) {
+            self.horizontal_last = true;
+        } else if pressed(input.up()) || pressed(input.down()) {
+            self.horizontal_last = false;
+        }
+        let motion = input.as_vec2();
+        let horizontal = (motion.x != 0.0).then_some(if motion.x > 0.0 {
+            Direction::Right
+        } else {
+            Direction::Left
+        });
+        let vertical = (motion.y != 0.0).then_some(if motion.y > 0.0 {
+            Direction::Down
+        } else {
+            Direction::Up
+        });
+        let mut wishes = if self.horizontal_last {
+            [horizontal, vertical]
+        } else {
+            [vertical, horizontal]
+        };
+        wishes.sort_by_key(|w| w.is_none());
+        wishes.into_iter().flatten().collect()
+    }
+
+    pub fn walk_input(
+        &mut self,
+        input: Input,
+        delta: f32,
+        walkable: impl Fn(Tile) -> bool,
+        bomb_tiles: &[Tile],
+    ) -> Option<(Tile, Direction)> {
+        self.moving = false;
+        if !self.alive {
+            return None;
+        }
+        let wishes = self.wishes(input);
+        if wishes.is_empty() {
+            return None;
+        }
+        let start = tile_of(self.position);
+        let distance = delta * self.speed();
+        let result = walk(&mut self.position, &wishes, distance, |tile| {
+            !walkable(tile) || (tile != start && bomb_tiles.contains(&tile))
+        });
+        self.moving = result.travelled > 0.0;
+        if let Some(facing) = result.facing {
+            self.direction = facing;
+        }
+        result
+            .bumped
+            .filter(|(tile, _)| !self.moving && bomb_tiles.contains(tile))
+    }
+
+    pub fn footprint(&self) -> Vec<Tile> {
+        let mut tiles = vec![tile_of(self.position)];
+        for offset in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
+            let tile = tile_of(self.position + offset * 0.45);
+            if !tiles.contains(&tile) {
+                tiles.push(tile);
+            }
+        }
+        tiles
+    }
+
+    pub fn player_move(
+        &mut self,
+        input: Input,
+        delta: f32,
+        map: &Map,
+        bombs: &mut [Bomb],
+        occupied: &[Tile],
+    ) {
+        let bomb_tiles: Vec<Tile> = bombs
+            .iter()
+            .filter(|b| b.state != BombState::Exploding)
+            .map(|b| tile_of(b.position))
+            .collect();
+        let burning: Vec<Tile> = bombs.iter().flat_map(|b| b.burning_tiles()).collect();
+        let fireproof = self.fireproof();
+        let wall_pass = self.powers.wall_pass;
+        if let Some((tile, direction)) = self.walk_input(
+            if self.cursed_with(Curse::Reverse) {
+                input.reversed()
+            } else {
+                input
+            },
+            delta,
+            |tile: Tile| {
+                (map.is_walkable_tile(tile.0, tile.1)
+                    || (wall_pass && map.is_breakable_tile(tile.0, tile.1)))
+                    && (fireproof || !burning.contains(&tile))
+                    && !occupied.contains(&tile)
+            },
+            if self.powers.bomb_pass {
+                &[]
+            } else {
+                &bomb_tiles
+            },
+        ) && self.powers.kick
+        {
+            let beyond = step(tile, direction);
+            if map.is_walkable_tile(beyond.0, beyond.1)
+                && !burning.contains(&beyond)
+                && !bomb_tiles.contains(&beyond)
+                && let Some(bomb) = bombs
+                    .iter_mut()
+                    .find(|b| b.state == BombState::Planted && tile_of(b.position) == tile)
+            {
+                bomb.state = BombState::Sliding(direction);
+            }
+        }
+
+        if let Some(obj) = &mut self.object {
+            obj.transform.translation = Vec3::new(
+                self.position.x,
+                obj.transform.translation.y,
+                self.position.y,
+            );
+            obj.transform.rotation.y = self.direction.yaw();
+        }
+    }
+
+    pub fn speed(&self) -> f32 {
+        match self.curse {
+            Some((Curse::Fast, _)) => BASE_SPEED + SPEED_STEP * (MAX_SPEED_LEVEL + 3) as f32,
+            Some((Curse::Slow, _)) => BASE_SPEED * 0.5,
+            _ => BASE_SPEED + SPEED_STEP * self.powers.speed.min(MAX_SPEED_LEVEL) as f32,
+        }
+    }
+
+    pub fn respawn(&mut self, resources: &Resources, position: Vec2, invincible: f32) {
+        self.position = center_of(tile_of(position));
+        self.alive = true;
+        self.moving = false;
+        self.curse = None;
+        self.invincible = invincible;
+        self.animation = PlayerAnimation::Idle;
+        self.bomb_animation = 0.0;
+        self.powers.lose_specials();
         self.object = Some(Self::create_object(
             resources,
             self.position,
             self.direction,
         ));
-        self.alive = true;
-        self.power_level = 10;
-        self.speed_level = PLAYER_SPEEDS.len() as u8;
-        self.bombs_remaining = 100;
-        self.can_kick_bomb = true;
     }
 
-    /// Collides the [Player] with every object, resolves collisions, and starts expected events
-    fn handle_collisions(&mut self, map: &Map, direction: Direction, bombs: &mut Vec<Bomb>) {
-        self.bound(map);
-        self.collide_map(map, direction);
-        for bomb in bombs {
-            if bomb.owner_id == self.id && !bomb.collision_enabled {
-                continue;
-            }
-            if self.resolve_collision_with(bomb.position, BOMB_RADIUS, direction)
-                && self.can_kick_bomb
-                && bomb.state == BombState::Planted
-            {
-                bomb.state = BombState::Sliding(direction);
-            }
-        }
-    }
-
-    /// Places a [Bomb] if possible and returns it and updates the [Player]'s [bombs remaining](Player::bombs_remaining) value. Returns [None] if creation failed
-    pub fn create_bomb(
-        &mut self,
-        resources: &Resources,
-        bombs: &Vec<Bomb>,
-        player_positions: &[(u32, Vec2)],
-    ) -> Option<Bomb> {
-        if self.bombs_remaining == 0 {
-            return None;
-        }
-
-        let target_x = self.position.x as usize;
-        let target_y = self.position.y as usize;
-
-        let ret_bomb = Bomb::new(self.id, target_x, target_y, self.power_level, resources);
-
-        for bomb in bombs {
-            if bomb.owner_id == self.id && !bomb.collision_enabled {
-                return None;
-            }
-            if bomb.is_colliding_with(
-                Vec2 {
-                    x: ret_bomb.position.x as f32,
-                    y: ret_bomb.position.y as f32,
-                },
-                BOMB_RADIUS,
-            ) {
-                return None;
-            }
-        }
-
-        for (id, pos) in player_positions {
-            if *id == self.id {
-                continue;
-            }
-            if ret_bomb.is_colliding_with(pos.clone(), PLAYER_RADIUS) {
-                return None;
-            }
-        }
-
-        self.bombs_remaining -= 1;
-        Some(ret_bomb)
-    }
-
-    /// Detects if a [Player] is near a gap and modifies the inputs to guide it towards the gap if the [Player] is trying to get in
-    fn assist_input(&self, input: Input, map: &Map) -> Vec2 {
-        let ret = input.as_vec2();
-        if ret.y == 0.0 && ret.x != 0.0 {
-            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
-                if self.position.y % 1.0 > 0.60 {
-                    return ret + Vec2 { x: 0.0, y: -1.0 };
-                }
-                if self.position.y % 1.0 < 0.40 {
-                    return ret + Vec2 { x: 0.0, y: 1.0 };
-                }
-            }
-        }
-        if ret.x == 0.0 && ret.y != 0.0 {
-            if *map.get_elem_pos(self.position + ret) == MapElement::Empty {
-                if self.position.x % 1.0 > 0.60 {
-                    return ret + Vec2 { y: 0.0, x: -1.0 };
-                }
-                if self.position.x % 1.0 < 0.40 {
-                    return ret + Vec2 { y: 0.0, x: 1.0 };
-                }
-            }
-        }
-        ret
-    }
-
-    /// The [Player] movement function, it is triggered every tick.
-    /// It takes in the inputs of the [Player] and makes it move, collide with the [Map], and collide with [Bomb]s
-    pub fn player_move(&mut self, input: Input, delta: f32, map: &Map, bombs: &mut Vec<Bomb>) {
-        if !self.alive {
-            return;
-        }
-        let mut motion = self.assist_input(input, map)
-            * delta
-            * PLAYER_SPEEDS[(self.speed_level as usize).min(PLAYER_SPEEDS.len() - 1)];
-
-        let mut dist: f32;
-        // PERF: The right thing to do would be find the distance to the nearest block center...
-        // but I'll just iterate 0.2 at a time because performance is plenty
-        // (also works better at real framerates)
-        while motion.x != 0.0 || motion.y != 0.0 {
-            // X tick
-            if motion.x != 0.0 {
-                dist = motion.x.abs().min(0.2);
-                if motion.x > 0.0 {
-                    self.direction = Direction::Right;
-                    motion.x -= dist;
-                    self.position.x += dist;
-                } else {
-                    self.direction = Direction::Left;
-                    motion.x += dist;
-                    self.position.x -= dist;
-                }
-                self.handle_collisions(map, self.direction, bombs);
-            }
-            if motion.y != 0.0 {
-                dist = motion.y.abs().min(0.2);
-                if motion.y > 0.0 {
-                    self.direction = Direction::Down;
-                    motion.y -= dist;
-                    self.position.y += dist;
-                } else {
-                    self.direction = Direction::Up;
-                    motion.y += dist;
-                    self.position.y -= dist;
-                }
-                self.handle_collisions(map, self.direction, bombs);
-            }
-        }
-        match &mut self.object {
-            None => (),
-            Some(obj) => {
-                obj.transform.translation = Vec3::new(self.position.x, obj.transform.translation.y, self.position.y);
-                let (x, y) = input.as_vec2().into();
-                if x != 0.0 || y != 0.0 {
-                    obj.transform.rotation.y = x.atan2(y);
-                }
-            }
-        }
-    }
-
-    /// Kills the player, effectively removing it
     pub fn kill(&mut self) {
         self.alive = false;
+        self.moving = false;
         self.object = None;
-    }
-
-    /// Respawns a Player in the singleplayer campaign. Used when colliding with an [Enemy]
-    /// if lives are left
-    pub fn respawn(&mut self, position: Vec2, resources: &Resources) {
-        self.alive = true;
-        self.position = position;
-        self.object = Some(Self::create_object(resources, position, self.direction));
-        self.power_level = 2;
-        self.speed_level = 0;
-        self.bombs_remaining = 1;
-        self.can_kick_bomb = false;
-    }
-
-    pub fn set_animation(&mut self, animation: Animation) {
-        if let Some(object) = &mut self.object {
-            if let Mesh::Skinned(skinned_mesh) = &mut object.meshes[0] {
-                skinned_mesh.animator.set_animation(Some(animation));
-            }
-        }
     }
 }
 
@@ -288,17 +398,6 @@ impl Collision for Player {
     }
 
     fn get_size(&self) -> f32 {
-        PLAYER_RADIUS
-    }
-}
-
-pub trait Alive {
-    fn alive(&mut self) -> impl Iterator<Item = &'_ mut Player>;
-}
-
-impl Alive for Vec<Player> {
-    /// Returns a list of alive players as mutable
-    fn alive(&mut self) -> impl Iterator<Item = &'_ mut Player> {
-        self.iter_mut().filter(|p| p.alive)
+        0.4
     }
 }

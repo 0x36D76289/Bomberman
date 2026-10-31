@@ -1,119 +1,73 @@
-use glam::{Vec2, Vec4};
-
 use crate::{
-    app_state::AppState,
-    audio::AudioManager,
-    input::input::Input,
-    settings::save::GameDifficulty,
+    app_state::{AppState, Ctx, POP_TO_MENU, Transition, replace_or_menu},
+    graphics::text::FontId,
+    settings::save::SaveState,
     ui::{
         UiState,
-        button::{Button, ButtonNeighbors},
-        canvas::Canvas,
+        draw::TextStyle,
+        layout::Rect,
+        style,
+        textures::Icon,
+        ui::id,
+        widgets::{Action, ButtonStyle},
     },
 };
+use glam::{Vec2, Vec4};
 
-impl UiState {
-    /// The game over screen ui page constructor
-    pub fn game_over(score: u32) -> Self {
-        let shadow = Canvas {
-            center: Vec2::ZERO,
-            width: 2.0,
-            height: 2.0,
-            color: Vec4::new(0.4, 0.0, 0.0, 0.7),
-            ..Default::default()
-        };
+pub fn tick(state: &mut UiState, ctx: &mut Ctx, run: SaveState) -> Transition {
+    let mut ui = super::begin(state, ctx);
+    let screen = ui.screen();
+    ui.fill(Vec4::new(0.3, 0.02, 0.05, 0.7));
 
-        let title = Canvas {
-            center: Vec2::new(0.0, -0.3),
-            text: Some("GAME OVER".to_string()),
-            text_color: Some(Vec4::ONE),
-            text_size: Some(2.0),
-            ..Default::default()
-        };
+    ui.title("GAME OVER", Vec2::new(screen.x / 2.0, 330.0), 112.0);
 
-        let score_text = Canvas {
-            center: Vec2::new(0.0, -0.05),
-            text: Some(format!("SCORE: {}", score)),
-            text_color: Some(Vec4::ONE),
-            text_size: Some(1.2),
-            ..Default::default()
-        };
+    ui.dl.text(
+        &format!("Score final : {}", run.score),
+        Vec2::new(screen.x / 2.0, 470.0),
+        TextStyle::new(FontId::Title, 44.0, style::WHITE).outline(style::INK, 4.0),
+    );
+    ui.dl.text(
+        &format!("Tu as atteint le niveau {}", run.level),
+        Vec2::new(screen.x / 2.0, 530.0),
+        TextStyle::new(FontId::Body, 30.0, style::WHITE),
+    );
 
-        let mut retry_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.1),
-                text: Some("Retry".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.6),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 1,
-                left: 0,
-                right: 0,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
-        retry_button.toggle(); // Select by default
-
-        let menu_button = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.3),
-                text: Some("Main Menu".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.6),
-                ..Default::default()
-            },
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 1,
-                left: 1,
-                right: 1,
-            },
-            selected_text_color: Some(Vec4::new(1.0, 1.0, 0.0, 1.0)),
-            ..Default::default()
-        };
-
-        Self {
-            canvases: vec![shadow, title, score_text],
-            buttons: vec![retry_button, menu_button],
-            selected: 0,
-            render_info: Default::default(),
-        }
+    let buttons = Rect::new((screen.x - 860.0) / 2.0, 640.0, 860.0, 90.0).columns(2, 40.0);
+    let retry = SaveState {
+        lives: 3,
+        score: 0,
+        powers: Default::default(),
+        ..run
+    };
+    let mut transition = (None, 0);
+    ui.default_focus(id("retry"));
+    if ui
+        .button(
+            id("menu"),
+            buttons[0],
+            "Menu principal",
+            Some(Icon::Home),
+            ButtonStyle::Normal,
+        )
+        .clicked
+        || ui.back_pressed()
+    {
+        ctx.settings.save_progress(retry);
+        transition = (None, POP_TO_MENU);
     }
-
-    /// The game over ui page tick function
-    pub fn game_over_tick(
-        &mut self,
-        inputs: &Vec<Input>,
-        audio_manager: &mut AudioManager,
-        difficulty: GameDifficulty,
-    ) -> (Option<AppState>, u8) {
-        if self.button_inputs(inputs) {
-            return match self.selected {
-                0 => {
-                    // Retry
-                    if let Some(game_state) =
-                        crate::game::game_state::GameState::new_campaign(1, 3, 0, difficulty)
-                    {
-                        (Some(AppState::game(game_state)), 2)
-                    } else {
-                        println!(
-                            "Error: Failed to load campaign level 1 for retry. Returning to menu."
-                        );
-                        audio_manager.play_background_music(crate::audio::BackgroundMusic::Menu);
-                        (Some(AppState::main_menu()), 2)
-                    }
-                }
-                _ => {
-                    // Main Menu
-                    audio_manager.play_background_music(crate::audio::BackgroundMusic::Menu);
-                    (Some(AppState::main_menu()), 2)
-                }
-            };
-        }
-        (None, 0)
+    if ui
+        .button(
+            id("retry"),
+            buttons[1],
+            "Réessayer",
+            Some(Icon::Return),
+            ButtonStyle::Go,
+        )
+        .clicked
+    {
+        transition = replace_or_menu(AppState::level_start(ctx.settings, retry, false), 2);
     }
+    ui.prompts(&[(Action::Navigate, "Déplacer"), (Action::Confirm, "Valider")]);
+    ui.end(ctx.audio);
+    transition
 }

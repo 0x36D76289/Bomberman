@@ -1,17 +1,23 @@
+.PHONY: all assets release run install uninstall clean
+
 all: release
 
-debug:
-	cargo build
-	ln -s -f target/debug/Bomberman Bomberman
+assets:
+	./scripts/fetch_assets.sh
 
-release:
-	cargo build -r
-	ln -s -f target/release/Bomberman Bomberman
+release: assets
+	cargo build --release
+	ln -sf target/release/Bomberman Bomberman
 
-docker:
-	docker build --platform linux/amd64 --tag bomberman .
-	docker run --rm -v .:/bomberman bomberman
+run: release
+	./Bomberman
+
+install: release
+	./scripts/install.sh
+
+uninstall:
+	./scripts/install.sh --uninstall
 
 clean:
 	cargo clean
-	rm Bomberman
+	rm -f Bomberman

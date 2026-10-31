@@ -1,8 +1,8 @@
-use std::{collections::HashMap, println, time::Duration};
-use glam::{Mat4, Quat, Vec3};
-use ufbx::Scene;
-use vulkano::{buffer::{Subbuffer}};
 use crate::graphics::{object::Object, renderer::animation_vs::JointsUbo};
+use glam::{Mat4, Quat, Vec3};
+use std::{collections::HashMap, println, time::Duration};
+use ufbx::Scene;
+use vulkano::buffer::Subbuffer;
 
 /// A component of the skeleton, can also be refered as a bone
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -24,7 +24,7 @@ impl Joint {
             animated_transform: Mat4::default(),
             children: Vec::new(),
             local_bind_transform,
-            inverse_bind_transform: Mat4::default()
+            inverse_bind_transform: Mat4::default(),
         }
     }
 
@@ -52,7 +52,7 @@ pub struct KeyFrame {
     pub time_stamp: Duration,
     // the transform for each joint in relation with its name
     // these transforms are in relation to to their parent joint, they are not in model space
-    pub pose: HashMap<String, JointTransform>
+    pub pose: HashMap<String, JointTransform>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,7 +66,11 @@ impl JointTransform {
         Mat4::from_rotation_translation(self.rotation, self.position)
     }
 
-    pub fn interpolate(frame_a: &JointTransform, frame_b: &JointTransform, progression: f32) -> JointTransform {
+    pub fn interpolate(
+        frame_a: &JointTransform,
+        frame_b: &JointTransform,
+        progression: f32,
+    ) -> JointTransform {
         let pos = {
             let position_a = frame_a.position;
             let position_b = frame_b.position;
@@ -81,7 +85,7 @@ impl JointTransform {
 
         JointTransform {
             position: pos,
-            rotation: rot
+            rotation: rot,
         }
     }
 }
@@ -92,7 +96,7 @@ pub struct Animator {
     current_anim: Option<Animation>,
     animation_time: Duration,
     current_frame: usize,
-    lock: Duration
+    lock: Duration,
 }
 
 impl Animator {
@@ -101,7 +105,7 @@ impl Animator {
             current_anim: animation,
             animation_time: Duration::ZERO,
             current_frame: 0,
-            lock: Duration::ZERO
+            lock: Duration::ZERO,
         }
     }
 
@@ -136,8 +140,7 @@ impl Animator {
             return;
         }
 
-        let time_passed = Duration::try_from_secs_f32(delta_time)
-            .unwrap_or(Duration::new(0, 0));
+        let time_passed = Duration::try_from_secs_f32(delta_time).unwrap_or(Duration::new(0, 0));
 
         self.increase_animation_time(time_passed);
 
@@ -150,7 +153,9 @@ impl Animator {
     pub fn increase_animation_time(&mut self, time: Duration) {
         let current_anim = match &self.current_anim {
             Some(anim) => anim,
-            None => {return;}
+            None => {
+                return;
+            }
         };
 
         self.animation_time += time;
@@ -163,7 +168,7 @@ impl Animator {
         {
             self.current_frame += 1;
         }
-    } 
+    }
 
     pub fn get_animation_time(&self) -> Duration {
         self.animation_time
@@ -173,8 +178,15 @@ impl Animator {
         let current_anim = self.current_anim.as_ref().unwrap();
 
         let (frame1, frame2) = {
-            let next_frame_id = if self.current_frame + 1 >= current_anim.frames.len() {0} else {self.current_frame + 1};
-            (&current_anim.frames[self.current_frame], &current_anim.frames[next_frame_id])
+            let next_frame_id = if self.current_frame + 1 >= current_anim.frames.len() {
+                0
+            } else {
+                self.current_frame + 1
+            };
+            (
+                &current_anim.frames[self.current_frame],
+                &current_anim.frames[next_frame_id],
+            )
         };
 
         let progression = self.calc_progression(&frame1, &frame2);
@@ -190,20 +202,32 @@ impl Animator {
         current_time.as_secs_f32() / total_time.as_secs_f32()
     }
 
-    fn interpolate_poses(&self, frame1: &KeyFrame, frame2: &KeyFrame, progression: f32) -> HashMap<String, Mat4> {
+    fn interpolate_poses(
+        &self,
+        frame1: &KeyFrame,
+        frame2: &KeyFrame,
+        progression: f32,
+    ) -> HashMap<String, Mat4> {
         let mut current_pos = HashMap::new();
         for (joint_name, frame1_transform) in frame1.pose.iter() {
             let frame2_transform = match frame2.pose.get(joint_name) {
                 Some(transform) => transform,
-                None => {continue;}
+                None => {
+                    continue;
+                }
             };
-            let current_transform = JointTransform::interpolate(frame1_transform, frame2_transform, progression);
+            let current_transform =
+                JointTransform::interpolate(frame1_transform, frame2_transform, progression);
             current_pos.insert(joint_name.clone(), current_transform.get_transform());
         }
         current_pos
     }
 
-    fn apply_pose_to_joints(current_pose: &HashMap<String, Mat4>, joint: &mut Joint, parent_transform: Mat4) {
+    fn apply_pose_to_joints(
+        current_pose: &HashMap<String, Mat4>,
+        joint: &mut Joint,
+        parent_transform: Mat4,
+    ) {
         let current_local_transform = match current_pose.get(&joint.name) {
             Some(transform) => *transform,
             None => joint.local_bind_transform,
@@ -217,4 +241,3 @@ impl Animator {
         joint.animated_transform = current_transform;
     }
 }
-

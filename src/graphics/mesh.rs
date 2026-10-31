@@ -1,7 +1,11 @@
-use crate::graphics::{AnimationVertex, GameVertex, animation::{Animation, Animator, Joint, JointTransform, KeyFrame}, renderer::animation_vs::JointsUbo};
-use std::{collections::HashMap, error::Error, io::Cursor, println, sync::Arc, time::Duration};
+use crate::graphics::{
+    AnimationVertex, GameVertex,
+    animation::{Animation, Animator, Joint, JointTransform, KeyFrame},
+    renderer::animation_vs::JointsUbo,
+};
 use anyhow::Context;
 use glam::{Mat4, Quat, Vec2, Vec3};
+use std::{collections::HashMap, error::Error, io::Cursor, println, sync::Arc, time::Duration};
 use tobj::LoadError;
 use ufbx::{LoadOpts, Node, Scene, SceneRoot, SkinDeformer};
 use vulkano::{
@@ -12,7 +16,7 @@ use vulkano::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mesh {
     Static(StaticMesh),
-    Skinned(SkinnedMesh)
+    Skinned(SkinnedMesh),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,48 +31,48 @@ impl StaticMesh {
         memory_allocator: Arc<StandardMemoryAllocator>,
     ) -> Result<Self, Box<dyn Error>> {
         let mut cursor = Cursor::new(obj_bytes);
-        
+
         let (models, _) = tobj::load_obj_buf(&mut cursor, &tobj::GPU_LOAD_OPTIONS, |_| {
             Err(LoadError::OpenFileFailed)
         })?;
-        
+
         let mut unique_vertices: HashMap<GameVertex, u32> = HashMap::new();
         let mut vertices = vec![GameVertex::default()];
         let mut indices = Vec::new();
-        
+
         for model in models {
             for i in model.mesh.indices {
                 let mut vertex = GameVertex::default();
                 let i = i as usize;
-                
+
                 vertex.position = [
                     model.mesh.positions[i * 3],
                     -model.mesh.positions[i * 3 + 1],
                     model.mesh.positions[i * 3 + 2],
                 ];
-                
+
                 if !model.mesh.normals.is_empty() {
                     vertex.normal = [
                         model.mesh.normals[i * 3],
                         -model.mesh.normals[i * 3 + 1],
                         model.mesh.normals[i * 3 + 2],
-                        ];
-                    }
-                    
+                    ];
+                }
+
                 if !model.mesh.texcoords.is_empty() {
                     vertex.uv = [
                         model.mesh.texcoords[i * 2],
                         1.0 - model.mesh.texcoords[i * 2 + 1],
-                        ];
-                    }
-                    
-                    if !unique_vertices.contains_key(&vertex) {
-                        unique_vertices.insert(vertex, vertices.len() as u32);
-                        vertices.push(vertex);
-                    }
-                    indices.push(unique_vertices[&vertex]);
+                    ];
                 }
+
+                if !unique_vertices.contains_key(&vertex) {
+                    unique_vertices.insert(vertex, vertices.len() as u32);
+                    vertices.push(vertex);
+                }
+                indices.push(unique_vertices[&vertex]);
             }
+        }
 
         let vertex_buffer = Buffer::from_iter(
             memory_allocator.clone(),
@@ -78,7 +82,7 @@ impl StaticMesh {
             },
             AllocationCreateInfo {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
             vertices,
@@ -93,11 +97,11 @@ impl StaticMesh {
             AllocationCreateInfo {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
                     | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                indices,
+                ..Default::default()
+            },
+            indices,
         )?;
-        
+
         Ok(Self {
             vertex_buffer: Arc::new(vertex_buffer),
             index_buffer: Arc::new(index_buffer),
@@ -137,7 +141,7 @@ impl SkinnedMesh {
         // }
 
         let id = head_joint.id as usize;
-        
+
         if id < joint_transforms.len() {
             joint_transforms[id] = head_joint.animated_transform;
         }
@@ -160,14 +164,14 @@ impl SkinnedMesh {
 pub struct FbxImportResult {
     pub static_meshes: Vec<StaticMesh>,
     pub skinned_meshes: Vec<SkinnedMesh>,
-    pub animations: Vec<Animation>
+    pub animations: Vec<Animation>,
 }
 
 fn ufbx_vec3_to_glam(value: ufbx::Vec3) -> glam::Vec3 {
     glam::Vec3 {
         x: value.x as f32,
         y: value.y as f32,
-        z: value.z as f32
+        z: value.z as f32,
     }
 }
 
@@ -180,17 +184,32 @@ fn ufbx_vec2_to_glam(value: ufbx::Vec2) -> glam::Vec2 {
 
 fn ufbx_matrix_to_glam(m: &ufbx::Matrix) -> Mat4 {
     Mat4::from_cols_array(&[
-        m.m00 as f32, m.m10 as f32, m.m20 as f32, 0.0,
-        m.m01 as f32, m.m11 as f32, m.m21 as f32, 0.0,
-        m.m02 as f32, m.m12 as f32, m.m22 as f32, 0.0,
-        m.m03 as f32, m.m13 as f32, m.m23 as f32, 1.0,
+        m.m00 as f32,
+        m.m10 as f32,
+        m.m20 as f32,
+        0.0,
+        m.m01 as f32,
+        m.m11 as f32,
+        m.m21 as f32,
+        0.0,
+        m.m02 as f32,
+        m.m12 as f32,
+        m.m22 as f32,
+        0.0,
+        m.m03 as f32,
+        m.m13 as f32,
+        m.m23 as f32,
+        1.0,
     ])
 }
 
 pub struct FbxImport;
 
 impl FbxImport {
-    pub fn from_bytes(bytes: &[u8], memory_allocator: Arc<StandardMemoryAllocator>) -> Result<FbxImportResult, Box<dyn std::error::Error>> {
+    pub fn from_bytes(
+        bytes: &[u8],
+        memory_allocator: Arc<StandardMemoryAllocator>,
+    ) -> Result<FbxImportResult, Box<dyn std::error::Error>> {
         let mut static_meshes = Vec::new();
         let mut skinned_meshes = Vec::new();
 
@@ -199,7 +218,7 @@ impl FbxImport {
         opts.target_axes = ufbx::CoordinateAxes {
             right: ufbx::CoordinateAxis::PositiveX,
             up: ufbx::CoordinateAxis::NegativeY,
-            front: ufbx::CoordinateAxis::PositiveZ
+            front: ufbx::CoordinateAxis::PositiveZ,
         };
         opts.space_conversion = ufbx::SpaceConversion::AdjustTransforms;
 
@@ -218,7 +237,8 @@ impl FbxImport {
             }
 
             match mesh.skin_deformers.is_empty() || animations.is_empty() {
-                true => { // static mesh
+                true => {
+                    // static mesh
                     let (vertices, indices) = Self::extract_static_vertices(mesh);
 
                     let vertex_buffer = Buffer::from_iter(
@@ -229,7 +249,7 @@ impl FbxImport {
                         },
                         AllocationCreateInfo {
                             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                            | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                             ..Default::default()
                         },
                         vertices,
@@ -244,19 +264,20 @@ impl FbxImport {
                         AllocationCreateInfo {
                             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
                                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                                ..Default::default()
-                            },
-                            indices,
+                            ..Default::default()
+                        },
+                        indices,
                     )?;
 
                     let static_mesh = StaticMesh {
                         index_buffer: Arc::new(index_buffer),
-                        vertex_buffer: Arc::new(vertex_buffer)
+                        vertex_buffer: Arc::new(vertex_buffer),
                     };
 
                     static_meshes.push(static_mesh);
-                },
-                false => { // skinned mesh
+                }
+                false => {
+                    // skinned mesh
                     let (vertices, indices) = Self::extract_skinned_vertices(mesh);
 
                     let vertex_buffer = Buffer::from_iter(
@@ -267,7 +288,7 @@ impl FbxImport {
                         },
                         AllocationCreateInfo {
                             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                            | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                             ..Default::default()
                         },
                         vertices,
@@ -282,9 +303,9 @@ impl FbxImport {
                         AllocationCreateInfo {
                             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
                                 | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                                ..Default::default()
-                            },
-                            indices,    
+                            ..Default::default()
+                        },
+                        indices,
                     )?;
 
                     let (root_joint, joint_count) = Self::build_joint_tree(mesh).unwrap();
@@ -295,7 +316,7 @@ impl FbxImport {
                         root_joint,
                         joint_count: joint_count as u32,
                         //animator: Animator::new(animations.clone().into_iter().max_by(|a, b| a.length.cmp(&b.length)))
-                        animator: Animator::new(None)
+                        animator: Animator::new(None),
                     };
 
                     skinned_meshes.push(skinned_mesh);
@@ -303,7 +324,11 @@ impl FbxImport {
             }
         }
 
-        Ok( FbxImportResult { static_meshes, skinned_meshes, animations })
+        Ok(FbxImportResult {
+            static_meshes,
+            skinned_meshes,
+            animations,
+        })
     }
 
     fn extract_static_vertices(mesh: &ufbx::Mesh) -> (Vec<GameVertex>, Vec<u32>) {
@@ -329,7 +354,7 @@ impl FbxImport {
             let vertex = GameVertex {
                 position: position.to_array(),
                 normal: normal.to_array(),
-                uv: uv.to_array()
+                uv: uv.to_array(),
             };
 
             vertices.push(vertex);
@@ -371,9 +396,7 @@ impl FbxImport {
                 continue;
             }
             let mul_factor = 1.0 / sum;
-            weights
-                .iter_mut()
-                .for_each(|a| a.1 *= mul_factor);
+            weights.iter_mut().for_each(|a| a.1 *= mul_factor);
         }
 
         let mut vertices = Vec::with_capacity(mesh.num_indices);
@@ -412,7 +435,7 @@ impl FbxImport {
                 normal: normal.to_array(),
                 uv: uv.to_array(),
                 joint_ids: joint_ids,
-                joint_weights: joint_weights
+                joint_weights: joint_weights,
             };
 
             vertices.push(vertex);
@@ -435,7 +458,9 @@ impl FbxImport {
         let skin = mesh.skin_deformers.first()?;
 
         let root_cluster = skin.clusters.iter().find(|cluster| {
-            let Some(bone_node) = &cluster.bone_node else { return false };
+            let Some(bone_node) = &cluster.bone_node else {
+                return false;
+            };
 
             match &bone_node.parent {
                 None => true,
@@ -500,12 +525,15 @@ impl FbxImport {
         let mut joint_count = 0;
 
         let joint_id_opt = skin.clusters.iter().position(|c| {
-            c.bone_node.as_ref().map_or(false, |n| n.element.element_id == node.element.element_id)
+            c.bone_node
+                .as_ref()
+                .map_or(false, |n| n.element.element_id == node.element.element_id)
         });
 
         let inverse_bind_transform = {
             if let Some(id) = joint_id_opt {
-                skin.clusters.get(id)
+                skin.clusters
+                    .get(id)
                     .map(|c| ufbx_matrix_to_glam(&c.geometry_to_bone))
                     .unwrap_or(Mat4::IDENTITY)
             } else {
@@ -524,20 +552,23 @@ impl FbxImport {
             }
         }
 
-        (Joint {
-            id: joint_id_opt.unwrap_or(usize::MAX) as u32,
-            name: node.element.name.to_string(),
-            animated_transform: Mat4::IDENTITY,
-            local_bind_transform,
-            inverse_bind_transform,
-            children
-        }, joint_count)
+        (
+            Joint {
+                id: joint_id_opt.unwrap_or(usize::MAX) as u32,
+                name: node.element.name.to_string(),
+                animated_transform: Mat4::IDENTITY,
+                local_bind_transform,
+                inverse_bind_transform,
+                children,
+            },
+            joint_count,
+        )
     }
 
     fn extract_animations(scene: &SceneRoot) -> Vec<Animation> {
         let mut animations = Vec::new();
         let sample_rate = 30.0; // 30 FPS
-        
+
         for anim_stack in &scene.anim_stacks {
             let duration_secs = anim_stack.time_end - anim_stack.time_begin;
             let total_frames = (duration_secs * sample_rate).ceil() as usize;
@@ -562,7 +593,7 @@ impl FbxImport {
                     let position = Vec3 {
                         x: transform.translation.x as f32,
                         y: transform.translation.y as f32,
-                        z: transform.translation.z as f32
+                        z: transform.translation.z as f32,
                     };
 
                     let rotation = Quat::from_xyzw(
@@ -574,15 +605,14 @@ impl FbxImport {
 
                     pose.insert(bone_name, JointTransform { position, rotation });
                 }
-                
+
                 keyframes.push(KeyFrame { time_stamp, pose });
             }
 
             animations.push(Animation {
                 length: Duration::from_secs_f64(duration_secs),
-                frames: keyframes
+                frames: keyframes,
             });
-
         }
 
         animations

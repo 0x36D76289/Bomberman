@@ -1,21 +1,25 @@
+#[rustfmt::skip]
+#[allow(unused_imports, clippy::all)]
+pub mod animation;
+pub mod draw;
 pub mod game_state;
 pub mod init;
 pub mod light;
+#[rustfmt::skip]
+#[allow(unused_imports, dead_code, clippy::all)]
 pub mod mesh;
+pub mod model;
 pub mod object;
 pub mod renderer;
 pub mod text;
 pub mod texture;
 pub mod transform;
 pub mod ui_state;
-pub mod animation;
 
 pub use {
     light::LightInfo,
-    mesh::StaticMesh,
-    renderer::{Renderer, StateRenderInfo, game_vs::GamePush, game_vs::GlobalUbo, gui_vs::GuiPush},
-    text::TextRenderer,
-    texture::load_texture,
+    model::Model,
+    renderer::{Renderer, StateRenderInfo, game_vs::GamePush, game_vs::GlobalUbo},
 };
 
 use std::{hash::Hash, sync::Arc, time::Instant};
@@ -46,10 +50,7 @@ pub struct Vulkan {
 
 pub struct TimeInfo {
     pub dt: f32,
-    pub avg_fps: f32,
     time: Instant,
-    dt_sum: f32,
-    frame_count: f32,
 }
 
 #[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
@@ -104,19 +105,41 @@ pub struct GuiVertex {
     pub uv: [f32; 2],
 }
 
+#[derive(BufferContents, Vertex, Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct UiVertex {
+    #[format(R32G32_SFLOAT)]
+    #[name("in_position")]
+    pub position: [f32; 2],
+
+    #[format(R32G32_SFLOAT)]
+    #[name("in_uv")]
+    pub uv: [f32; 2],
+
+    #[format(R32G32B32A32_SFLOAT)]
+    #[name("in_color")]
+    pub color: [f32; 4],
+
+    #[format(R32_SINT)]
+    #[name("in_tex")]
+    pub tex: i32,
+}
+
 impl PartialEq for GameVertex {
     fn eq(&self, other: &Self) -> bool {
-        let iter_self = self
+        for (s, o) in self
             .position
             .iter()
             .chain(self.normal.iter())
-            .chain(self.uv.iter());
-        let iter_other = other
-            .position
-            .iter()
-            .chain(other.normal.iter())
-            .chain(other.uv.iter());
-        for (s, o) in iter_self.zip(iter_other) {
+            .chain(self.uv.iter())
+            .zip(
+                other
+                    .position
+                    .iter()
+                    .chain(other.normal.iter())
+                    .chain(other.uv.iter()),
+            )
+        {
             if s.to_bits() != o.to_bits() {
                 return false;
             }
@@ -136,19 +159,6 @@ impl Hash for GameVertex {
             .chain(self.uv.iter())
         {
             v.to_bits().hash(state);
-        }
-    }
-}
-
-impl Default for GlobalUbo {
-    fn default() -> Self {
-        GlobalUbo {
-            projection: Default::default(),
-            view: Default::default(),
-            inverse_view: Default::default(),
-            ambient_light_color: Default::default(),
-            direction_to_light: Default::default(),
-            directional_light_color: Default::default(),
         }
     }
 }

@@ -1,8 +1,5 @@
-use std::ops::Mul;
-
-use glam::{Mat4, Vec3, Vec4};
-
 use crate::input::{input::Input, input_state::InputState};
+use glam::{Mat4, Vec3, Vec4};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Transform {
@@ -12,8 +9,6 @@ pub struct Transform {
 }
 
 impl Transform {
-    // Matrix corrsponds to Translate * Ry * Rx * Rz * Scale
-    // Rotations correspond to Tait-bryan angles of Y(1), X(2), Z(3)
     // https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
     pub fn mat4(&self) -> Mat4 {
         let c3 = self.rotation.z.cos();
@@ -111,7 +106,6 @@ impl Transform {
             self.rotation.x = self.rotation.x.clamp(-1.5, 1.5);
             self.rotation.y %= 2.0 * std::f32::consts::PI;
         } else {
-            // if bomb is not pressed, move the camera position
             let yaw = self.rotation.y;
             let up_dir = Vec3::new(0.0, -1.0, 0.0);
             let forward_dir = Vec3::new(yaw.sin(), 0.0, yaw.cos());
@@ -148,12 +142,3 @@ impl Transform {
         }
     }
 }
-
-// impl Mul for Transform {
-//     // This is equivalent of multiplying their matrix forms
-//     type Output = Self;
-
-//     fn mul(self, rhs: Self) -> Self {
-     
-//     }
-// }

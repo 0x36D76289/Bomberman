@@ -1,2 +1,26 @@
 # Bomberman
-Bomberman is one of the most famous video games ever. With more that 70 adaptations, from the first version on MSX, ZX Spectrum and Sharp MZ-700 in 1983 to the last versions available on the PlayStation Network, WiiWare and the Xbox Live Arcade commercialized in 2010. More than 10 millions units have been sold.
+
+Un Bomberman en 3D écrit en Rust avec Vulkan, pour le cursus de 42 Paris. C'est un jeu
+complet : une campagne de 5 niveaux avec une histoire, un niveau par monde et le boss final
+dans le dernier, une arène multijoueur locale jusqu'à 8 joueurs ou IA, la prise en charge des
+manettes et des sauvegardes.
+
+## Démarrage rapide
+
+```bash
+./scripts/setup.sh
+./Bomberman
+```
+
+ou, si Rust est déjà installé :
+
+```bash
+make
+make run
+```
+
+## Assets
+
+Les assets ne sont pas dans le dépôt : `make` télécharge `assets.zip` depuis la release
+`assets-v1` et vérifie son empreinte (`scripts/assets.sha256`). `make pack-assets` régénère
+ce zip à partir du dossier `assets/` local.

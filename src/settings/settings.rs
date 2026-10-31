@@ -1,120 +1,142 @@
-use std::fs::{self, OpenOptions};
-use std::path::Path;
-
-use serde::{Deserialize, Serialize};
-use winit::keyboard::KeyCode;
-
+use crate::game::map::map::LEVEL_COUNT;
 use crate::settings::save::SaveState;
 use crate::{
     input::{
         event::InputEvent,
-        input::{Binds, default_binds},
-        input_name::InputName,
+        input::{BIND_LEN, Binds, default_binds},
     },
     settings::path::get_settings_path,
 };
+use serde::{Deserialize, Serialize};
+use std::fs::{self, File};
+use winit::keyboard::KeyCode;
 
-/// The layout of the entire save file
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
-    /// The resolution of the display in pixel as (x, y)
     pub resolution: (u32, u32),
-    /// If scaling should use nearest neighbor or bilinear TODO:
     pub filtering: bool,
-    /// Should the window be displayed in fullscreen
+    #[serde(default = "enabled")]
+    pub pixel_art: bool,
     pub fullscreen: bool,
-    /// what is the framerate limit in fps, -1 if none, 0 for vsync
     pub framerate_limit: i32,
-    /// Music Volume, between 0 and 1
     pub volume_music: f32,
-    /// SFX Volume, between 0 and 1
     pub volume_sfx: f32,
-    /// Each member of the vector is a player, the content of the element are in order of InputName
+    #[serde(deserialize_with = "padded_binds")]
     pub binds: Vec<Binds>,
-    /// The current save file for single player
-    pub single_player_save: SaveState,
+    #[serde(default)]
+    pub single_player_save: Option<SaveState>,
+    #[serde(default = "first_level")]
+    pub unlocked_level: u32,
+    #[serde(default)]
+    pub intro_seen: bool,
+}
+
+fn padded_binds<'de, D: serde::Deserializer<'de>>(de: D) -> Result<Vec<Binds>, D::Error> {
+    Ok(Vec::<Vec<InputEvent>>::deserialize(de)?
+        .into_iter()
+        .enumerate()
+        .map(|(player, events)| {
+            let mut binds = Settings::player_binds(player);
+            for (slot, event) in binds.iter_mut().zip(events) {
+                *slot = event;
+            }
+            binds
+        })
+        .collect())
+}
+
+fn first_level() -> u32 {
+    1
+}
+
+fn enabled() -> bool {
+    true
+}
+
+fn key_binds(keys: [KeyCode; BIND_LEN]) -> Binds {
+    keys.map(InputEvent::from_keycode)
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        let mut p1_binds: Binds = default_binds();
-        p1_binds[InputName::Up as usize] = InputEvent::from_keycode(KeyCode::KeyW);
-        p1_binds[InputName::Down as usize] = InputEvent::from_keycode(KeyCode::KeyS);
-        p1_binds[InputName::Left as usize] = InputEvent::from_keycode(KeyCode::KeyA);
-        p1_binds[InputName::Right as usize] = InputEvent::from_keycode(KeyCode::KeyD);
-        p1_binds[InputName::Bomb as usize] = InputEvent::from_keycode(KeyCode::Space);
-        p1_binds[InputName::Back as usize] = InputEvent::from_keycode(KeyCode::Escape);
-
-        let mut p2_binds: Binds = default_binds();
-        p2_binds[InputName::Up as usize] = InputEvent::from_keycode(KeyCode::ArrowUp);
-        p2_binds[InputName::Down as usize] = InputEvent::from_keycode(KeyCode::ArrowDown);
-        p2_binds[InputName::Left as usize] = InputEvent::from_keycode(KeyCode::ArrowLeft);
-        p2_binds[InputName::Right as usize] = InputEvent::from_keycode(KeyCode::ArrowRight);
-        p2_binds[InputName::Bomb as usize] = InputEvent::from_keycode(KeyCode::ShiftRight);
-        p2_binds[InputName::Back as usize] = InputEvent::from_keycode(KeyCode::Numpad0);
-
         Self {
-            resolution: (800, 600),
-            filtering: false,
+            resolution: (1280, 720),
+            filtering: true,
+            pixel_art: true,
             fullscreen: false,
-            framerate_limit: 60,
-            volume_music: 1.0,
-            volume_sfx: 1.0,
-            binds: vec![p1_binds, p2_binds],
-            single_player_save: SaveState::default(),
+            framerate_limit: 0,
+            volume_music: 0.7,
+            volume_sfx: 0.8,
+            binds: vec![
+                key_binds([
+                    KeyCode::KeyW,
+                    KeyCode::KeyS,
+                    KeyCode::KeyA,
+                    KeyCode::KeyD,
+                    KeyCode::Space,
+                    KeyCode::Escape,
+                    KeyCode::KeyE,
+                ]),
+                key_binds([
+                    KeyCode::ArrowUp,
+                    KeyCode::ArrowDown,
+                    KeyCode::ArrowLeft,
+                    KeyCode::ArrowRight,
+                    KeyCode::ShiftRight,
+                    KeyCode::Numpad0,
+                    KeyCode::ControlRight,
+                ]),
+            ],
+            single_player_save: None,
+            unlocked_level: 1,
+            intro_seen: false,
         }
     }
 }
 
 impl Settings {
-    /// Saves the settings file to the settings path using [get_settings_path()]
+    pub fn player_binds(player: usize) -> Binds {
+        Self::default()
+            .binds
+            .get(player)
+            .copied()
+            .unwrap_or_else(default_binds)
+    }
+
     pub fn save(&self) {
-        let path_str = get_settings_path();
-        let path = Path::new(&path_str);
-
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                if let Err(e) = fs::create_dir_all(parent) {
-                    println!("Error creating settings directory: {}", e);
-                    return;
-                }
-            }
+        let path = get_settings_path();
+        if let Some(parent) = path.parent()
+            && fs::create_dir_all(parent).is_err()
+        {
+            return;
         }
-
-        let settings_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path);
-
-        if let Ok(file) = settings_file {
-            if let Err(e) = serde_cbor::to_writer(file, self) {
-                println!("save: couldn't write settings to {}: {}", path_str, e);
-            }
-        } else {
-            println!("save: failed to open {}", path_str);
+        if let Ok(file) = File::create(path) {
+            let _ = ciborium::into_writer(self, file);
         }
     }
 
-    /// Returns the [Settings] struct from the serialized file at [get_settings_path()]
     pub fn load_settings() -> Self {
-        let settings_file = OpenOptions::new().read(true).open(get_settings_path());
-
-        if settings_file.is_err() {
-            println!(
-                "couldn't read file \"{}\", loading default settings",
-                get_settings_path()
-            );
+        let Ok(file) = File::open(get_settings_path()) else {
             return Self::default();
-        }
-        let load: Result<Settings, serde_cbor::Error> =
-            serde_cbor::from_reader(settings_file.unwrap());
-        if load.is_err() {
-            println!("file {} is invalid, saving defaults", get_settings_path());
+        };
+        let Ok(mut settings) = ciborium::from_reader::<Settings, _>(file) else {
             let default = Self::default();
             default.save();
             return default;
+        };
+        if settings.binds.is_empty() {
+            settings.binds = Self::default().binds;
         }
-        load.unwrap()
+        settings.unlocked_level = settings.unlocked_level.clamp(1, LEVEL_COUNT);
+        if let Some(save) = &mut settings.single_player_save {
+            save.level = save.level.clamp(1, LEVEL_COUNT);
+        }
+        settings
+    }
+
+    pub fn save_progress(&mut self, save: SaveState) {
+        self.unlocked_level = self.unlocked_level.max(save.level);
+        self.single_player_save = Some(save);
+        self.save();
     }
 }

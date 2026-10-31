@@ -1,14 +1,49 @@
-use std::println;
-
 use crate::{
-    audio::AudioManager,
-    game::{game_settings::GameSettings, game_state::GameState, resources::Resources},
+    audio::{AudioManager, BackgroundMusic},
+    game::{
+        game_state::{ClearStats, GameState, RestartInfo},
+        lobby::LobbySettings,
+        resources::Resources,
+    },
     input::{event::InputEvent, input::Input},
-    settings::{save::GameDifficulty, settings::Settings},
-    ui::{UiState, pages::game_settings::UIGameSettings, pages::stage_clear::STAGE_CLEAR_DURATION},
+    settings::{
+        save::{GameDifficulty, SaveState},
+        settings::Settings,
+    },
+    ui::{
+        UiState,
+        input::UiInput,
+        pages::{
+            self,
+            cutscene::{CutsceneNext, Scene},
+            settings::SettingsPage,
+        },
+    },
 };
+use glam::Vec2;
 
-/// All the states the program can be in
+pub const POP_TO_MENU: u8 = u8::MAX;
+
+pub type Transition = (Option<AppState>, u8);
+
+pub fn replace_or_menu(state: Option<AppState>, pop: u8) -> Transition {
+    match state {
+        Some(state) => (Some(state), pop),
+        None => (None, POP_TO_MENU),
+    }
+}
+
+pub struct Ctx<'a> {
+    pub delta: f32,
+    pub inputs: &'a Vec<Input>,
+    pub events: &'a Vec<InputEvent>,
+    pub ui: &'a UiInput,
+    pub resources: &'static Resources,
+    pub audio: &'a mut AudioManager,
+    pub settings: &'a mut Settings,
+    pub screen: Vec2,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
     pub state: AppStateEnum,
@@ -16,310 +51,247 @@ pub struct AppState {
     pub ui: Option<UiState>,
 }
 
-/// The list of App States, dictates current behaviour
 #[derive(Debug, Clone, Default)]
 pub enum AppStateEnum {
     Game,
     #[default]
     MainMenu,
-    Pause,
-    DifficultySelect,
-    LevelSelect {
+    NewGame {
         difficulty: GameDifficulty,
+        random_layout: bool,
     },
-    GameSettings(UIGameSettings),
-    Settings {
-        selected_player: usize,
+    StageMap {
+        run: SaveState,
     },
-    Binds {
-        player: usize,
-        waiting: isize,
+    Lobby(LobbySettings),
+    Settings(SettingsPage),
+    Pause {
+        restart: RestartInfo,
+        confirm: Option<pages::pause::PauseConfirm>,
     },
     GameOver {
-        difficulty: GameDifficulty,
+        run: SaveState,
     },
     StageClear {
-        timer: f32,
-        next_level: u32,
-        lives: u32,
-        score: u32,
-        difficulty: GameDifficulty,
+        run: SaveState,
+        stats: ClearStats,
+        name: String,
     },
-    MultiplayerEndScreen,
-    #[cfg(debug_assertions)]
-    TestScene
+    MultiplayerEnd {
+        winners: Vec<u32>,
+        restart: RestartInfo,
+    },
+    Cutscene {
+        scene: Scene,
+        slide: usize,
+        timer: f32,
+        next: CutsceneNext,
+    },
+    Credits,
 }
 
 impl AppState {
-    /// The binds app state constructor
-    pub fn binds(player: usize, ratio: f32) -> Self {
+    fn page(state: AppStateEnum) -> Self {
         Self {
-            state: AppStateEnum::Binds {
-                player,
-                waiting: -1,
-            },
+            state,
             game: None,
-            ui: Some(UiState::binds(player, ratio)),
+            ui: Some(UiState::default()),
         }
     }
 
-    /// The game app state constructor
     pub fn game(game_state: GameState) -> Self {
         Self {
             state: AppStateEnum::Game,
             game: Some(game_state),
-            ..Default::default()
+            ui: Some(UiState::default()),
         }
     }
 
-    /// The game over app state constructor
-    pub fn game_over(score: u32, difficulty: GameDifficulty) -> Self {
-        Self {
-            state: AppStateEnum::GameOver { difficulty },
-            game: None,
-            ui: Some(UiState::game_over(score)),
+    pub fn level_start(settings: &mut Settings, run: SaveState, with_story: bool) -> Option<Self> {
+        let game = GameState::new_campaign(run)?;
+        settings.save_progress(run);
+        if with_story {
+            if run.level == 1 && !settings.intro_seen {
+                settings.intro_seen = true;
+                settings.save();
+                return Some(Self::cutscene(Scene::Intro, CutsceneNext::Level(run)));
+            }
+            if let Some(scene) = Scene::world_intro(run.level) {
+                return Some(Self::cutscene(scene, CutsceneNext::Level(run)));
+            }
         }
+        Some(Self::game(game))
     }
 
-    /// The difficulty select app state constructor
-    pub fn difficulty_select() -> Self {
-        Self {
-            state: AppStateEnum::DifficultySelect,
-            game: None,
-            ui: Some(UiState::difficulty_select()),
-        }
-    }
-
-    /// The game settings app state constructor
-    pub fn game_settings(resources: &Resources, player_count: u8) -> Self {
-        Self {
-            state: AppStateEnum::GameSettings(UIGameSettings::corners(player_count)),
-            game: Some(GameState::new_settings_preview(
-                GameSettings::default(),
-                resources,
-            )),
-            ui: Some(UiState::game_settings(player_count)),
-        }
-    }
-
-    /// The level select app state constructor
-    pub fn level_select(difficulty: GameDifficulty) -> Self {
-        Self {
-            state: AppStateEnum::LevelSelect { difficulty },
-            game: None,
-            ui: Some(UiState::level_select(difficulty)),
-        }
-    }
-
-    /// The main menu app state constructor
     pub fn main_menu() -> Self {
         Self {
             state: AppStateEnum::MainMenu,
-            game: None,
-            ui: Some(UiState::main_menu()),
+            game: Some(GameState::backdrop(
+                crate::resources(),
+                crate::game::theme::Theme::Grass,
+            )),
+            ui: Some(UiState::default()),
         }
     }
 
-    /// The multiplayer end screen app state constructor
-    pub fn multiplayer_end_screen(winners: Vec<u32>) -> Self {
+    pub fn new_game() -> Self {
+        Self::page(AppStateEnum::NewGame {
+            difficulty: GameDifficulty::Normal,
+            random_layout: false,
+        })
+    }
+
+    pub fn stage_map(run: SaveState) -> Self {
+        Self::page(AppStateEnum::StageMap { run })
+    }
+
+    pub fn lobby(resources: &Resources, humans: u8) -> Self {
+        let lobby = LobbySettings::new(crate::game::lobby::LobbyPreset::Corners, humans);
+        let mut ui = UiState::default();
+        ui.render_info.drawn_first = true;
         Self {
-            state: AppStateEnum::MultiplayerEndScreen,
-            game: None,
-            ui: Some(UiState::multiplayer_end_screen(winners)),
+            state: AppStateEnum::Lobby(lobby),
+            game: Some(GameState::lobby_preview(&lobby, resources)),
+            ui: Some(ui),
         }
     }
 
-    /// The pause app state constructor
-    pub fn pause() -> Self {
-        Self {
-            state: AppStateEnum::Pause,
-            game: None,
-            ui: Some(UiState::pause()),
-        }
+    pub fn settings(in_game: bool) -> Self {
+        Self::page(AppStateEnum::Settings(SettingsPage::new(in_game)))
     }
 
-    /// The main settings app state constructor
-    pub fn settings() -> Self {
-        Self {
-            state: AppStateEnum::Settings { selected_player: 0 },
-            game: None,
-            ui: Some(UiState::settings()),
-        }
+    pub fn pause(restart: RestartInfo) -> Self {
+        Self::page(AppStateEnum::Pause {
+            restart,
+            confirm: None,
+        })
     }
 
-    /// The stage clear app state constructor
+    pub fn game_over(run: SaveState) -> Self {
+        Self::page(AppStateEnum::GameOver { run })
+    }
+
     pub fn stage_clear(
         settings: &mut Settings,
-        level: u32,
-        lives: u32,
-        score: u32,
-        difficulty: GameDifficulty,
+        run: SaveState,
+        name: String,
+        stats: ClearStats,
     ) -> Self {
+        pages::stage_clear::save(settings, run);
+        Self::page(AppStateEnum::StageClear { run, stats, name })
+    }
+
+    pub fn multiplayer_end_screen(winners: Vec<u32>, restart: RestartInfo) -> Self {
+        Self::page(AppStateEnum::MultiplayerEnd { winners, restart })
+    }
+
+    pub fn cutscene(scene: Scene, next: CutsceneNext) -> Self {
         Self {
-            state: AppStateEnum::StageClear {
-                timer: STAGE_CLEAR_DURATION,
-                next_level: level + 1,
-                lives,
-                score,
-                difficulty,
+            state: AppStateEnum::Cutscene {
+                scene,
+                slide: 0,
+                timer: 0.0,
+                next,
             },
-            game: None,
-            ui: Some(UiState::stage_clear(
-                settings, level, lives, score, difficulty,
-            )),
+            game: Some(pages::cutscene::backdrop(scene)),
+            ui: Some(UiState::default()),
         }
     }
 
-    #[cfg(debug_assertions)]
-    pub fn test_scene(resources: &Resources) -> Self {
-        Self {
-            state: AppStateEnum::TestScene,
-            game: Some(GameState::create_test_scene(resources)),
-            ..Default::default()
-        }
+    pub fn credits() -> Self {
+        Self::page(AppStateEnum::Credits)
     }
 
-    /// The main game's logic, is triggered once per frame and handles any action the game needs to
-    /// execute during [delta](f32) amount of time
-    pub fn tick(
-        &mut self,
-        delta: f32,
-        inputs: &Vec<Input>,
-        events: &Vec<InputEvent>,
-        resources: &Resources,
-        audio_manager: &mut AudioManager,
-        settings: &mut Settings,
-        ratio: f32,
-    ) -> (Option<AppState>, u8) {
+    pub fn tick(&mut self, ctx: &mut Ctx) -> Transition {
+        let ui = self.ui.get_or_insert_with(UiState::default);
         match &mut self.state {
             AppStateEnum::Game => {
-                self.game
-                    .as_mut()
-                    .unwrap()
-                    .tick(delta, inputs, resources, audio_manager, settings)
-            }
-            AppStateEnum::MainMenu => {
-                self.ui
-                    .as_mut()
-                    .unwrap()
-                    .main_menu_tick(inputs, audio_manager, resources, settings)
-            }
-            AppStateEnum::DifficultySelect => self
-                .ui
-                .as_mut()
-                .unwrap()
-                .difficulty_select_tick(inputs, audio_manager),
-            AppStateEnum::LevelSelect { difficulty } => self
-                .ui
-                .as_mut()
-                .unwrap()
-                .level_select_tick(inputs, audio_manager, *difficulty, settings),
-            AppStateEnum::GameSettings(ui_game_settings) => {
-                let (game, ui) = match (self.game.as_mut(), self.ui.as_mut()) {
-                    (Some(game), Some(ui)) => (game, ui),
-                    _ => panic!(
-                        "Tried to tick game settings but app state doesnt contain a gamestate or a uistate"
-                    ),
+                let Some(game) = self.game.as_mut() else {
+                    return (None, POP_TO_MENU);
                 };
-                let old_settings = *ui_game_settings;
-                match ui.game_settings_tick(delta, inputs, ui_game_settings) {
-                    None => {
-                        if old_settings != *ui_game_settings {
-                            let err = game.update_from_ui_settings(ui_game_settings, resources);
-                            if err.is_err() {
-                                ui.set_error(
-                                    "Map creation failed, try ajusting settings".to_string(),
-                                    ui_game_settings,
-                                );
-                            }
-                        }
-                        (None, 0)
-                    }
-                    Some(enter_pressed) => {
-                        if enter_pressed {
-                            (
-                                Some(AppState::game(GameState::new_multiplayer_from_map(
-                                    resources,
-                                    GameSettings {
-                                        nb_humans: ui_game_settings.player_count as u32,
-                                        nb_bots: ui_game_settings.bot_count as u32,
-                                        ..GameSettings::default()
-                                    },
-                                    game.get_map().clone(),
-                                ))),
-                                0,
-                            )
-                        } else {
-                            (None, 1)
-                        }
-                    }
-                }
+                let ret = game.tick(
+                    ctx.delta,
+                    ctx.inputs,
+                    ctx.resources,
+                    ctx.audio,
+                    ctx.settings,
+                );
+                pages::hud::draw(ui, game, ctx);
+                ret
             }
-            AppStateEnum::Settings { selected_player } => {
-                self.ui
-                    .as_mut()
-                    .unwrap()
-                    .settings_tick(inputs, settings, selected_player, ratio)
-            }
-            AppStateEnum::Binds { player, waiting } => self
-                .ui
-                .as_mut()
-                .unwrap()
-                .binds_tick(inputs, events, settings, player, waiting),
-            AppStateEnum::Pause => {
-                self.ui
-                    .as_mut()
-                    .unwrap()
-                    .pause_tick(inputs, resources, audio_manager, settings)
-            }
-            AppStateEnum::GameOver { difficulty } => {
-                self.ui
-                    .as_mut()
-                    .unwrap()
-                    .game_over_tick(inputs, audio_manager, *difficulty)
-            }
-            AppStateEnum::StageClear {
-                timer,
-                next_level,
-                lives,
-                score,
+            AppStateEnum::MainMenu => pages::main_menu::tick(ui, ctx),
+            AppStateEnum::NewGame {
                 difficulty,
-            } => self.ui.as_mut().unwrap().stage_clear_tick(
-                delta,
-                timer,
-                next_level,
-                lives,
-                score,
-                *difficulty,
-            ),
-            AppStateEnum::MultiplayerEndScreen => self
-                .ui
-                .as_ref()
-                .unwrap()
-                .multiplayer_end_screen_tick(inputs),
-            #[cfg(debug_assertions)]
-            AppStateEnum::TestScene => {
-                self.game.as_mut().unwrap().tick_test(delta, inputs, resources, audio_manager, settings)
+                random_layout,
+            } => pages::new_game::tick(ui, ctx, difficulty, random_layout),
+            AppStateEnum::StageMap { run } => pages::stage_map::tick(ui, ctx, *run),
+            AppStateEnum::Lobby(lobby) => {
+                let old = *lobby;
+                let ret = pages::lobby::tick(ui, ctx, lobby, self.game.as_mut());
+                if *lobby != old
+                    && let Some(preview) = self.game.as_mut()
+                {
+                    preview.update_from_lobby(lobby, ctx.resources);
+                }
+                ret
             }
+            AppStateEnum::Settings(page) => page.tick(ui, ctx),
+            AppStateEnum::Pause { restart, confirm } => {
+                pages::pause::tick(ui, ctx, restart, confirm)
+            }
+            AppStateEnum::GameOver { run } => pages::game_over::tick(ui, ctx, *run),
+            AppStateEnum::StageClear { run, stats, name } => {
+                pages::stage_clear::tick(ui, ctx, *run, *stats, name)
+            }
+            AppStateEnum::MultiplayerEnd { winners, restart } => {
+                pages::mp_end::tick(ui, ctx, winners, restart)
+            }
+            AppStateEnum::Cutscene {
+                scene,
+                slide,
+                timer,
+                next,
+            } => pages::cutscene::tick(ui, ctx, *scene, slide, timer, *next),
+            AppStateEnum::Credits => pages::credits::tick(ui, ctx),
         }
     }
 
-    /// If an App State is considered transparent the State below it in the stack will also be rendered
     pub fn is_transparent(&self) -> bool {
-        match self.state {
-            AppStateEnum::Game => false,
-            AppStateEnum::Pause => true,
-            AppStateEnum::GameOver { .. } => true,
-            AppStateEnum::MainMenu => false,
-            AppStateEnum::DifficultySelect => false,
-            AppStateEnum::LevelSelect { .. } => false,
-            AppStateEnum::GameSettings(_) => false,
-            AppStateEnum::Binds { .. } => false,
-            AppStateEnum::Settings { .. } => false,
-            AppStateEnum::StageClear { .. } => true,
-            AppStateEnum::MultiplayerEndScreen => false,
-            #[cfg(debug_assertions)]
-            AppStateEnum::TestScene => false
+        match &self.state {
+            AppStateEnum::Pause { .. }
+            | AppStateEnum::GameOver { .. }
+            | AppStateEnum::StageClear { .. }
+            | AppStateEnum::MultiplayerEnd { .. } => true,
+            AppStateEnum::Settings(page) => page.in_game,
+            _ => false,
+        }
+    }
+
+    pub fn is_gameplay(&self) -> bool {
+        matches!(self.state, AppStateEnum::Game)
+    }
+
+    pub fn music(&self) -> Option<Option<BackgroundMusic>> {
+        match &self.state {
+            AppStateEnum::MainMenu => Some(Some(BackgroundMusic::Menu)),
+            AppStateEnum::Settings(page) if !page.in_game => Some(Some(BackgroundMusic::Menu)),
+            AppStateEnum::NewGame { .. }
+            | AppStateEnum::StageMap { .. }
+            | AppStateEnum::Lobby(_)
+            | AppStateEnum::MultiplayerEnd { .. } => Some(Some(BackgroundMusic::Select)),
+            AppStateEnum::Game => self.game.as_ref().map(|game| Some(game.theme().music())),
+            AppStateEnum::GameOver { .. } | AppStateEnum::StageClear { .. } => Some(None),
+            AppStateEnum::Pause { .. } | AppStateEnum::Settings(_) => None,
+            AppStateEnum::Cutscene { scene, .. } => Some(Some(scene.music())),
+            AppStateEnum::Credits => Some(Some(BackgroundMusic::Ending)),
+        }
+    }
+
+    pub fn update_music(&self, audio_manager: &mut AudioManager) {
+        match self.music() {
+            Some(Some(music)) => audio_manager.play_background_music(music),
+            Some(None) => audio_manager.stop_background_music(),
+            None => (),
         }
     }
 }

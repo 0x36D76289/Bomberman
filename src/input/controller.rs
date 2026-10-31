@@ -1,10 +1,8 @@
-use crate::input::event::InputEvent;
+use crate::input::{event::InputEvent, input::Binds};
 use gilrs::EventType;
 
-/// The threshold for an analog action to be considered [true]
 const DEADZONE: f32 = 0.2;
 
-/// Tests in an event is a valid Bind (ie: it's an activation and not a click)
 pub fn is_bindable_action(event: &InputEvent) -> bool {
     match event {
         InputEvent::Keyboard { key: _, down } => *down,
@@ -16,13 +14,9 @@ pub fn is_bindable_action(event: &InputEvent) -> bool {
             EventType::AxisChanged(_, value, _) => value.abs() > DEADZONE,
             _ => false,
         },
-        InputEvent::Click { .. } => false,
     }
 }
 
-/// This modulates the input_event such that values will be in ([0.0], [1.0], [-1.0])
-/// Binds are only saved as one of these 3 values then future events match [DEADZONE] to be
-/// converted into a trinary value
 pub fn create_bind(input_event: &InputEvent) -> InputEvent {
     match input_event {
         InputEvent::ControllerInput { controller, event } => match event {
@@ -40,7 +34,6 @@ pub fn create_bind(input_event: &InputEvent) -> InputEvent {
     }
 }
 
-/// Clamps an analog value to a trinary value ([-1.0], [0.0], [1.0])
 fn normalize_value(value: f32) -> f32 {
     if value.abs() < DEADZONE {
         return 0.0;
@@ -48,9 +41,6 @@ fn normalize_value(value: f32) -> f32 {
     value.signum()
 }
 
-/// Returns None if test and input aren't testing the same key/buttton/axis
-/// returns false if their normalized values differ
-/// returns true  if their normalized values are equal
 pub fn input_events_compare(test: &InputEvent, predicate: &InputEvent) -> Option<bool> {
     if *test == *predicate {
         return Some(true);
@@ -101,4 +91,10 @@ pub fn input_events_compare(test: &InputEvent, predicate: &InputEvent) -> Option
         return Some(*test_down == *predicate_down);
     }
     None
+}
+
+pub fn uses_controller(binds: &Binds) -> bool {
+    binds
+        .iter()
+        .any(|bind| matches!(bind, InputEvent::ControllerInput { .. }))
 }

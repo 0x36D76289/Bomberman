@@ -1,145 +1,154 @@
-use glam::{Vec2, Vec4};
-
 use crate::{
-    app_state::AppState,
-    audio::{AudioManager, BackgroundMusic},
-    game::{game_state::GameState, resources::Resources},
-    input::{input::Input, input_state::InputState, input_vec::MenuInput},
-    settings::settings::Settings,
+    app_state::{AppState, Ctx, POP_TO_MENU, Transition, replace_or_menu},
+    game::game_state::RestartInfo,
     ui::{
         UiState,
-        button::{Button, ButtonNeighbors},
-        canvas::Canvas,
+        layout::Rect,
+        style,
+        textures::Icon,
+        ui::id,
+        widgets::{Action, ButtonStyle},
     },
 };
+use glam::Vec2;
 
-impl UiState {
-    /// The pause ui page constructor
-    pub fn pause() -> Self {
-        let shadow = Canvas {
-            center: Vec2::ZERO,
-            width: 0.5,
-            height: 0.5,
-            color: Vec4::ZERO.with_w(0.6),
-            texture: None,
-            text: None,
-            text_color: None,
-            text_size: None,
-        };
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PauseConfirm {
+    Restart,
+    Quit,
+}
 
-        let mut resume = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, -0.2),
-                width: 0.0,
-                height: 0.0,
-                color: Vec4::ZERO,
-                texture: None,
-                text: Some("Resume".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.6),
-            },
-            outline_color: None,
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 1,
-                left: 0,
-                right: 0,
-            },
-            selected_color: Vec4::ZERO,
-            selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            selected_texture: None,
-        };
-        resume.toggle();
+fn restart_game(ctx: &Ctx, restart: &RestartInfo) -> Transition {
+    replace_or_menu(restart.restart(ctx.resources).map(AppState::game), 2)
+}
 
-        let restart = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.0),
-                width: 0.0,
-                height: 0.0,
-                color: Vec4::ZERO,
-                texture: None,
-                text: Some("Restart".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.6),
-            },
-            outline_color: None,
-            neighbors: ButtonNeighbors {
-                up: 0,
-                down: 2,
-                left: 1,
-                right: 1,
-            },
-            selected_color: Vec4::ZERO,
-            selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            selected_texture: None,
-        };
-        let menu = Button {
-            canvas: Canvas {
-                center: Vec2::new(0.0, 0.2),
-                width: 0.0,
-                height: 0.0,
-                color: Vec4::ZERO,
-                texture: None,
-                text: Some("Menu".to_string()),
-                text_color: Some(Vec4::ONE),
-                text_size: Some(1.6),
-            },
-            outline_color: None,
-            neighbors: ButtonNeighbors {
-                up: 1,
-                down: 2,
-                left: 2,
-                right: 2,
-            },
-            selected_color: Vec4::ZERO,
-            selected_text_color: Some(Vec4::ONE.with_z(0.0)),
-            selected_texture: None,
-        };
+pub fn tick(
+    state: &mut UiState,
+    ctx: &mut Ctx,
+    restart: &RestartInfo,
+    confirm: &mut Option<PauseConfirm>,
+) -> Transition {
+    let mut ui = super::begin(state, ctx);
+    let screen = ui.screen();
+    let campaign = matches!(restart, RestartInfo::Campaign(_));
+    ui.fill(style::OVERLAY);
+    let mut transition = (None, 0);
 
-        Self {
-            canvases: vec![shadow],
-            buttons: vec![resume, restart, menu],
-            selected: 0,
-            render_info: Default::default(),
-        }
-    }
-
-    /// The pause ui page tick function
-    pub fn pause_tick(
-        &mut self,
-        inputs: &Vec<Input>,
-        _resources: &Resources,
-        audio_manager: &mut AudioManager,
-        settings: &Settings,
-    ) -> (Option<AppState>, u8) {
-        if self.button_inputs(inputs) {
-            return match self.selected {
-                0 => (None, 1), // Resume
-                1 => {
-                    // Restart
-                    audio_manager.play_background_music(BackgroundMusic::Game);
-                    if let Some(game_state) =
-                        GameState::new_campaign(1, 3, 0, settings.single_player_save.difficulty)
-                    {
-                        (Some(AppState::game(game_state)), 2)
+    match *confirm {
+        None => {
+            let panel = Rect::centered(screen / 2.0, Vec2::new(620.0, 600.0));
+            ui.panel(panel);
+            ui.title("PAUSE", Vec2::new(screen.x / 2.0, panel.y + 80.0), 80.0);
+            let rows = Rect::new(
+                panel.x + 60.0,
+                panel.y + 160.0,
+                panel.w - 120.0,
+                4.0 * 84.0 + 3.0 * 18.0,
+            )
+            .rows(4, 18.0);
+            if ui
+                .button(
+                    id("resume"),
+                    rows[0],
+                    "Reprendre",
+                    Some(Icon::Next),
+                    ButtonStyle::Go,
+                )
+                .clicked
+                || ui.back_pressed()
+            {
+                ctx.audio.resume_background_music();
+                transition = (None, 1);
+            }
+            if ui
+                .button(
+                    id("restart"),
+                    rows[1],
+                    "Recommencer",
+                    Some(Icon::Return),
+                    ButtonStyle::Normal,
+                )
+                .clicked
+            {
+                *confirm = Some(PauseConfirm::Restart);
+            }
+            if ui
+                .button(
+                    id("settings"),
+                    rows[2],
+                    "Paramètres",
+                    Some(Icon::Gear),
+                    ButtonStyle::Normal,
+                )
+                .clicked
+            {
+                transition = (Some(AppState::settings(true)), 0);
+            }
+            if ui
+                .button(
+                    id("quit"),
+                    rows[3],
+                    if campaign {
+                        "Menu principal"
                     } else {
-                        println!(
-                            "Error: Failed to load campaign level 1 for restart. Returning to menu."
-                        );
-                        audio_manager.play_background_music(BackgroundMusic::Menu);
+                        "Retour au salon"
+                    },
+                    Some(Icon::Home),
+                    ButtonStyle::Danger,
+                )
+                .clicked
+            {
+                *confirm = Some(PauseConfirm::Quit);
+            }
+            ui.prompts(&[
+                (Action::Navigate, "Déplacer"),
+                (Action::Confirm, "Valider"),
+                (Action::Back, "Reprendre"),
+            ]);
+        }
+        Some(PauseConfirm::Restart) => {
+            match ui.dialog(
+                "restart",
+                "Recommencer ?",
+                if campaign {
+                    "Le niveau recommence avec le même nombre de vies."
+                } else {
+                    "La manche recommence sur la même carte."
+                },
+                "Recommencer",
+            ) {
+                Some(true) => {
+                    ctx.audio.resume_background_music();
+                    transition = restart_game(ctx, restart);
+                }
+                Some(false) => *confirm = None,
+                None => (),
+            }
+        }
+        Some(PauseConfirm::Quit) => {
+            match ui.dialog(
+                "quit",
+                "Quitter la partie ?",
+                if campaign {
+                    "Tu reprendras au début de ce niveau."
+                } else {
+                    "La manche sera perdue."
+                },
+                "Quitter",
+            ) {
+                Some(true) => {
+                    ctx.audio.resume_background_music();
+                    transition = if campaign {
+                        (None, POP_TO_MENU)
+                    } else {
                         (None, 2)
-                    }
+                    };
                 }
-                _ => {
-                    // Menu
-                    audio_manager.play_background_music(BackgroundMusic::Menu);
-                    (None, 2)
-                }
-            };
+                Some(false) => *confirm = None,
+                None => (),
+            }
         }
-        if inputs.menu_back() == InputState::Pressed {
-            return (None, 1);
-        }
-        (None, 0)
     }
+    ui.end(ctx.audio);
+    transition
 }

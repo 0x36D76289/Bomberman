@@ -1,18 +1,21 @@
-use std::print;
-
-use glam::Mat4;
+use crate::{
+    game::{game_state::GameState, resources::Resources},
+    graphics::{
+        GamePush, GuiVertex, Renderer, StateRenderInfo, Vulkan,
+        draw::{draw, draw_indexed, present_rendering, vertex_buffer, viewport},
+        renderer::{
+            Resolution,
+            animation_vs::{AnimationPush, JointsUbo},
+            postprocess_fs::PostPush,
+        },
+    },
+};
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{RenderingAttachmentInfo, RenderingInfo, SubpassContents},
     descriptor_set::{DescriptorSet, WriteDescriptorSet},
     format::ClearValue,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter},
-    pipeline::{Pipeline, PipelineBindPoint, graphics::viewport::Viewport},
+    pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint},
     render_pass::{AttachmentLoadOp, AttachmentStoreOp},
-};
-
-use crate::{
-    game::{game_state::{GameMode, GameState}, resources::Resources}, graphics::{GamePush, GuiVertex, Renderer, StateRenderInfo, Vulkan, mesh::Mesh, object::Object, renderer::animation_vs::JointsUbo},
 };
 
 impl Renderer {
@@ -25,87 +28,50 @@ impl Renderer {
         is_first: bool,
     ) {
         self.game_pass(vulkan, resources, state);
-        //self.animation_pass(vulkan, resources, state);
         self.postprocess_pass(vulkan, &state.render_info, image_index, is_first);
     }
 
     fn game_pass(&mut self, vulkan: &Vulkan, resources: &Resources, state: &GameState) {
-        let (static_pipeline, animated_pipeline, command_buffer, rcx) = match (
-            self.game_pipeline.as_ref(),
-            self.animation_pipeline.as_ref(),
-            self.command_buffer.as_mut(),
-            self.rcx.as_ref(),
-        ) {
-            (Some(static_pipeline), Some(animated_pipeline), Some(command_buffer), Some(rcx)) => {
-                (static_pipeline.clone(), animated_pipeline.clone(), command_buffer, rcx)
-            }
-            (None, _, _, _) => panic!("Static objects pipeline is not initialized"),
-            (_, None, _, _) => panic!("Animated objects pipeline is not initialized"),
-            (_, _, None, _) => panic!("Command buffer is not started"),
-            (_, _, _, None) => panic!("Render context is not initialized"),
-        };
+        let pipeline = self.game_pipeline.clone().expect("game pipeline");
+        let animation_pipeline = self.animation_pipeline.clone().expect("animation pipeline");
+        let rcx = self.rcx.as_ref().expect("render context");
+        let command_buffer = self.command_buffer.as_mut().expect("command buffer");
 
         let window_size: [u32; 2] = rcx.swapchain.image_extent();
-        let game_resolution = rcx.game_resolution.resolution(window_size);
 
-        let global_ubo = {
-            let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
-            state.create_ubo(aspect_ratio)
-        };
-
-        let rendering_info = {
-            let mut color_attachment = RenderingAttachmentInfo::image_view(rcx.color_image.clone());
-            color_attachment.store_op = AttachmentStoreOp::Store;
-            color_attachment.load_op = AttachmentLoadOp::Clear;
-            color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-
-            let mut depth_attachment = RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
-            depth_attachment.load_op = AttachmentLoadOp::Clear;
-            depth_attachment.store_op = AttachmentStoreOp::Store;
-            depth_attachment.clear_value = Some(1f32.into());
-            RenderingInfo {
-                color_attachments: vec![Some(color_attachment)],
-                depth_attachment: Some(depth_attachment),
-                contents: SubpassContents::Inline,
-                ..Default::default()
-            }
-        };
-
-        // beginning rendering pass
-        command_buffer.begin_rendering(rendering_info).unwrap();
-
-        // draw the static objects
         command_buffer
-            .bind_pipeline_graphics(static_pipeline.clone())
-            .unwrap()
-            .set_viewport(
-                0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: [game_resolution[0] as f32, game_resolution[1] as f32],
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
-            )
+            .begin_rendering({
+                let mut color_attachment =
+                    RenderingAttachmentInfo::image_view(rcx.color_image.clone());
+                color_attachment.store_op = AttachmentStoreOp::Store;
+                color_attachment.load_op = AttachmentLoadOp::Clear;
+                color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
+
+                let mut depth_attachment =
+                    RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
+                depth_attachment.load_op = AttachmentLoadOp::Clear;
+                depth_attachment.store_op = AttachmentStoreOp::Store;
+                depth_attachment.clear_value = Some(1f32.into());
+                RenderingInfo {
+                    color_attachments: vec![Some(color_attachment)],
+                    depth_attachment: Some(depth_attachment),
+                    contents: SubpassContents::Inline,
+                    ..Default::default()
+                }
+            })
             .unwrap();
 
-        let descriptor_set = {
-            let uniform_buffer = {
-                let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-                *buffer.write().unwrap() = global_ubo;
-
-                buffer
-            };
-
-            let layout = &static_pipeline.layout().set_layouts()[0];
-
+        let viewport = viewport(rcx.game_resolution.resolution(window_size));
+        let uniform_buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
+        *uniform_buffer.write().unwrap() =
+            state.create_ubo(window_size[0] as f32 / window_size[1] as f32);
+        let global_set = |pipeline: &GraphicsPipeline| {
             DescriptorSet::new_variable(
                 vulkan.descriptor_set_allocator.clone(),
-                layout.clone(),
+                pipeline.layout().set_layouts()[0].clone(),
                 resources.textures.len() as u32,
                 [
-                    WriteDescriptorSet::buffer(0, uniform_buffer),
+                    WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
                     WriteDescriptorSet::sampler(1, self.game_sampler.clone()),
                     WriteDescriptorSet::image_view_array(2, 0, resources.textures.clone()),
                 ],
@@ -115,339 +81,95 @@ impl Renderer {
         };
 
         command_buffer
+            .bind_pipeline_graphics(pipeline.clone())
+            .unwrap()
+            .set_viewport(0, [viewport.clone()].into_iter().collect())
+            .unwrap()
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
-                static_pipeline.layout().clone(),
+                pipeline.layout().clone(),
                 0,
-                descriptor_set,
+                global_set(&pipeline),
             )
             .unwrap();
 
         for object in state.objects_to_render() {
-            let push_constant = GamePush {
-                model_matrix: object.transform.mat4().to_cols_array_2d(),
-                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-                color: object.color.to_array(),
-                tex_index: object.texture.unwrap_or(-1),
-            };
+            command_buffer
+                .push_constants(
+                    pipeline.layout().clone(),
+                    0,
+                    GamePush {
+                        model_matrix: object.transform.mat4().to_cols_array_2d(),
+                        normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+                        color: object.color.to_array(),
+                        tex_index: object.texture.unwrap_or(-1),
+                    },
+                )
+                .unwrap()
+                .bind_vertex_buffers(0, object.model.vertex_buffer.clone())
+                .unwrap()
+                .bind_index_buffer(object.model.index_buffer.clone())
+                .unwrap();
 
-            for mesh in object.meshes.iter() {
-                match mesh {
-                    Mesh::Skinned(_) => {continue;}
-                    Mesh::Static(mesh) => {
-                        command_buffer
-                            .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
-                            .unwrap()
-                            .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())
-                            .unwrap()
-                            .bind_index_buffer((*mesh.index_buffer).clone())
-                            .unwrap();
-            
-                        unsafe {
-                            command_buffer
-                                .draw_indexed(mesh.index_buffer.len() as u32, 1, 0, 0, 0)
-                                .unwrap();
-                        }
-                    }
-                }
-
-            }
-
+            draw_indexed(command_buffer, object.model.index_buffer.len() as u32);
         }
 
-        // draw the animated objects
         command_buffer
-            .bind_pipeline_graphics(animated_pipeline.clone())
+            .bind_pipeline_graphics(animation_pipeline.clone())
             .unwrap()
-            .set_viewport(
+            .set_viewport(0, [viewport].into_iter().collect())
+            .unwrap()
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                animation_pipeline.layout().clone(),
                 0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: [game_resolution[0] as f32, game_resolution[1] as f32],
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
+                global_set(&animation_pipeline),
             )
             .unwrap();
 
-        // let joints_ubo = {
-        //     let ubo = JointsUbo {
-        //         joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100] // 100 is the MAX_JOINTS in game_animation.vert
-        //     };
+        for object in state.animated_objects_to_render() {
+            let joints_buffer = vulkan
+                .uniform_buffer_allocator
+                .allocate_sized::<JointsUbo>()
+                .unwrap();
+            object.mesh.joint_transforms_to_ubo_buffer(&joints_buffer);
 
-        //     Buffer::from_data(
-        //         vulkan.memory_allocator.clone(),
-        //         BufferCreateInfo {
-        //             usage: BufferUsage::UNIFORM_BUFFER,
-        //             ..Default::default()
-        //         },
-        //         AllocationCreateInfo {
-        //             memory_type_filter: MemoryTypeFilter::PREFER_DEVICE | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-        //             ..Default::default()
-        //         },
-        //         ubo,
-        //     )
-        //     .unwrap()
-        // };
+            command_buffer
+                .bind_descriptor_sets(
+                    PipelineBindPoint::Graphics,
+                    animation_pipeline.layout().clone(),
+                    1,
+                    DescriptorSet::new(
+                        vulkan.descriptor_set_allocator.clone(),
+                        animation_pipeline.layout().set_layouts()[1].clone(),
+                        [WriteDescriptorSet::buffer(0, joints_buffer)],
+                        [],
+                    )
+                    .unwrap(),
+                )
+                .unwrap()
+                .push_constants(
+                    animation_pipeline.layout().clone(),
+                    0,
+                    AnimationPush {
+                        model_matrix: object.transform.mat4().to_cols_array_2d(),
+                        normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
+                        color: object.color.to_array(),
+                        tex_index: object.texture.unwrap_or(-1),
+                        tint_whites: object.tint_whites as i32,
+                    },
+                )
+                .unwrap()
+                .bind_vertex_buffers(0, (*object.mesh.vertex_buffer).clone())
+                .unwrap()
+                .bind_index_buffer((*object.mesh.index_buffer).clone())
+                .unwrap();
 
-        // let descriptor_set = {
-        //     let uniform_buffer = {
-        //         let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-        //         *buffer.write().unwrap() = global_ubo;
-
-        //         buffer
-        //     };
-
-        //     let layout = &animated_pipeline.layout().set_layouts()[0];
-
-        //     DescriptorSet::new_variable(
-        //         vulkan.descriptor_set_allocator.clone(),
-        //         layout.clone(),
-        //         resources.textures.len() as u32,
-        //         [
-        //             WriteDescriptorSet::buffer(0, uniform_buffer),
-        //             WriteDescriptorSet::buffer(1, joints_ubo.clone()),
-        //             WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
-        //             WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
-        //         ],
-        //         [],
-        //     )
-        //     .unwrap()
-        // };
-
-        // command_buffer
-        //     .bind_descriptor_sets(
-        //         PipelineBindPoint::Graphics,
-        //         animated_pipeline.layout().clone(),
-        //         0,
-        //         descriptor_set,
-        //     )
-        //     .unwrap();
-
-        let uniform_buffer = {
-            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-            *buffer.write().unwrap() = global_ubo;
-
-            buffer
-        };
-
-        let layout = &animated_pipeline.layout().set_layouts()[0];
-
-        for object in state.objects_to_render() {
-             let push_constant = GamePush {
-                model_matrix: object.transform.mat4().to_cols_array_2d(),
-                normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-                color: object.color.to_array(),
-                tex_index: object.texture.unwrap_or(-1),
-            };
-
-            for mesh in object.meshes.iter() {
-                match mesh {
-                    Mesh::Static(_) => {continue;}
-                    Mesh::Skinned(mesh) => {
-                        let joints_ubo = {
-                            let mut ubo = JointsUbo {
-                                joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100]
-                            };
-                            let joint_transforms = mesh.get_joint_transforms(); // <-- Récupérer directement les matrices
-                            for i in 0..100 {
-                                ubo.joint_transforms[i] = joint_transforms[i].to_cols_array_2d();
-                            }
-                            
-                            let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-                            *buffer.write().unwrap() = ubo;
-                            buffer
-                        };
-
-                        let descriptor_set = DescriptorSet::new_variable(
-                            vulkan.descriptor_set_allocator.clone(),
-                            layout.clone(),
-                            resources.textures.len() as u32,
-                            [
-                                WriteDescriptorSet::buffer(0, uniform_buffer.clone()),
-                                WriteDescriptorSet::buffer(1, joints_ubo),
-                                WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
-                                WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
-                            ],
-                            [],
-                        )
-                        .unwrap();
-
-                        command_buffer
-                            .bind_descriptor_sets(
-                                PipelineBindPoint::Graphics,
-                                animated_pipeline.layout().clone(),
-                                0,
-                                descriptor_set,
-                            )
-                            .unwrap()
-                            .push_constants(animated_pipeline.layout().clone(), 0, push_constant)
-                            .unwrap()
-                            .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())
-                            .unwrap()
-                            .bind_index_buffer((*mesh.index_buffer).clone())
-                            .unwrap();
-            
-                        unsafe {
-                            command_buffer
-                                .draw_indexed(mesh.index_buffer.len() as u32, 1, 0, 0, 0)
-                                .unwrap();
-                        }
-                    }
-                }
-
-            }
+            draw_indexed(command_buffer, object.mesh.index_buffer.len() as u32);
         }
 
         command_buffer.end_rendering().unwrap();
     }
-
-    // fn animation_pass(&mut self, vulkan: &Vulkan, resources: &Resources, state: &GameState) {
-    //     let (pipeline, command_buffer, rcx) = match (
-    //         self.animation_pipeline.as_ref(),
-    //         self.command_buffer.as_mut(),
-    //         self.rcx.as_ref(),
-    //     ) {
-    //         (Some(pipeline), Some(command_buffer), Some(rcx)) => {
-    //             (pipeline.clone(), command_buffer, rcx)
-    //         }
-    //         (None, _, _) => panic!("Pipeline is not initialized"),
-    //         (_, None, _) => panic!("Command buffer is not started"),
-    //         (_, _, None) => panic!("Render context is not initialized"),
-    //     };
-
-    //     let window_size: [u32; 2] = rcx.swapchain.image_extent();
-    //     let game_resolution = rcx.game_resolution.resolution(window_size);
-
-    //     let global_ubo = {
-    //         let aspect_ratio = window_size[0] as f32 / window_size[1] as f32;
-    //         state.create_ubo(aspect_ratio)
-    //     };
-
-    //     let joints_ubo = {
-    //         let ubo = JointsUbo {
-    //             joint_transforms: [Mat4::IDENTITY.to_cols_array_2d(); 100] // 100 is the MAX_JOINTS in game_animation.vert
-    //         };
-
-    //         Buffer::from_data(
-    //             vulkan.memory_allocator.clone(),
-    //             BufferCreateInfo {
-    //                 usage: BufferUsage::UNIFORM_BUFFER,
-    //                 ..Default::default()
-    //             },
-    //             AllocationCreateInfo {
-    //                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-    //                 ..Default::default()
-    //             },
-    //             ubo,
-    //         )
-    //         .unwrap()
-    //     };
-
-    //     let rendering_info = {
-    //         let mut color_attachment = RenderingAttachmentInfo::image_view(rcx.color_image.clone());
-    //         color_attachment.store_op = AttachmentStoreOp::Store;
-    //         color_attachment.load_op = AttachmentLoadOp::Load;
-    //         //color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-
-    //         let mut depth_attachment = RenderingAttachmentInfo::image_view(rcx.depth_image.clone());
-    //         depth_attachment.load_op = AttachmentLoadOp::Load;
-    //         depth_attachment.store_op = AttachmentStoreOp::Store;
-    //         //depth_attachment.clear_value = Some(1f32.into());
-    //         RenderingInfo {
-    //             color_attachments: vec![Some(color_attachment)],
-    //             depth_attachment: Some(depth_attachment),
-    //             contents: SubpassContents::Inline,
-    //             ..Default::default()
-    //         }
-    //     };
-
-
-
-    //     command_buffer.begin_rendering(rendering_info).unwrap();
-
-    //     command_buffer
-    //         .bind_pipeline_graphics(pipeline.clone())
-    //         .unwrap()
-    //         .set_viewport(
-    //             0,
-    //             [Viewport {
-    //                 offset: [0.0, 0.0],
-    //                 extent: [game_resolution[0] as f32, game_resolution[1] as f32],
-    //                 depth_range: 0.0..=1.0,
-    //             }]
-    //             .into_iter()
-    //             .collect(),
-    //         )
-    //         .unwrap();
-
-    //     let descriptor_set = {
-    //         let uniform_buffer = {
-    //             let buffer = vulkan.uniform_buffer_allocator.allocate_sized().unwrap();
-    //             *buffer.write().unwrap() = global_ubo;
-
-    //             buffer
-    //         };
-
-    //         let layout = &pipeline.layout().set_layouts()[0];
-
-    //         DescriptorSet::new_variable(
-    //             vulkan.descriptor_set_allocator.clone(),
-    //             layout.clone(),
-    //             resources.textures.len() as u32,
-    //             [
-    //                 WriteDescriptorSet::buffer(0, uniform_buffer),
-    //                 WriteDescriptorSet::buffer(1, joints_ubo.clone()),
-    //                 WriteDescriptorSet::sampler(2, self.game_sampler.clone()),
-    //                 WriteDescriptorSet::image_view_array(3, 0, resources.textures.clone()),
-    //             ],
-    //             [],
-    //         )
-    //         .unwrap()
-    //     };
-
-    //     command_buffer
-    //         .bind_descriptor_sets(
-    //             PipelineBindPoint::Graphics,
-    //             pipeline.layout().clone(),
-    //             0,
-    //             descriptor_set,
-    //         )
-    //         .unwrap();
-
-    //     for object in state.objects_to_render().filter(|o| matches!(o.mesh, Mesh::Animated(_))) {
-    //         let push_constant = GamePush {
-    //             model_matrix: object.transform.mat4().to_cols_array_2d(),
-    //             normal_matrix: object.transform.normal_matrix().to_cols_array_2d(),
-    //             color: object.color.to_array(),
-    //             tex_index: object.texture.unwrap_or(-1),
-    //         };
-
-    //         let mesh = match &object.mesh {
-    //             Mesh::Static(_) => {continue;},
-    //             Mesh::Animated(mesh) => mesh
-    //         };
-
-    //         mesh.joint_transforms_to_ubo_buffer(&joints_ubo);
-
-    //         command_buffer
-    //             .push_constants(pipeline.layout().clone(), 0, push_constant)
-    //             .unwrap()
-    //             .bind_vertex_buffers(0, (*mesh.vertex_buffer).clone())
-    //             .unwrap()
-    //             .bind_index_buffer((*mesh.index_buffer).clone())
-    //             .unwrap();
-
-    //         unsafe {
-    //             command_buffer
-    //                 .draw_indexed(mesh.index_buffer.len() as u32, 1, 0, 0, 0)
-    //                 .unwrap();
-    //         }
-    //     }
-
-    //     command_buffer.end_rendering().unwrap();
-    // }
 
     fn postprocess_pass(
         &mut self,
@@ -456,127 +178,79 @@ impl Renderer {
         image_index: u32,
         is_first: bool,
     ) {
-        let (pipeline, command_buffer, rcx) = match (
-            self.post_process_pipeline.as_ref(),
-            self.command_buffer.as_mut(),
-            self.rcx.as_ref(),
-        ) {
-            (Some(pipeline), Some(command_buffer), Some(rcx)) => {
-                (pipeline.clone(), command_buffer, rcx)
-            }
-            (None, _, _) => panic!("Pipeline is not initialized"),
-            (_, None, _) => panic!("Command buffer is not started"),
-            (_, _, None) => panic!("Render context is not initialized"),
-        };
+        let pipeline = self
+            .post_process_pipeline
+            .clone()
+            .expect("post process pipeline");
+        let rcx = self.rcx.as_ref().expect("render context");
+        let command_buffer = self.command_buffer.as_mut().expect("command buffer");
 
-        let rendering_info_info = {
-            let mut color_attachment =
-                RenderingAttachmentInfo::image_view(rcx.images[image_index as usize].clone());
-            color_attachment.store_op = AttachmentStoreOp::Store;
-            color_attachment.load_op = AttachmentLoadOp::Load;
-            if is_first {
-                color_attachment.load_op = AttachmentLoadOp::Clear;
-                color_attachment.clear_value = Some(ClearValue::Float([0.0, 0.0, 0.0, 0.0]));
-            }
-            RenderingInfo {
-                color_attachments: vec![Some(color_attachment)],
-                layer_count: 1,
-                contents: SubpassContents::Inline,
-                ..Default::default()
-            }
-        };
-
-        command_buffer.begin_rendering(rendering_info_info).unwrap();
+        command_buffer
+            .begin_rendering(present_rendering(rcx, image_index, is_first))
+            .unwrap();
         command_buffer
             .bind_pipeline_graphics(pipeline.clone())
             .unwrap()
             .set_viewport(
                 0,
-                [Viewport {
-                    offset: [0.0, 0.0],
-                    extent: rcx.window.inner_size().into(),
-                    depth_range: 0.0..=1.0,
-                }]
-                .into_iter()
-                .collect(),
+                [viewport(rcx.swapchain.image_extent())]
+                    .into_iter()
+                    .collect(),
             )
             .unwrap();
-
-        let layout = &pipeline.layout().set_layouts()[0];
-        let descriptor_set = DescriptorSet::new(
-            vulkan.descriptor_set_allocator.clone(),
-            layout.clone(),
-            [WriteDescriptorSet::image_view_sampler(
-                0,
-                rcx.color_image.clone(),
-                self.game_sampler.clone(),
-            )],
-            [],
-        )
-        .unwrap();
 
         command_buffer
             .bind_descriptor_sets(
                 PipelineBindPoint::Graphics,
                 pipeline.layout().clone(),
                 0,
-                descriptor_set,
-            )
-            .unwrap();
-
-        let vertex_buffer = {
-            let top_left = render_info.top_left_coord;
-            let bottom_right = render_info.bottom_right_coord;
-            let top_right = [bottom_right[0], top_left[1]];
-            let bottom_left = [top_left[0], bottom_right[1]];
-
-            let positions: [[f32; 2]; 6] = [
-                top_right,
-                top_left,
-                bottom_left,
-                bottom_left,
-                bottom_right,
-                top_right,
-            ];
-
-            let uv: [[f32; 2]; 6] = [
-                [1.0, 0.0],
-                [0.0, 0.0],
-                [0.0, 1.0],
-                [0.0, 1.0],
-                [1.0, 1.0],
-                [1.0, 0.0],
-            ];
-
-            let mut vertices = Vec::new();
-            for (position, uv) in positions.into_iter().zip(uv) {
-                let vertex = GuiVertex { position, uv };
-                vertices.push(vertex);
-            }
-
-            Buffer::from_iter(
-                vulkan.memory_allocator.clone(),
-                BufferCreateInfo {
-                    usage: BufferUsage::VERTEX_BUFFER,
-                    ..Default::default()
-                },
-                AllocationCreateInfo {
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                vertices,
+                DescriptorSet::new(
+                    vulkan.descriptor_set_allocator.clone(),
+                    pipeline.layout().set_layouts()[0].clone(),
+                    [WriteDescriptorSet::image_view_sampler(
+                        0,
+                        rcx.color_image.clone(),
+                        self.game_sampler.clone(),
+                    )],
+                    [],
+                )
+                .unwrap(),
             )
             .unwrap()
-        };
-
-        command_buffer
-            .bind_vertex_buffers(0, vertex_buffer)
+            .push_constants(
+                pipeline.layout().clone(),
+                0,
+                PostPush {
+                    pixel: matches!(rcx.game_resolution, Resolution::Pixel(_)) as i32,
+                },
+            )
             .unwrap();
 
-        unsafe {
-            command_buffer.draw(6, 1, 0, 0).unwrap();
-        }
+        let top_left = render_info.top_left_coord;
+        let bottom_right = render_info.bottom_right_coord;
+        let top_right = [bottom_right[0], top_left[1]];
+        let bottom_left = [top_left[0], bottom_right[1]];
+
+        command_buffer
+            .bind_vertex_buffers(
+                0,
+                vertex_buffer(
+                    vulkan,
+                    [
+                        (top_right, [1.0, 0.0]),
+                        (top_left, [0.0, 0.0]),
+                        (bottom_left, [0.0, 1.0]),
+                        (bottom_left, [0.0, 1.0]),
+                        (bottom_right, [1.0, 1.0]),
+                        (top_right, [1.0, 0.0]),
+                    ]
+                    .into_iter()
+                    .map(|(position, uv)| GuiVertex { position, uv }),
+                ),
+            )
+            .unwrap();
+
+        draw(command_buffer, 6);
 
         command_buffer.end_rendering().unwrap();
     }
